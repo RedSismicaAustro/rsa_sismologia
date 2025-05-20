@@ -1,0 +1,52 @@
+# Bytecode de Python y temporales
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.bak
+*.swp
+*.tmp
+*.log
+
+# Archivos y carpetas de entorno
+.venv/
+env/
+.conda/
+.env
+envs/
+*.env
+
+# Qt Designer temporales
+*.ui~
+
+# Archivos de datos y resultados
+datos/
+*.csv
+*.mseed
+*.sis
+*.pdf
+*.json
+*.conf
+*.xml
+*.xlsx
+*.zip
+
+# Carpetas externas
+pruebas/
+modulos_externos/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Builds y empaquetados
+build/
+dist/
+*.egg-info/
+*.spec
+
