@@ -30,7 +30,7 @@ class CustomScrollArea(QScrollArea):
 
 
 class Marcar_evento(QMainWindow):
-    def __init__(self, directorio_trabajo, parent=None):
+    def __init__(self, directorio_trabajo, usuario, parent=None):
         super().__init__(parent)
         self.directorio_trabajo = directorio_trabajo
         self.setWindowTitle("Marcado de eventos")
@@ -297,7 +297,7 @@ class Marcar_evento(QMainWindow):
             self.archivos_mseed =[]
         # Ordenar los archivos MSEED según el orden de las estaciones
         estaciones = self.mapa_estaciones['CODIGO']
-        imprimir_plt = self.mapa_estaciones['HAB_PLT']
+        imprimir_plt = self.mapa_estaciones['HAB_CANAL']
         # Crear una lista para almacenar archivos MSEED junto con su posición de orden
         archivos_con_posicion = []
         for archivo in self.archivos_mseed:

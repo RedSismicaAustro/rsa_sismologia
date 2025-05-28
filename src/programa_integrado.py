@@ -19,9 +19,6 @@ if ruta_librerias not in sys.path:
 if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
-
-
-
 import os
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMessageBox, QToolBar, QLabel, QVBoxLayout, QWidget,QGridLayout,QComboBox,QFileDialog,QPushButton
@@ -31,235 +28,12 @@ from PyQt5 import QtWidgets
 from subprogramas.fases import VentanaPrincipal as FasesVentana  # Usando la clase para integrar
 from subprogramas.extraer_integrado import Extraer_evento
 from subprogramas.marcar_eventos import Marcar_evento
+from subprogramas.inicio import Inicio_proceso
 from datetime import datetime, timedelta
 from metodos_rsa import lectura_archivo
 from metodos_gestion import obtener_directorios
 import subprocess
 import csv
-
-class EstadoProcesamientoSismico(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.initUI()
-
-    def initUI(self):
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-
-        # Colocar la ventana en la esquina superior izquierda y maximizarla
-        self.move(0, 0)
-        self.showMaximized()
-
-        # Etiqueta para mostrar la fecha y hora actual
-        self.lbl_fecha_hora = QLabel()
-        self.lbl_fecha_hora.setAlignment(Qt.AlignCenter)
-        self.lbl_fecha_hora.setStyleSheet("font-size: 24pt; font-weight: bold;")
-        layout.addWidget(self.lbl_fecha_hora)
-        
-        # Grid para mostrar los indicadores de estado
-        self.grid_estado = QGridLayout()
-        layout.addLayout(self.grid_estado)
-
-        # Inicializar la cuadrícula de estado
-        self.inicializar_grid_estado()
-
-        # Configurar temporizadores
-        self.timer_reloj = QTimer(self)
-        self.timer_reloj.timeout.connect(self.actualizar_reloj)
-        self.timer_reloj.start(1000)  # Actualizar cada segundo
-
-        self.timer_estado = QTimer(self)
-        self.timer_estado.timeout.connect(self.actualizar_estado)
-        self.timer_estado.start(60000)  # Actualizar cada minuto
-
-        # Actualizar el estado inicial
-        self.actualizar_estado()
-
-    def inicializar_grid_estado(self):
-        etiquetas = ['00H-12H', '12H-18H', '18H-24H', 'DIARIO', 'ESTACIONES']
-        for col, etiqueta in enumerate(etiquetas):
-            self.grid_estado.addWidget(QLabel(etiqueta), 0, col + 1, alignment=Qt.AlignCenter)
-
-        for row in range(3):
-            fecha = (datetime.now() - timedelta(days=2-row)).strftime('%d/%m/%Y')
-            self.grid_estado.addWidget(QLabel(fecha), row + 1, 0, alignment=Qt.AlignRight)
-
-    def actualizar_reloj(self):
-        fecha_hora_actual = QDateTime.currentDateTime().toString('dd/MM/yyyy HH:mm:ss')
-        self.lbl_fecha_hora.setText(fecha_hora_actual)
-
-    def actualizar_estado(self):
-        for row in range(3):
-            fecha = datetime.now() - timedelta(days=2-row)
-            fecha_str = fecha.strftime('%y%m%d000000')
-            self.directorio_trabajo='G:/Mi unidad/DIA/'
-            directorios = obtener_directorios(fecha_str)
-            archivo_csv=self.directorio_trabajo+directorios['archivo_csv']
-            archivo_sis = [fila[1] for fila in lectura_archivo(archivo_csv)]
-            archivo_fas = [elemento[:-3] + "fas" if elemento.endswith("sis") else elemento for elemento in archivo_sis]
-
-            periodos = [
-                ('000000', '115959'),
-                ('120000', '175959'),
-                ('180000', '235959')
-            ]
-
-            for col, (inicio, fin) in enumerate(periodos):
-                archivo_periodo = f"{fecha_str[:8]}{inicio}.sis"
-                estado = os.path.exists(os.path.join(directorios['Directorio_dia'], archivo_periodo)) and \
-                         os.path.exists(os.path.join(directorios['Directorio_dia'], archivo_fas))
-                self.actualizar_celda_estado(row + 1, col + 1, estado)
-
-            # Verificar DIARIO
-            archivo_diario = f"{fecha_str[2:8]}000000_rep.pdf"
-            estado_diario = os.path.exists(os.path.join(directorios['Directorio_dia'], archivo_diario))
-            self.actualizar_celda_estado(row + 1, 4, estado_diario)
-
-            # Verificar ESTACIONES
-            
-            archivo_estaciones = f"{fecha_str[2:8]}000000_est.csv"
-            estado_estaciones = os.path.exists(os.path.join(directorios['Directorio_dia'], archivo_estaciones))
-            self.actualizar_celda_estado(row + 1, 5, estado_estaciones)
-
-    def actualizar_celda_estado(self, row, col, estado):
-        # Verifica si ya existe un widget en la posición
-        item = self.grid_estado.itemAtPosition(row, col)
-    
-        if item is None:  # Si no hay widget en la celda, creamos uno nuevo
-            widget = QLabel()
-            self.grid_estado.addWidget(widget, row, col)
-        else:
-            widget = item.widget()
-
-        # Configura el tamaño y el color del widget según el estado
-        widget.setFixedSize(30, 30)
-        widget.setStyleSheet(f"background-color: {'green' if estado else 'red'}; border: 1px solid black;")
-
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        for row in range(1, 4):
-            for col in range(1, 6):
-                widget = self.grid_estado.itemAtPosition(row, col).widget()
-                if widget:
-                    color = QColor(widget.styleSheet().split(':')[1].split(';')[0].strip())
-                    painter.setBrush(QBrush(color))
-                    painter.drawRect(widget.geometry())
-
-# Función para leer el archivo CSV delimitado por ;
-def obtener_responsables(ruta_csv):
-    try:
-        ruta_completa = os.path.join(os.path.dirname(__file__), ruta_csv)
-        
-        with open(ruta_completa, newline='', encoding='utf-8') as archivo:
-            lector_csv = csv.reader(archivo, delimiter=';')  # Leer con delimitador ;
-            responsables = [fila[0] for fila in lector_csv if fila]  # Tomar solo la primera columna
-        return responsables
-    except FileNotFoundError:
-        QMessageBox.critical(None, "Error", f"No se encontró el archivo: {ruta_csv}")
-        return []
-    except Exception as e:
-        QMessageBox.critical(None, "Error", f"Error al leer el archivo CSV: {e}")
-        return []
-
-
-# Clase para la ventana secundaria
-class VentanaSecundaria(QWidget):
-    def __init__(self, parent, ruta_csv):
-        super().__init__()
-        self.setWindowTitle("Seleccionar Responsable y Directorio")
-        self.setGeometry(100, 100, 500, 400)
-
-        # Guardar referencia al padre (VentanaPrincipal)
-        self.parent = parent
-
-        # Layout principal
-        layout = QVBoxLayout()
-
-        # Etiqueta del reloj
-        self.reloj = QLabel("")
-        self.reloj.setFont(QFont("Arial", 14, QFont.Bold))  # Mismo tamaño que el responsable y directorio
-        self.reloj.setAlignment(Qt.AlignLeft)  # Alineada a la izquierda
-        layout.addWidget(self.reloj)
-
-        # Iniciar el reloj en tiempo real
-        self.iniciar_reloj()
-
-        # Leer datos del archivo CSV
-        self.responsables = obtener_responsables(ruta_csv)
-
-        # Inicializar la variable 'responsable' con el primer valor del CSV
-        self.parent.usuario = self.responsables[0] if self.responsables else "No disponible"
-
-        # Etiqueta para mostrar la información seleccionada (tamaño de letra más grande)
-        self.etiqueta_informacion = QLabel(f"Responsable: {self.parent.usuario}\nDirectorio: {self.parent.directorio_trabajo}")
-        self.etiqueta_informacion.setFont(QFont("Arial", 14, QFont.Bold))
-        self.etiqueta_informacion.setAlignment(Qt.AlignLeft)  # Alineada a la izquierda
-        layout.addWidget(self.etiqueta_informacion)
-
-        # Etiqueta: Selecciona un responsable
-        etiqueta_responsable = QLabel("Selecciona un responsable:")
-        etiqueta_responsable.setFont(QFont("Arial", 10))
-        etiqueta_responsable.setAlignment(Qt.AlignLeft)  # Alineada a la izquierda
-        layout.addWidget(etiqueta_responsable)
-
-        # Lista desplegable (QComboBox)
-        self.combo_responsables = QComboBox()
-        self.combo_responsables.addItems(self.responsables)
-        self.combo_responsables.setCurrentIndex(0)  # Seleccionar el primer valor por defecto
-        self.combo_responsables.setFixedWidth(200)  # Reducir el tamaño de la lista desplegable
-        layout.addWidget(self.combo_responsables, alignment=Qt.AlignCenter)  # Centrada
-
-        # Botón para seleccionar un directorio
-        boton_seleccionar_directorio = QPushButton("Seleccionar Directorio")
-        boton_seleccionar_directorio.setFixedWidth(200)  # Ancho ajustado
-        layout.addWidget(boton_seleccionar_directorio, alignment=Qt.AlignCenter)
-        boton_seleccionar_directorio.clicked.connect(self.seleccionar_directorio)
-
-        # Botón para salir
-        boton_salir = QPushButton("Salir")
-        boton_salir.setFixedWidth(200)  # Ancho ajustado
-        layout.addWidget(boton_salir, alignment=Qt.AlignCenter)
-        boton_salir.clicked.connect(self.cerrar_ventana)
-
-        # Configurar el layout
-        self.setLayout(layout)
-
-    def iniciar_reloj(self):
-        """Inicia el reloj que se actualiza cada segundo."""
-        timer = QTimer(self)
-        timer.timeout.connect(self.actualizar_reloj)
-        timer.start(1000)  # Actualizar cada segundo
-        self.actualizar_reloj()  # Actualización inicial
-
-    def actualizar_reloj(self):
-        """Actualiza la etiqueta del reloj con la hora actual."""
-        hora_actual = QTime.currentTime().toString("hh:mm:ss")
-        self.reloj.setText(f"Hora actual: {hora_actual}")
-
-    def actualizar_informacion(self):
-        """Actualiza la etiqueta con el responsable seleccionado y el directorio actual."""
-        self.parent.usuario = self.combo_responsables.currentText()
-        texto = f"Responsable: {self.parent.usuario}\nDirectorio: {self.parent.directorio_trabajo}"
-        self.etiqueta_informacion.setText(texto)
-
-    def seleccionar_directorio(self):
-        """Permite seleccionar un directorio y muestra la información en la etiqueta."""
-        directorio = QFileDialog.getExistingDirectory(self, "Selecciona un directorio de trabajo")
-        if directorio:
-            self.parent.directorio_trabajo = directorio  # Actualizar el directorio actual en el padre
-            texto = f"Responsable: {self.parent.usuario}\nDirectorio: {self.parent.directorio_trabajo}"
-            self.etiqueta_informacion.setText(texto)
-            QMessageBox.information(self, "Directorio Seleccionado", f"Directorio seleccionado: {directorio}")
-        else:
-            QMessageBox.warning(self, "Sin Selección", "No seleccionaste ningún directorio.")
-
-    def cerrar_ventana(self):
-        """Cierra la ventana secundaria."""
-        self.close()
-
 
 class VentanaPrincipal(QMainWindow):
     def __init__(self):
@@ -279,17 +53,55 @@ class VentanaPrincipal(QMainWindow):
         self.RAIZ_PROYECTO=os.path.join(self.RAIZ_PROYECTO, "..")
         ruta_csv =  os.path.join(self.RAIZ_PROYECTO, "datos", "responsables.csv")
         ruta_csv = os.path.abspath(ruta_csv)
-        # Crear y mostrar la ventana secundaria al iniciar
-        self.ventana_secundaria = VentanaSecundaria(self, ruta_csv)  # Pasar self como referencia al padre
-        self.ventana_secundaria.show()
         
+    def limpiar_variables_temporales(self):
+        """Elimina atributos temporales, conservando los esenciales para la UI."""
+        atributos_permitidos = {
+            'directorio_trabajo',
+            'usuario',
+            'periodo',
+            'menu_inicio',
+            'menu_configuracion',
+            'menu_procesamiento',
+            'menu_informes',
+            'menu_ayuda',
+            'barra_menu',
+            'barra_herramientas',
+            'etiqueta_logo',
+            'etiqueta_titulo',
+            'widget_central',
+            'layout_principal',
+            'RAIZ_PROYECTO'
+            }
+        for atributo in list(self.__dict__.keys()):
+            if atributo not in atributos_permitidos:
+                delattr(self, atributo)
+
         
     def init_ui(self):
         # Crear barra de menú
         self.barra_menu = self.menuBar()
+ 
         
         ##########################################################################################
-        #  Menú uno: Configuración
+        #  Menú uno: Inicio
+        ##########################################################################################
+        # Crear menú Configuración
+        self.menu_inicio = self.barra_menu.addMenu('Inicio')
+
+        # Crear acción Directorio de trabajo
+        self.accion_inicializar_dia = QAction('Inicializacion de dia', self)
+        self.accion_inicializar_dia.triggered.connect(self.inicializar_dia)
+        self.menu_inicio.addAction(self.accion_inicializar_dia)
+
+        # Crear acción Salir
+        self.accion_salir = QAction('Salir', self)
+        self.accion_salir.triggered.connect(self.salir)
+        self.menu_inicio.addAction(self.accion_salir)
+ 
+ 
+        ##########################################################################################
+        #  Menú dos: Configuración
         ##########################################################################################
         # Crear menú Configuración
         self.menu_configuracion = self.barra_menu.addMenu('Configuración')
@@ -322,13 +134,8 @@ class VentanaPrincipal(QMainWindow):
         self.menu_configuracion.addAction(self.accion_ingresar_datos_ev)
 
 
-        # Crear acción Salir
-        self.accion_salir = QAction('Salir', self)
-        self.accion_salir.triggered.connect(self.salir)
-        self.menu_configuracion.addAction(self.accion_salir)
-
         ##########################################################################################
-        #  Menú dos: procesamiento
+        #  Menú tres: procesamiento
         ##########################################################################################
 
         # Crear menú Procesamiento
@@ -363,7 +170,7 @@ class VentanaPrincipal(QMainWindow):
 
 
         ##########################################################################################
-        #  Menú tres: Informes
+        #  Menú cuatro: Informes
         ##########################################################################################
 
 
@@ -392,7 +199,7 @@ class VentanaPrincipal(QMainWindow):
         self.menu_informes.addAction(self.accion_shapes)
 
         ##########################################################################################
-        #  Menú cuatro: Ayuda
+        #  Menú cinco: Ayuda
         ##########################################################################################
 
 
@@ -428,15 +235,42 @@ class VentanaPrincipal(QMainWindow):
         self.setCentralWidget(self.widget_central)
         self.layout_principal = QVBoxLayout(self.widget_central)
 
+
+        # Solo el menú de Inicio queda habilitado al principio
+        self.menu_configuracion.setEnabled(False)
+        self.menu_procesamiento.setEnabled(False)
+        self.menu_informes.setEnabled(False)
+        self.menu_ayuda.setEnabled(False)
+
+
         # Agregar el componente de estado de procesamiento sísmico
         #self.estado_sismico = EstadoProcesamientoSismico()
         #self.layout_principal.addWidget(self.estado_sismico)
 
+
         ##########################################################################################
-        #  Menú uno: Configuración
+        #  Menú uno: Inicio
+        ##########################################################################################
+
+    def inicializar_dia(self):
+        print("INICIALIZANDO DIA")
+        self.limpiar_variables_temporales()
+        Inicio_proceso(self.directorio_trabajo,self.usuario)
+        self.menu_configuracion.setEnabled(True)
+        self.menu_procesamiento.setEnabled(True)
+        self.menu_informes.setEnabled(True)
+        self.menu_ayuda.setEnabled(True)
+
+
+    def salir(self):
+        self.close()
+
+        ##########################################################################################
+        #  Menú dos: Configuración
         ##########################################################################################
 
     def seleccionar_drive(self):
+        self.limpiar_variables_temporales()
         folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Select Folder')
         if folderpath[-1]=='/':
             folderpath=folderpath
@@ -444,39 +278,38 @@ class VentanaPrincipal(QMainWindow):
             folderpath=folderpath+'/'
         self.directorio_trabajo=folderpath
 
- 
-
-
     def estaciones(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         QMessageBox.information(self, 'Configuración', 'Configuración de estaciones.')
         self.habilitar_menus()
 
     def enlaces_digitales(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         QMessageBox.information(self, 'Configuración', 'Configuración de enlaces digitales.')
         self.habilitar_menus()
 
     def ingresar_datos_estacion_rg(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         QMessageBox.information(self, 'Configuración', 'Ingresar datos de estación en registro continuo')
         self.habilitar_menus()
 
     def ingresar_datos_estacion_ev(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         QMessageBox.information(self, 'Configuración', 'Ingresar datos de estación en eventos')
         self.habilitar_menus()
 
-    def salir(self):
-        self.close()
-
         ##########################################################################################
-        #  Menú dos: procesamiento
+        #  Menú tres: procesamiento
         ##########################################################################################
 
 
     def mostrar_fases(self):
         # Deshabilitar menús al ejecutar esta acción
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
 
         # Integrar la funcionalidad de Fases en la ventana principal
@@ -492,9 +325,10 @@ class VentanaPrincipal(QMainWindow):
 
     def marcar_eventos(self):
         # Deshabilitar menús al ejecutar esta acción
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         # Integrar la funcionalidad de Marcar Eventos en la ventana principal
-        self.marcar_evento = Marcar_evento(self.directorio_trabajo)
+        self.marcar_evento = Marcar_evento(self.directorio_trabajo,self.usuario)
         self.setCentralWidget(self.marcar_evento)
         self.marcar_evento.showMaximized()
         # Actualizar el título después de haber cambiado el widget central
@@ -503,18 +337,19 @@ class VentanaPrincipal(QMainWindow):
         self.marcar_evento.closeEvent =  self.restaurar_estado_sismico
 
     def procesamiento(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         QMessageBox.information(self, 'Procesamiento', 'Procesamiento')
         self.habilitar_menus()
 
     def extraer_eventos(self):
+        self.limpiar_variables_temporales()
         # Deshabilitar menús al ejecutar esta acción
         self.deshabilitar_menus()
         
         # Integrar la funcionalidad de Extraer Eventos en la ventana principal
-        self.extraer_eventos = Extraer_evento()
-        #self.setCentralWidget(self.extraer_eventos)
-        self.extraer_eventos.show()
+        self.extraer_eventos = Extraer_evento(self.directorio_trabajo,self.usuario)
+        self.setCentralWidget(self.extraer_eventos)
         self.extraer_eventos.showMaximized()
 
         # Actualizar el título después de haber cambiado el widget central
@@ -524,6 +359,7 @@ class VentanaPrincipal(QMainWindow):
         self.extraer_eventos.closeEvent = self.restaurar_estado_sismico
 
     def reextracion(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         QMessageBox.information(self, 'Procesamiento', 'Reextraccion')
         self.habilitar_menus()
@@ -534,6 +370,7 @@ class VentanaPrincipal(QMainWindow):
 
 
     def reporte_diario(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
 
         # Método que se ejecuta cuando se selecciona la acción en el menú
@@ -547,17 +384,20 @@ class VentanaPrincipal(QMainWindow):
         self.habilitar_menus()
 
     def reporte_periodo(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         QMessageBox.information(self, 'Informe', 'Reporte Periodo.')
         self.habilitar_menus()
 
     def reporte_enjambre(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         QMessageBox.information(self, 'Informe', 'Reporte Enjambre.')
         self.habilitar_menus()
 
 
     def creacion_shapes(self):
+        self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         QMessageBox.information(self, 'Informe', 'Cracion de Shapes')
         self.habilitar_menus()
@@ -583,13 +423,8 @@ class VentanaPrincipal(QMainWindow):
         self.update()
 
     def restaurar_estado_sismico(self, event):
-        # Restaurar la pantalla principal de EstadoProcesamientoSismico
-        #self.setCentralWidget(self.estado_sismico)
-        #self.estado_sismico.move(0, 0)
-        #self.estado_sismico.showMaximized()
-        # Restaurar el título original
+        self.limpiar_variables_temporales()  # <- limpieza al cerrar submenú
         self.actualizar_titulo('PROCESAMIENTO INTEGRADO')
-        # Habilitar todos los elementos del menú.
         self.habilitar_menus()
         event.accept()
 

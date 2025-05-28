@@ -25,10 +25,10 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
                              QLabel, QMessageBox, QCheckBox)
 from PyQt5 import uic
 from PyQt5 import QtWidgets
-from librerias.metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,
+from metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,
                          filtro_evento,extraccion_, diagnostico_memoria)
 
-from librerias.metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
+from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
 
 datos_sismo={}
 
@@ -44,10 +44,10 @@ import copy
 #from obspy import read, UTCDateTime
 import gc
 import psutil
-
+from obspy.core.trace import Trace
     
 class Extraer_evento(QMainWindow):
-    def __init__(self):
+    def __init__(self, directorio_trabajo, usuario, parent=None):
         super().__init__()
         self.setWindowTitle('Extraer Eventos')
         # Configurar el layout principal
@@ -219,10 +219,30 @@ class Extraer_evento(QMainWindow):
 
 
     def guardar_evento(self):
-        print("Guardando evento:", self.archivo)
-        bandera_ajuste = 1 if self.chkBx_ajuste.checkState() == 2 else 0
+        print(f"Guardando evento: {self.archivo}")
 
+        # 🔄 Limpieza del visor antes de guardar
         try:
+            print(">> Limpiando visor")
+            self.limpiar_visor()
+        except Exception as e:
+            print("[ERROR] Fallo al limpiar visor:", e)
+
+        # 🧼 Liberar estructuras grandes manualmente
+        try:
+            print(">> Liberando estructuras internas")
+            if hasattr(self, 'trCanal'):
+                self.trCanal = None
+            if hasattr(self, 'lectura_mseed_dia'):
+                self.lectura_mseed_dia = None
+            gc.collect()
+            diagnostico_memoria("Después de liberar memoria antes de guardar")
+        except Exception as e:
+            print("[ERROR] al liberar estructuras:", e)
+
+        # ✅ Llamada segura a extraccion_
+        try:
+            print(">> Llamando a extraccion_()")
             extraccion_(
                 self.archivo,
                 self.cmbx_eventos.currentIndex() + 1,
@@ -231,29 +251,35 @@ class Extraer_evento(QMainWindow):
                 self.t_final,
                 self.estaciones_eventos_total,
                 self.estaciones_eventos,
-                bandera_ajuste,
-                self.registro_tiempo,
                 self.filtros_estaciones
-                )
+            )
         except Exception as e:
-            QMessageBox.critical(self, "Error al guardar", f"Fallo en la extracción:\n{e}")
             import traceback
+            print("[ERROR] en extraccion_():", e)
             traceback.print_exc()
+            QMessageBox.critical(self, "Error al guardar", f"Fallo en la extracción:\n{e}")
             return
 
-        self.Lbl_Mensajes_2.setText("Ultimo : Marca " + str(self.cmbx_eventos.currentIndex() + 1))
-        self.grupo_evento.setEnabled(False)
-        self.limpiar_visor()
-        diagnostico_memoria("Despues de  guardar evento")
+        # 🧹 Limpiar visor de nuevo después del guardado
         try:
-            del self.trCanal
-            del self.lectura_mseed_dia
-            gc.collect()
-            diagnostico_memoria("Memoria tras limpiar")
+            self.limpiar_visor()
+            diagnostico_memoria("Después de guardar evento")
+            self.Lbl_Mensajes_2.setText("Último: Marca " + str(self.cmbx_eventos.currentIndex() + 1))
+            self.grupo_evento.setEnabled(False)
         except Exception as e:
-            print("Error al liberar memoria:", e)
-        
+            print("[ERROR] al limpiar después de guardar:", e)
+
+        # 🔁 Refrescar estructura de control
+        try:
+            self.trCanal = None
+            self.lectura_mseed_dia = None
+            gc.collect()
+            diagnostico_memoria("Memoria tras limpieza final")
+        except Exception as e:
+            print("[ERROR] final al liberar memoria:", e)
+
         print("Evento guardado correctamente.")
+
 
 
  
@@ -263,46 +289,80 @@ class Extraer_evento(QMainWindow):
         self.Lbl_Mensajes_2.setText(text)
 
     def cargar_eventos(self):
+        print(">> Iniciando carga de eventos")
         
-        self.visor.clear()  
+        # Limpiar visor y estructuras anteriores
+        self.limpiar_visor()
+        self.trCanal = None
+        self.lectura_mseed_dia = None
+        gc.collect()
+        diagnostico_memoria("Después de limpiar estructuras previas")
+
+        # Estado de controles de la GUI
         self.grupo_evento.setEnabled(True)
         self.grupo_guardar.setEnabled(False)
         self.grupo_cortar.setEnabled(True)
         self.grupo_desplazar.setEnabled(False)
-        self.bandera_marcas=1
-        self.estaciones_eventos=[]
-        self.filtros_estaciones=[]
-        for i in range(0, len(self.parametros['CODIGO'])):#Verifica todos los archivos MSEED de registro continuo encontrados en la base de datos.
-            nombreMseed = self.directorio_registros+"/"+self.parametros['CODIGO'][i]+self.fecha_.strftime('_%Y%m%d_%H%M%S.mseed')
+
+        self.bandera_marcas = 1
+        self.estaciones_eventos = []
+        self.filtros_estaciones = []
+
+        # Verificar archivos mseed existentes
+        for i in range(len(self.parametros['CODIGO'])):
+            nombreMseed = os.path.join(
+                self.directorio_registros,
+                self.parametros['CODIGO'][i] + self.fecha_.strftime('_%Y%m%d_%H%M%S.mseed')
+            )
             try:
-                auxiliar=open(nombreMseed,'r')
-                auxiliar.close
-                self.estaciones_eventos.append(self.parametros['NUM_ESTACION'][i])
-                self.filtros_estaciones.append('000000')
+                with open(nombreMseed, 'r'):
+                    self.estaciones_eventos.append(self.parametros['NUM_ESTACION'][i])
+                    self.filtros_estaciones.append('000000')
             except FileNotFoundError:
                 pass
-        self.estaciones_eventos_total=self.estaciones_eventos
-        hora_sismo=lectura_eventos(self.archivo)[1]
-        a= self.cmbx_eventos.currentIndex()
-        self.lectura_mseed_dia=leer_mseed(self.archivo,0)#leer_mseed(self.archivo,tipo):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        for i in range(0,101):
-            if self.trCanal[i]!=[]:
-                tiempo=self.trCanal[i][0].stats.starttime
-                self.registro_tiempo=i
+
+        self.estaciones_eventos_total = self.estaciones_eventos.copy()
+
+        # Obtener tiempo del evento desde el CSV
+        hora_sismo = lectura_eventos(self.archivo)[1]
+        indice_evento = self.cmbx_eventos.currentIndex()
+
+        tiempo_segundo = hora_sismo[indice_evento] / 64
+
+        self.t_inicio = tiempo_segundo - 420
+        self.t_final = tiempo_segundo + 420
+
+        # Leer mseed completo
+        print(">> Leyendo mseed desde archivo")
+        self.lectura_mseed_dia = leer_mseed(self.archivo, 0)
+
+        # ⚠️ Copia segura del Stream
+        self.trCanal = self.lectura_mseed_dia.copy()
+
+        # Determinar tiempo inicial del registro
+        for i in range(min(101, len(self.trCanal))):
+            traza = self.trCanal[i]
+            if isinstance(traza, Trace) and hasattr(traza, 'data') and len(traza.data) > 0:
+                self.registro_tiempo = i
                 break
-        hora=tiempo.hour
-        minuto=tiempo.minute
-        segundo=tiempo.second
-        hora_inicio=(hora*3600+minuto*60+segundo)
-        tiempo_segundo=(hora_sismo[a])/64-hora_inicio  #t=trCanal[0][0].stats.starttime
-        self.limpiar_visor()
-        self.t_inicio=tiempo_segundo-420
-        self.t_final=tiempo_segundo+420
-        #el metodo grafico_evento grafica el evento con los canales habilitados en trCanal(los 16 canales 
-        #del registro contínuo, con t_inicio y t_final como límites)
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
-        self.Lbl_Mensajes.setText("Actual: Evento " + str(a+1)) #self.Lbl_Mensajes.setText("Evento " + str(a)+"    Hora:"+text)
+ 
+
+        # Graficar el evento
+        print(">> Graficando evento en visor")
+        grafico_evento_int(
+            self.visor,
+            self.canvas,
+            self.trCanal,
+            self.t_inicio,
+            self.t_final,
+            self.estaciones_eventos,
+            self.hab_grafico,
+            self.bandera_marcas,
+            self.pagina
+        )
+
+        self.Lbl_Mensajes.setText(f"Actual: Evento {indice_evento + 1}")
+
         
     def cargar_eventos_fijo(self):
         # Limpia la figura antes de graficar un nuevo evento

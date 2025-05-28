@@ -1,3 +1,24 @@
+import sys
+import os
+from pathlib import Path
+def extraer_hasta_directorio(ruta_completa, nombre_directorio):
+    partes = Path(ruta_completa).parts
+    if nombre_directorio in partes:
+        indice = partes.index(nombre_directorio)
+        ruta_recortada = Path(*partes[:indice + 1])
+        return str(ruta_recortada) + '/'
+    else:
+        return ''
+ruta_librerias=os.path.dirname(__file__)
+ruta_proyecto=extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
+ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
+
+# Insertar la ruta al inicio del sys.path
+if ruta_librerias not in sys.path:
+    sys.path.insert(0, ruta_librerias)
+
+
+
 import geopandas as gpd
 import pandas as pd
 import os
@@ -22,7 +43,8 @@ def catalogo_gis(catalogo):
     Returns:
         None
     """
-    file_path = './GIS/ecuador.shp'
+
+    file_path=os.path.join(ruta_proyecto,'datos','GIS','ecuador.shp')
     mapa_ec = gpd.read_file(file_path)
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
     mapa_ec.plot(ax=ax, color='lightgrey')  # Cargar el mapa de Ecuador como fondo
@@ -67,7 +89,7 @@ def catalogo_gis_(catalogo,indice):
         profundidad=catalogo[1][9]
         magnitud=catalogo[1][15]
         epicentro=catalogo[1][19]        
-    file_path = '.\GIS\ecuador.shp'
+    file_path=os.path.join(ruta_proyecto,'datos','GIS','ecuador.shp')
     mapa_ec = gpd.read_file(file_path)
     # Control del tamaño de la figura del mapa
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
@@ -126,7 +148,7 @@ def proceso_gis(widget, procesamiento, archivo_estaciones):
     gdf_1,estaciones = cobertura_red(archivo_estaciones, 50)
     gdf_2,estaciones = cobertura_red(archivo_estaciones, 150)
     ext = len(procesamiento)
-    file_path = './GIS/ecuador.shp'
+    file_path=os.path.join(ruta_proyecto,'datos','GIS','ecuador.shp')
     mapa_ec = gpd.read_file(file_path)
     ax.axis([-81.5, -75, -5, 1.5])
     ax.set_title('SISMO', pad=20, fontdict={'fontsize': 16, 'color': '#4873ab'})
@@ -194,7 +216,7 @@ def proceso_gis_(procesamiento,archivo_estaciones):
     gdf_1,estaciones = cobertura_red(archivo_estaciones,50)
     gdf_2,estaciones = cobertura_red(archivo_estaciones,150)
     ext=len(procesamiento)
-    file_path = '.\GIS\ecuador.shp'
+    file_path=os.path.join(ruta_proyecto,'datos','GIS','ecuador.shp')
     mapa_ec = gpd.read_file(file_path)
     # Control del tamaño de la figura del mapa
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
@@ -252,7 +274,7 @@ def graficar_catalogo_gis(catalogo):
   """
 
   # Carga del shapefile de Ecuador
-  file_path = '.\GIS\ecuador.shp'
+  file_path=os.path.join(ruta_proyecto,'datos','GIS','ecuador.shp')
   mapa_ec = gpd.read_file(file_path)
 
   # Control del tamaño de la figura del mapa
@@ -319,7 +341,7 @@ def cobertura_red(archivo,distancia):
     
     bandera=0
     if not os.path.exists(archivo):
-        archivo="estaciones.csv"
+        archivo=os.path.join(ruta_proyecto,'datos','estaciones.csv')
         bandera=1
         
     estaciones_completa=lectura_archivo(archivo)

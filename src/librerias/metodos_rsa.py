@@ -61,7 +61,6 @@ def leer_mseed(archivo, tipo, t_inicio=None, t_final=None):
     nombre_canal = parametros['CODIGO']
     num_estaciones = len(nombre_canal)
     fecha_ = obtencion_hora(archivo)
-    
     trCanal = [[] for _ in range(num_estaciones)]
 
     # Convertimos t_inicio y t_final a UTCDateTime
@@ -76,7 +75,7 @@ def leer_mseed(archivo, tipo, t_inicio=None, t_final=None):
         if tipo != 0:
             nombreMseed = f"{directorios['Directorio_eventos']}/{nombre_canal[i]}{fecha_.strftime('_%Y%m%d_%H%M%S.mseed')}"
         else:
-            nombreMseed = f"{directorios['Directorio_registros']}/{nombre_canal[i]}{fecha_.strftime('_%Y%m%d_%H%M%S.mseed')}"
+            nombreMseed = f"{directorios['Directorio_registros']}/{nombre_canal[i]}{fecha_.strftime('_%Y%m%d_000000.mseed')}"
 
         try:
             with open(nombreMseed, 'rb'):
@@ -353,6 +352,8 @@ def calidad_estacion(stLeido):
 
 
 
+
+def lectura_eventos(archivo):
 #########################################################################################    
 # Método lectura_eventos(archivo)
 # Depurado; archivo es un parámetro para poder ubicar los directorios de almacenamiento.
@@ -362,7 +363,6 @@ def calidad_estacion(stLeido):
 # la respuesta es una tupla de dos elementos, un mensaje y la lista con las horas 
 # aproximadas de los eventos
 #########################################################################################
-def lectura_eventos(archivo):
     hora_sismo=[]
     contador=0
     directorios=obtener_directorios(archivo)
@@ -1042,61 +1042,106 @@ def lectura_archivo__(archivo):
 
 def lectura_archivo(archivo):
     """
-    Lee un archivo de texto donde cada línea contiene valores separados por punto y coma.
+    Lee un archivo CSV donde cada línea contiene valores separados por punto y coma (;).
     Intenta detectar automáticamente la codificación entre varias comunes (UTF-8, Latin-1, cp1252).
-    Devuelve una lista de listas con los datos.
+    
+    Devuelve una lista de listas con los datos. Si el archivo no existe o hay un error,
+    devuelve una lista vacía en lugar de None para evitar interrupciones en el flujo.
+
     Args:
         archivo (str): Ruta del archivo a leer.
+
     Returns:
-        list: Lista de listas con los datos del archivo o None si ocurre un error.
+        list: Lista de listas con los datos del archivo, o lista vacía si ocurre un error.
     """
     import codecs
     codificaciones_posibles = ['utf-8', 'latin-1', 'cp1252']
-    valores = []
+    
     for codificacion in codificaciones_posibles:
         try:
+            valores = []
             with codecs.open(archivo, 'r', encoding=codificacion, errors='strict') as file:
                 for linea in file:
                     elementos = linea.strip().split(';')
-                    if elementos != ['']:
+                    if isinstance(elementos, list) and any(e.strip() != '' for e in elementos):
                         valores.append(elementos)
-            return valores  # Si se logra leer correctamente, retornamos aquí
+            return valores
         except UnicodeDecodeError:
-            continue  # Intenta con la siguiente codificación
+            continue
         except FileNotFoundError:
-            print(f"El archivo {archivo} no fue encontrado.")
-            return None
+            print(f"[INFO] El archivo no fue encontrado: {archivo}")
+            return []
         except Exception as e:
-            print(f"Ocurrió un error al leer el archivo con codificación {codificacion}: {e}")
-            return None
-    print("No se pudo leer el archivo con ninguna de las codificaciones conocidas.")
-    return None
+            print(f"[ERROR] Error al leer el archivo con codificación {codificacion}: {e}")
+            return []
+    
+    print(f"[ERROR] No se pudo leer el archivo con ninguna codificación válida: {archivo}")
+    return []
+
 
 def escritura_archivo(archivo, valores):
-    try:
-        # Abrimos el archivo en modo escritura
-        with open(archivo, 'w') as file:
-            # Iteramos a través de las listas en valores
-            for sublist in valores:
-                if sublist!=[]:
-                # Convertimos la sublista en una cadena separada por punto y coma
-                    lista_como_cadenas = [str(elemento) for elemento in sublist]    
-                    linea = ';'.join(lista_como_cadenas)
-                # Escribimos la línea en el archivo, seguida de una nueva línea
-                    file.write(linea + '\n')
-                    #print(linea)
-    except Exception as e:
-        print(f"Error al escribir en el archivo {archivo}: {str(e)}")
+    """
+    Escribe una lista de listas en un archivo CSV, separando los valores con punto y coma (;).
+    Si encuentra sublistas vacías o elementos nulos, los ignora o los convierte a cadena vacía.
+    
+    Args:
+        archivo (str): Ruta del archivo a escribir.
+        valores (list): Lista de listas con los valores a escribir.
+    """
+    import os
 
-def copiar_archivos(archivos_origen, archivos_destino):
+    try:
+        # Elimina el archivo anterior si existe (evita conflictos con Google Drive o permisos)
+        if os.path.exists(archivo):
+            os.remove(archivo)
+        
+        with open(archivo, 'w', encoding='utf-8', newline='') as file:
+            for sublist in valores:
+                if isinstance(sublist, (list, tuple)) and len(sublist) > 0:
+                    try:
+                        lista_como_cadenas = [str(elemento) if elemento is not None else '' for elemento in sublist]
+                        linea = ';'.join(lista_como_cadenas)
+                        file.write(linea + '\n')
+                    except Exception as e:
+                        print(f"[WARN] Error al procesar fila {sublist}: {e}")
+                else:
+                    print(f"[INFO] Fila vacía o inválida ignorada: {sublist}")
+    except Exception as e:
+        print(f"[ERROR] Error al escribir en el archivo {archivo}: {e}")
+
+
+def copiar_archivos__(archivos_origen, archivos_destino):
 
     lista=(17,17,12,11,10,10,10)
     for i in range(0,7):
         try:
+            print(archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:])
             archivo_dest=archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:]
             shutil.copyfile(archivos_origen[i],archivo_dest)
         except FileNotFoundError:
             pass
+
+def copiar_archivos(archivos_origen, archivos_destino):
+    lista = (17, 17, 12, 11, 10, 10, 10)
+    
+    for i in range(0, 7):
+        try:
+            if not os.path.exists(archivos_origen[i]):
+                print(f"[ADVERTENCIA] Archivo de origen no encontrado: {archivos_origen[i]}")
+                continue
+
+            nombre_destino = archivos_destino[i][:-lista[i]] + archivos_origen[i][-lista[i]:]
+            directorio_destino = os.path.dirname(nombre_destino)
+
+            if not os.path.exists(directorio_destino):
+                os.makedirs(directorio_destino)
+                print(f"[INFO] Carpeta creada: {directorio_destino}")
+
+            print(f"[COPIANDO] {archivos_origen[i]} -> {nombre_destino}")
+            shutil.copyfile(archivos_origen[i], nombre_destino)
+
+        except Exception as e:
+            print(f"[ERROR] No se pudo copiar {archivos_origen[i]}: {e}")
 
 
 def lectura_rsa(archivo,directorio_trabajo,usuario):
@@ -1619,21 +1664,18 @@ def filtro_evento(canvas, visor, stLeido, freqmin_, freqmax_, grado_, t_inicio, 
     grafico_evento_int(visor,canvas,stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
 
 
-def extraccion_(archivo, n_evento, tipo_evento, t_inicio, t_final, estaciones_eventos_total, estaciones_eventos, bandera_ajuste, registro_tiempo, filtros):
+def extraccion_(archivo, n_evento, tipo_evento, t_inicio, t_final, estaciones_eventos_total, estaciones_eventos,  filtros):
     """
     Versión simplificada para solo generar los archivos CSV sin procesar señales.
     """
     print("Entra a extraer")
+    t_inicio, t_final = sorted([t_inicio, t_final])
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
     num_canales = len(parametros['HAB_CANAL'])
     fecha_ = obtencion_hora(archivo)
     fecha_real = fecha_ + t_inicio  # Usado solo para generar nombre
     nombre_sis = fecha_real.strftime('%y%m%d_%H%M%S.sis')
-    if t_inicio > t_final:
-        QMessageBox.about(None, "Advertencia", "Hora incorrecta: Tiempo de inicio mayor a final")
-        return
-
     # Generar string para el CSV principal
     xxx = f"{n_evento};{nombre_sis};{tipo_evento}"
     ahora = datetime.now()

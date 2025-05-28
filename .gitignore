@@ -33,8 +33,6 @@ datos/
 *.zip
 
 # Carpetas externas
-pruebas/
-modulos_externos/
 
 # Notebooks
 .ipynb_checkpoints/

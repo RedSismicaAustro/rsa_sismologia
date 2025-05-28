@@ -6,6 +6,10 @@ import obspy
 import subprocess
 from PyQt5.QtWidgets import QApplication, QMessageBox
 import sys
+
+
+
+def lectura_eventos(archivo):
 #########################################################################################    
 # Método lectura_eventos(archivo)
 # Depurado; archivo es un parámetro para poder ubicar los directorios de almacenamiento.
@@ -16,8 +20,6 @@ import sys
 # aproximadas de los eventos
 #########################################################################################
 
-
-def lectura_eventos(archivo):
     hora_sismo=[]
     contador=0
     directorios=obtener_directorios(archivo)
@@ -129,15 +131,15 @@ def parametros_estaciones():
                 polaridad_.append(estaciones_[i][23])
                 reserva_1.append(estaciones_[i][24])              
 
-    return{'NOMBRE':nombre_canal_total_,    #Canal 0  'NOMBRE'
-           'CODIGO':nombre_canal,           #Canal 1  'CODIGO'
-           'SENSOR':tipo_sensor,            #Canal 2  'SENSOR'
-           'CANALES':n_canales_,            #Canal 3  'CANALES'
-           'HAB_CANAL':hab_canal,           #Canal 4  'HAB_CANAL'
-           'COMPONENTE':componente_canal,   #Canal 5  'COMPONENTE'
+    return{'NOMBRE':nombre_canal_total_,    #Canal 0  'NOMBRE' Nombre con detalle
+           'CODIGO':nombre_canal,           #Canal 1  'CODIGO' Nombre abrebiado 2n 4 letras mayusculas
+           'SENSOR':tipo_sensor,            #Canal 2  'SENSOR' Tipo se sensor, sismico o acelerografio
+           'CANALES':n_canales_,            #Canal 3  'CANALES' Numero de canales de la estacion, 1 , 3 , 6 o mas
+           'HAB_CANAL':hab_canal,           #Canal 4  'HAB_CANAL'  Estacion habilitadaa
+           'COMPONENTE':componente_canal,   #Canal 5  'COMPONENTE' Numero de componente a procesar
            'HAB_GRAFICO':grafico_,          #Canal 6  'HAB_GRAFICO'
-           'HAB_PLT':hab_plt,               #Canal 7  'HAB_PLT'
-           'GAN_PLT':gan_plt,               #Canal 8  'GAN_PLT'
+           'BITS':hab_plt,                  #Canal 7  'BITS'  Numero de bits de cuantificacion
+           'CALIBRACION':gan_plt,           #Canal 8  'CALIBRACION' Fa
            'GANANCIA':ganancia,             #Canal 9  'GANANCIA'
            'DIEZMADO_PLT':diez_plt,         #Canal 10 'DIEZ_PLT'
            'FACTOR_MUL':factor_mult,        #Canal 11 'FACTOR_MUL'

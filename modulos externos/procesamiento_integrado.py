@@ -156,9 +156,6 @@ class MyApp(QMainWindow):
         self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
         self.Lbl_directorio.setText(self.directorio_trabajo)
         self.showDate(d)
-
-        self.coeficientes=lectura_archivo('coeficientes.csv')
-
         self.canales_habilitados=[]
         for i in range(0,101):
             if self.parametros['HAB_CANAL'][i]=='1':
@@ -304,6 +301,7 @@ class MyApp(QMainWindow):
                 
                 self.archivos_procesamiento_virtual=archivos_fast(archivo,self.directorio_trabajo,self.responsable_evento)
                 self.archivos_procesamiento_real=archivos_fast(archivo,self.directorio_trabajo,'')
+                print(self.archivos_procesamiento_real,self.archivos_procesamiento_virtual)
                 copiar_archivos(self.archivos_procesamiento_real,self.archivos_procesamiento_virtual)
         else:
             self.bandera_virtual=False
