@@ -12,25 +12,42 @@ def extraer_hasta_directorio(ruta_completa, nombre_directorio):
 ruta_librerias=os.path.dirname(__file__)
 ruta_proyecto=extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
 ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
-
+ruta_datos = os.path.abspath(os.path.join(ruta_proyecto,'datos'))
 # Insertar la ruta al inicio del sys.path
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
 
 import csv
-from PyQt5.QtWidgets import (QMessageBox)
+from PyQt5.QtWidgets import (QMessageBox,QGraphicsScene)
 from PyQt5.QtCore import QDate,QDateTime
+from PyQt5.QtWidgets import QGraphicsScene, QGraphicsView
 import matplotlib
 matplotlib.use('Qt5Agg')  # Asegúrate de que esto está antes de importar matplotlib.pyplot
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator    
 from matplotlib.widgets import Cursor, Button
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.ticker import MultipleLocator
+from time import sleep
 import subprocess
+
 from obspy import UTCDateTime, read, Trace, Stream
 from datetime import datetime, timedelta
+from reportlab.graphics.charts.linecharts import HorizontalLineChart
+#from reportlab.graphics.shapes import *
 from reportlab.lib.colors import *
+from reportlab.lib import colors
+from reportlab.pdfgen import canvas
+from reportlab.graphics import shapes
+from reportlab.graphics.charts.linecharts import HorizontalLineChart
+from reportlab.graphics.shapes import Drawing, Rect
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.lib.pagesizes import letter, A4
+import sys
+from pathlib import Path
+from PyQt5.QtCore import QDate,QDateTime,Qt
 import os
 import re
 import xml.etree.ElementTree as ET
@@ -38,16 +55,17 @@ import struct
 import copy
 import numpy as np
 import scipy.signal as signal
-from datetime import date
+from scipy import integrate  
+from scipy.signal import hilbert, chirp
+from datetime import date,datetime, timedelta
 import calendar
+
+from obspy import read
 import tkinter as tk
 import shutil
-from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,revisar_csv
+from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,denegar_escritura,habilitar_escritura,revisar_csv
 import pandas as pd
-from matplotlib.ticker import MultipleLocator
 
-import gc
-import psutil
 
 IDX_INDICE,IDX_ANIO,IDX_MES,IDX_DIA,IDX_HORA,IDX_MINUTO,IDX_SEGUNDO,\
 IDX_LATITUD,IDX_LONGITUD,IDX_PROFUNDIDAD,IDX_RMS,IDX_E_X,IDX_E_Y,IDX_E_0,\
@@ -75,7 +93,7 @@ def leer_mseed(archivo, tipo, t_inicio=None, t_final=None):
         if tipo != 0:
             nombreMseed = f"{directorios['Directorio_eventos']}/{nombre_canal[i]}{fecha_.strftime('_%Y%m%d_%H%M%S.mseed')}"
         else:
-            nombreMseed = f"{directorios['Directorio_registros']}/{nombre_canal[i]}{fecha_.strftime('_%Y%m%d_000000.mseed')}"
+            nombreMseed = f"{directorios['Directorio_registros']}/{nombre_canal[i]}{fecha_.strftime('_%Y%m%d_%H%M%S.mseed')}"
 
         try:
             with open(nombreMseed, 'rb'):
@@ -87,14 +105,10 @@ def leer_mseed(archivo, tipo, t_inicio=None, t_final=None):
                 trCanal[i] = stLeido
         except FileNotFoundError:
             pass
-        except Exception as e:
-            print(f"Error leyendo {nombreMseed}: {e}")
-
+ 
     return trCanal
 
-
-
-def grafico_evento(stLeido,t_inicio,t_final,estaciones_evento,hab_grafico,bandera_marcas,pagina):
+def grafico_evento_int(visor, stLeido, t_inicio, t_final, estaciones_evento, hab_grafico, bandera_marcas, pagina):
     #stLeido es la traza donde se encuetra el Mseed de la estaciòn
     #t_inicio----- incio del perido del grafico
     #t_final------ fin del perido del grafico
@@ -102,216 +116,78 @@ def grafico_evento(stLeido,t_inicio,t_final,estaciones_evento,hab_grafico,bander
     #hab_grafico---- Vector con la habilitacion de los graficos desde el archivo de configuracion 
     #bandera_marcas---- Permite ver las marcas para la extraccion
     #pagina-------- Variable que genera paginas para el despliegue, son de 6 en 6.
-    parametros=parametros_estaciones()
-    ax={}#ax=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-    ax = [0 for x in range(6)]
-    estaciones_graficar=[]
-    st_graficar=[]
-    for kk in range(0,len(stLeido)):
-        if stLeido[kk]!=[]:
-            st_tiempo=stLeido[kk][0].stats.starttime
-            break
-    for i in range(pagina*6, pagina*6+6):
-        if i<len(estaciones_evento):
-            canal_= estaciones_evento[i] 
-            comp_=int(parametros['COMPONENTE'][canal_])-1
-            estaciones_graficar.append(canal_)
-            st_graficar.append(stLeido[canal_][comp_])
-    t=st_graficar[0].stats.starttime #obtencion de la referencia del tiempo
-    if t==t_inicio:
-        t_i=t_inicio
-        t_f=t_final
-    else:
-        t_i=t+t_inicio
-        t_f=t+t_final
-    for i in range(0, len(st_graficar)):
-        st_graficar[i].trim(t_i,t_f)#Aquí la trama, sobre esta hay que trabajar filtros, corrección de línea de base,etc.
-        st_graficar[i].detrend('linear')#Hace la correccion de línea de base linear
-    fig, (ax[0], ax[1], ax[2], ax[3], ax[4], ax[5]) = plt.subplots(6, figsize=(10,10),linewidth=0.005)
-    minorLocator = MultipleLocator(320)# Es  para poner las divisiones del gràfico cada 5 segundos
-    anio_=st_graficar[0].stats.starttime.year
-    mes_=st_graficar[0].stats.starttime.month
-    dia_=st_graficar[0].stats.starttime.day
-    hora_=st_graficar[0].stats.starttime.hour
-    minuto_=st_graficar[0].stats.starttime.minute
-    segundo_=st_graficar[0].stats.starttime.second
-    tiempo_inicio=datetime(anio_,mes_,dia_,hora_,minuto_,segundo_)
-    marca_1=tiempo_inicio+timedelta(0, 420) 
-    marca_2=tiempo_inicio+timedelta(0, 780)
-    marca_0=tiempo_inicio+timedelta(0, 60)
-    for i in range(0, 6):
-        try:
-            canal_= estaciones_graficar[5-i]
-            componente_graficar=int(parametros['COMPONENTE'][canal_])-1
-            ax[i].plot(stLeido[canal_][componente_graficar].times("matplotlib"), st_graficar[5-i].data, "b-")
-            ax[i].set_title(parametros['NOMBRE'][canal_])
-            if bandera_marcas:
-                ax[i].axvline(marca_0 , color = "red")
-                ax[i].axvline(marca_1 , color = "green")
-                ax[i].axvline(marca_2 , color = "green")
-            ax[i].xaxis.set_minor_locator(minorLocator)
-            ax[i].get_yaxis().set_visible(False)
-            ax[i].grid(which = 'minor')
-            ax[i].grid(True)
-            ax[i].xaxis_date()
-        except IndexError:
-            pass
-    fig.autofmt_xdate()
-    mng = plt.get_current_fig_manager()    
-    mng.window.showMaximized()
-    plt.show()
-
-
-def grafico_evento_int(visor, canvas, stLeido, t_inicio, t_final,
-                       estaciones_evento, hab_grafico, bandera_marcas, pagina):
-    try:
-        # 🔁 Limpieza segura de ejes existentes
-        while visor.axes:
-            visor.delaxes(visor.axes[0])
-
-        # Crear subplots dentro de la figura existente
-        ax = [visor.add_subplot(6, 1, i + 1) for i in range(6)]
-        minorLocator = MultipleLocator(320)
-        parametros = parametros_estaciones()
-
-        estaciones_graficar = []
-        st_graficar = []
-
-        for kk in range(len(stLeido)):
-            if stLeido[kk] != []:
-                st_tiempo = stLeido[kk][0].stats.starttime
-                break
-
-        for i in range(pagina * 6, pagina * 6 + 6):
-            if i < len(estaciones_evento):
-                canal_ = estaciones_evento[i]
-                comp_ = int(parametros['COMPONENTE'][canal_]) - 1
-                estaciones_graficar.append(canal_)
-                st_graficar.append(stLeido[canal_][comp_])
-
-        t = st_graficar[0].stats.starttime
-        t_i = t + t_inicio
-        t_f = t + t_final
-
-        for i in range(len(st_graficar)):
-            st_graficar[i].trim(t_i, t_f)
-            st_graficar[i].detrend('linear')
-
-        tiempo_inicio = st_graficar[0].stats.starttime.datetime
-        marca_0 = tiempo_inicio + timedelta(seconds=60)
-        marca_1 = tiempo_inicio + timedelta(seconds=420)
-        marca_2 = tiempo_inicio + timedelta(seconds=780)
-
-        for i in range(6):
-            try:
-                canal_ = estaciones_graficar[5 - i]
-                componente_graficar = int(parametros['COMPONENTE'][canal_]) - 1
-
-                ax[i].plot(stLeido[canal_][componente_graficar].times("matplotlib"),
-                           st_graficar[5 - i].data, "b-")
-                ax[i].set_title(parametros['NOMBRE'][canal_])
-
-                if bandera_marcas:
-                    ax[i].axvline(marca_0, color="red")
-                    ax[i].axvline(marca_1, color="green")
-                    ax[i].axvline(marca_2, color="green")
-
-                ax[i].xaxis.set_minor_locator(minorLocator)
-                ax[i].get_yaxis().set_visible(False)
-                ax[i].grid(which='minor')
-                ax[i].grid(True)
-                ax[i].xaxis_date()
-            except IndexError:
-                continue
-
-        visor.autofmt_xdate()
-        canvas.draw_idle()
-
-    except Exception as e:
-        import traceback
-        print("Error en grafico_evento_int:", e)
-        traceback.print_exc()
-
-
-
-
-
-def grafico_evento_int_(visor, stLeido, t_inicio, t_final, estaciones_evento, hab_grafico, bandera_marcas, pagina):
-    # ✅ Limpiar la figura sin destruirla (seguro en Qt)
+    # Limpiar la figura existente
     visor.clear()
     
-    # Crear subplots
-    ax = [visor.add_subplot(6, 1, i + 1) for i in range(6)]
+    # Crear subplots dentro de la figura existente
+    ax = [visor.add_subplot(6, 1, i+1) for i in range(6)]
     minorLocator = MultipleLocator(320)
+    
+    # Código original para preparar los datos y las marcas...
 
-    parametros = parametros_estaciones()
+    parametros = parametros_estaciones()  # (nombre_canal_total_, nombre_canal, tipo_canal_, n_canales_, hab_canal, componente_canal, grafico_)
     estaciones_graficar = []
     st_graficar = []
 
-    # Obtener tiempo base del primer canal disponible
     for kk in range(len(stLeido)):
-        if stLeido[kk]:
+        if stLeido[kk] != []:
             st_tiempo = stLeido[kk][0].stats.starttime
             break
 
-    # Seleccionar canales de la página actual
     for i in range(pagina * 6, pagina * 6 + 6):
         if i < len(estaciones_evento):
             canal_ = estaciones_evento[i]
             comp_ = int(parametros['COMPONENTE'][canal_]) - 1
             estaciones_graficar.append(canal_)
-            st_graficar.append(stLeido[canal_][comp_].copy())
+            st_graficar.append(stLeido[canal_][comp_])
 
-    if not st_graficar:
-        return  # Nada que graficar
+    t = st_graficar[0].stats.starttime  # Obtención de la referencia del tiempo
+    if t == t_inicio:
+        t_i = t_inicio
+        t_f = t_final
+    else:
+        t_i = t + t_inicio
+        t_f = t + t_final
 
-    # Calcular tiempos absolutos de recorte
-    t_base = st_graficar[0].stats.starttime
-    t_i = t_base + t_inicio
-    t_f = t_base + t_final
+    for i in range(len(st_graficar)):
+        st_graficar[i].trim(t_i, t_f)  # Aquí la trama, sobre esta hay que trabajar filtros, corrección de línea de base, etc.
+        st_graficar[i].detrend('linear')  # Hace la corrección de línea de base lineal
 
-    # Recorte y preprocesamiento
-    for tr in st_graficar:
-        tr.trim(t_i, t_f)
-        tr.detrend('linear')
-
-    # Calcular marcas de tiempo
-    anio_, mes_, dia_ = t_base.year, t_base.month, t_base.day
-    hora_, minuto_, segundo_ = t_base.hour, t_base.minute, t_base.second
+    anio_ = st_graficar[0].stats.starttime.year
+    mes_ = st_graficar[0].stats.starttime.month
+    dia_ = st_graficar[0].stats.starttime.day
+    hora_ = st_graficar[0].stats.starttime.hour
+    minuto_ = st_graficar[0].stats.starttime.minute
+    segundo_ = st_graficar[0].stats.starttime.second
     tiempo_inicio = datetime(anio_, mes_, dia_, hora_, minuto_, segundo_)
-    marca_0 = tiempo_inicio + timedelta(seconds=60)
     marca_1 = tiempo_inicio + timedelta(seconds=420)
     marca_2 = tiempo_inicio + timedelta(seconds=780)
+    marca_0 = tiempo_inicio + timedelta(seconds=60)
 
-    # Graficar señales
+    # Preparar los datos para el gráfico
     for i in range(6):
         try:
             canal_ = estaciones_graficar[5 - i]
-            traza = st_graficar[5 - i]
-            tiempos = traza.times("matplotlib")
-            ax[i].plot(tiempos, traza.data, "b-")
+            componente_graficar = int(parametros['COMPONENTE'][canal_]) - 1
+
+            ax[i].plot(stLeido[canal_][componente_graficar].times("matplotlib"), st_graficar[5 - i].data, "b-")
             ax[i].set_title(parametros['NOMBRE'][canal_])
-            
             if bandera_marcas:
                 ax[i].axvline(marca_0, color="red")
                 ax[i].axvline(marca_1, color="green")
                 ax[i].axvline(marca_2, color="green")
-            
             ax[i].xaxis.set_minor_locator(minorLocator)
             ax[i].get_yaxis().set_visible(False)
             ax[i].grid(which='minor')
             ax[i].grid(True)
             ax[i].xaxis_date()
         except IndexError:
-            pass  # En caso de que no haya suficientes trazas para llenar los 6 ejes
+            pass
 
-    # Ajuste de formato de fechas
     visor.autofmt_xdate()
 
-
-
-
-
+    # Redibujar el canvas para mostrar los gráficos actualizados
+    visor.canvas.draw()
 
 
 
@@ -352,8 +228,6 @@ def calidad_estacion(stLeido):
 
 
 
-
-def lectura_eventos(archivo):
 #########################################################################################    
 # Método lectura_eventos(archivo)
 # Depurado; archivo es un parámetro para poder ubicar los directorios de almacenamiento.
@@ -363,6 +237,7 @@ def lectura_eventos(archivo):
 # la respuesta es una tupla de dos elementos, un mensaje y la lista con las horas 
 # aproximadas de los eventos
 #########################################################################################
+def lectura_eventos(archivo):
     hora_sismo=[]
     contador=0
     directorios=obtener_directorios(archivo)
@@ -470,8 +345,7 @@ def imprimir_plt(archivo,trCanal1,ganancia,diezmado,factor_mult):   #Depurado
                 contador=contador+delta
     
 
-def obtenerTraza(nombreCanal,num_canal, data, anio, mes, dia, horas, minutos, segundos, microsegundos,calib):#Depurado
-    print("Calib:\n\n",calib,"\n\n")    
+def obtenerTraza(nombreCanal,num_canal, data, anio, mes, dia, horas, minutos, segundos, microsegundos):#Depurado
     # Define todas las caracteristicas de la traza
     parametros=parametros_estaciones()
     nombre_estacion=parametros['CODIGO']
@@ -496,7 +370,7 @@ def obtenerTraza(nombreCanal,num_canal, data, anio, mes, dia, horas, minutos, se
     num_canal=num_canal-3*(int((num_canal-1)/3))
     nombreCanal=nombreCanal+nCanal[num_canal-1:num_canal]
     stats = {'network': nombreRed, 'station': nombreEstacion, 'location': localizacion,
-             'channel': nombreCanal, 'npts': len(data), 'sampling_rate': fsample,'calib': calib,
+             'channel': nombreCanal, 'npts': len(data), 'sampling_rate': fsample,
              'mseed': {'dataquality': calidad}}
     # Establece el tiempo
     stats['starttime'] = UTCDateTime(anio, mes, dia, horas, minutos, segundos, microsegundos)    
@@ -604,13 +478,9 @@ def ubicacion(latitud,longitud):
     coordenadas=[]
     latitud=float(latitud)
     longitud=float(longitud)
-    ruta_csv =  os.path.join(ruta_proyecto, "datos", "poblaciones.csv")
-    ruta_csv = os.path.abspath(ruta_csv)
 
-    with open(ruta_csv,newline='') as f:
-        datos=csv.reader(f,delimiter=';',quotechar=';')
-        for r in datos:
-            coordenadas.append(r)
+    poblaciones=os.path.join(ruta_datos,"poblaciones.csv")
+    coordenadas=lectura_archivo(poblaciones)
     auxiliar=len(coordenadas)
     distancia=pow(pow(longitud-float(coordenadas[1][0]),2)+pow(latitud-float(coordenadas[1][1]),2),0.5)
     indice=1
@@ -1042,106 +912,61 @@ def lectura_archivo__(archivo):
 
 def lectura_archivo(archivo):
     """
-    Lee un archivo CSV donde cada línea contiene valores separados por punto y coma (;).
+    Lee un archivo de texto donde cada línea contiene valores separados por punto y coma.
     Intenta detectar automáticamente la codificación entre varias comunes (UTF-8, Latin-1, cp1252).
-    
-    Devuelve una lista de listas con los datos. Si el archivo no existe o hay un error,
-    devuelve una lista vacía en lugar de None para evitar interrupciones en el flujo.
-
+    Devuelve una lista de listas con los datos.
     Args:
         archivo (str): Ruta del archivo a leer.
-
     Returns:
-        list: Lista de listas con los datos del archivo, o lista vacía si ocurre un error.
+        list: Lista de listas con los datos del archivo o None si ocurre un error.
     """
     import codecs
     codificaciones_posibles = ['utf-8', 'latin-1', 'cp1252']
-    
+    valores = []
     for codificacion in codificaciones_posibles:
         try:
-            valores = []
             with codecs.open(archivo, 'r', encoding=codificacion, errors='strict') as file:
                 for linea in file:
                     elementos = linea.strip().split(';')
-                    if isinstance(elementos, list) and any(e.strip() != '' for e in elementos):
+                    if elementos != ['']:
                         valores.append(elementos)
-            return valores
+            return valores  # Si se logra leer correctamente, retornamos aquí
         except UnicodeDecodeError:
-            continue
+            continue  # Intenta con la siguiente codificación
         except FileNotFoundError:
-            print(f"[INFO] El archivo no fue encontrado: {archivo}")
+            print(f"El archivo {archivo} no fue encontrado.")
             return []
         except Exception as e:
-            print(f"[ERROR] Error al leer el archivo con codificación {codificacion}: {e}")
-            return []
-    
-    print(f"[ERROR] No se pudo leer el archivo con ninguna codificación válida: {archivo}")
+            print(f"Ocurrió un error al leer el archivo con codificación {codificacion}: {e}")
+            return None
+    print("No se pudo leer el archivo con ninguna de las codificaciones conocidas.")
     return []
 
-
 def escritura_archivo(archivo, valores):
-    """
-    Escribe una lista de listas en un archivo CSV, separando los valores con punto y coma (;).
-    Si encuentra sublistas vacías o elementos nulos, los ignora o los convierte a cadena vacía.
-    
-    Args:
-        archivo (str): Ruta del archivo a escribir.
-        valores (list): Lista de listas con los valores a escribir.
-    """
-    import os
-
     try:
-        # Elimina el archivo anterior si existe (evita conflictos con Google Drive o permisos)
-        if os.path.exists(archivo):
-            os.remove(archivo)
-        
-        with open(archivo, 'w', encoding='utf-8', newline='') as file:
+        # Abrimos el archivo en modo escritura
+        with open(archivo, 'w') as file:
+            # Iteramos a través de las listas en valores
             for sublist in valores:
-                if isinstance(sublist, (list, tuple)) and len(sublist) > 0:
-                    try:
-                        lista_como_cadenas = [str(elemento) if elemento is not None else '' for elemento in sublist]
-                        linea = ';'.join(lista_como_cadenas)
-                        file.write(linea + '\n')
-                    except Exception as e:
-                        print(f"[WARN] Error al procesar fila {sublist}: {e}")
-                else:
-                    print(f"[INFO] Fila vacía o inválida ignorada: {sublist}")
+                if sublist!=[]:
+                # Convertimos la sublista en una cadena separada por punto y coma
+                    lista_como_cadenas = [str(elemento) for elemento in sublist]    
+                    linea = ';'.join(lista_como_cadenas)
+                # Escribimos la línea en el archivo, seguida de una nueva línea
+                    file.write(linea + '\n')
+                    #print(linea)
     except Exception as e:
-        print(f"[ERROR] Error al escribir en el archivo {archivo}: {e}")
+        print(f"Error al escribir en el archivo {archivo}: {str(e)}")
 
-
-def copiar_archivos__(archivos_origen, archivos_destino):
+def copiar_archivos(archivos_origen, archivos_destino):
 
     lista=(17,17,12,11,10,10,10)
     for i in range(0,7):
         try:
-            print(archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:])
             archivo_dest=archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:]
             shutil.copyfile(archivos_origen[i],archivo_dest)
         except FileNotFoundError:
             pass
-
-def copiar_archivos(archivos_origen, archivos_destino):
-    lista = (17, 17, 12, 11, 10, 10, 10)
-    
-    for i in range(0, 7):
-        try:
-            if not os.path.exists(archivos_origen[i]):
-                print(f"[ADVERTENCIA] Archivo de origen no encontrado: {archivos_origen[i]}")
-                continue
-
-            nombre_destino = archivos_destino[i][:-lista[i]] + archivos_origen[i][-lista[i]:]
-            directorio_destino = os.path.dirname(nombre_destino)
-
-            if not os.path.exists(directorio_destino):
-                os.makedirs(directorio_destino)
-                print(f"[INFO] Carpeta creada: {directorio_destino}")
-
-            print(f"[COPIANDO] {archivos_origen[i]} -> {nombre_destino}")
-            shutil.copyfile(archivos_origen[i], nombre_destino)
-
-        except Exception as e:
-            print(f"[ERROR] No se pudo copiar {archivos_origen[i]}: {e}")
 
 
 def lectura_rsa(archivo,directorio_trabajo,usuario):
@@ -1315,8 +1140,8 @@ def archivos_fast(evento,dir_trabajo,usuario):
 # Ususario es el responsable.
     directorios=obtener_directorios(evento)
     archivos_procesammiento=[]
-    ruta_csv = os.path.abspath(os.path.join(ruta_proyecto, 'datos','responsables.csv'))
-    with open(ruta_csv,newline='') as f:
+    responsables=os.path.join(ruta_datos, "responsables.csv")
+    with open(responsables,newline='') as f:
         datos=csv.reader(f,delimiter=';',quotechar=';')
         for r in datos:
             dir_dia_temp = r[1] 
@@ -1624,9 +1449,7 @@ def verificar_coincidencias(matriz, vector):
         msg_box.exec_()
 
 
-def filtro_evento(canvas, visor, stLeido, freqmin_, freqmax_, grado_, t_inicio, t_final,
-                  estaciones_eventos, hab_grafico, bandera_marcas, pagina,
-                  filtros_estaciones, estaciones_eventos_total, bandera_todos):
+def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaciones_eventos,hab_grafico,bandera_marcas,pagina,filtros_estaciones,estaciones_eventos_total,bandera_todos):
     #stLeido es la traza donde se encuetra el mseed de la estaciòn
     #freqmin_ Frecuencia mínima de cada estacion
     #freqmax_ Frecuencia máxima de cada estacion
@@ -1661,21 +1484,24 @@ def filtro_evento(canvas, visor, stLeido, freqmin_, freqmax_, grado_, t_inicio, 
     plt.close()
     #stLeido[0] = obspy.signal.filter.highpass(stLeido[0].data, 1.0, corners=1, zerophase=True, df=stLeido[0].stats.sampling_rate)
     #stLeido[0][0] = obspy.realtime.signal.offset(stLeido[0][0], offset=5.0, rtmemory_list=None)
-    grafico_evento_int(visor,canvas,stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
+    grafico_evento_int(visor,stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
 
 
-def extraccion_(archivo, n_evento, tipo_evento, t_inicio, t_final, estaciones_eventos_total, estaciones_eventos,  filtros):
+def extraccion_(archivo, n_evento, tipo_evento, t_inicio, t_final, estaciones_eventos_total, estaciones_eventos, bandera_ajuste, registro_tiempo, filtros):
     """
     Versión simplificada para solo generar los archivos CSV sin procesar señales.
     """
     print("Entra a extraer")
-    t_inicio, t_final = sorted([t_inicio, t_final])
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
     num_canales = len(parametros['HAB_CANAL'])
     fecha_ = obtencion_hora(archivo)
     fecha_real = fecha_ + t_inicio  # Usado solo para generar nombre
     nombre_sis = fecha_real.strftime('%y%m%d_%H%M%S.sis')
+    if t_inicio > t_final:
+        QMessageBox.about(None, "Advertencia", "Hora incorrecta: Tiempo de inicio mayor a final")
+        return
+
     # Generar string para el CSV principal
     xxx = f"{n_evento};{nombre_sis};{tipo_evento}"
     ahora = datetime.now()
@@ -1711,9 +1537,7 @@ def extraccion_(archivo, n_evento, tipo_evento, t_inicio, t_final, estaciones_ev
     print("Saliendo de Extraer")
     return
 
-def extraccion__(archivo, n_evento, tipo_evento, t_inicio, t_final,
-                estaciones_eventos_total, estaciones_eventos,
-                bandera_ajuste, registro_tiempo, filtros):
+def extraccion__(archivo, n_evento, tipo_evento,stLeido,t_inicio, t_final, estaciones_eventos_total, estaciones_eventos, bandera_ajuste, registro_tiempo, filtros):
     """
     archivo:                     archivo con formato G:\DIA\AAMMDD000000
     n_evento:                    Creo que es el idice del registro, no necsario si se ordena.
@@ -1726,157 +1550,114 @@ def extraccion__(archivo, n_evento, tipo_evento, t_inicio, t_final,
     registro_tiempo:             la primera estación datos y referencia de tiempo
     filtros_estaciones:          Marcas de filtros para las estaciones
     """
-    """
-    Extrae evento desde un archivo MSEED continuo, aplicando filtros y generando archivos individuales .mseed y .sis
-    """
+    print("Entro extraccion",t_inicio, t_final)
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
     num_canales = len(parametros['HAB_CANAL'])
     fecha_ = obtencion_hora(archivo)
     fecha_real = fecha_ + t_inicio
-    stLeido = leer_mseed(archivo, 0)
-    t = stLeido[registro_tiempo][0].stats.starttime
-
+#########
+#   Aqui hay que hacer el analisis del error.
+########
+    for stream in stLeido:
+        if stream!=[]:
+            stream.trim(fecha_real, fecha_+t_final)
     sismo_extraido = [[] for _ in range(num_canales)]
-    nombre_sis = os.path.join(directorios['Directorio_dia'] , fecha_real.strftime('%y%m%d_%H%M%S.sis'))
-    t_i = t + t_inicio
-    t_f = t + t_final
-    hora_formateada = t_i.strftime(" %H: %M: %S")
-
+    nombre_sis = directorios['Directorio_dia'] + "/" + fecha_real.strftime('%y%m%d_%H%M%S.sis')
+    hora_formateada = fecha_real.strftime(" %H: %M: %S")
     if t_inicio > t_final:
         QMessageBox.about(None, "Advertencia", "Hora incorrecta: Tiempo de inicio mayor a final")
         return
-
     if tipo_evento != "Ruido":
         bandera_muestras = 0
         error = 0
-
-        if bandera_ajuste:
+        if bandera_ajuste:#El analisis del error hay que hacerlo antes de la lectura pues ya lee lo real.
             stream1 = copy.deepcopy(stLeido[5])
             stream2 = copy.deepcopy(stLeido[100])
-            stream1.trim(t_i, t_f)
-            stream2.trim(t_i, t_f)
-            error = plot_streams(stream1[0], stream2[0])  # Este método debe estar implementado
-
+            error = plot_streams(stream1[0], stream2[0])
         for i in range(num_canales):
             stcanal = stLeido[i]
-            if not stcanal:
-                continue
-
-            tiempo_1 = t_i + error
-            tiempo_2 = t_f + error
-            stcanal.trim(tiempo_1, tiempo_2)
-
-            if len(stcanal) == 0:
-                print(f"Canal {parametros['CODIGO'][i]} sin señal en el intervalo.")
-                continue
-
-            # Aplica corrección de polaridad si es necesario
-            if parametros['POLARIDAD'][i] == 'N':
-                print('Canal con polaridad negativa: ', parametros['CODIGO'][i])
-                stcanal[0].data *= -1
-
-            # Aplicar filtro si corresponde
-            try:
-                filtro_str = filtros[estaciones_eventos_total.index(i)]
-                orden = int(filtro_str[:2])
-                fmin = int(filtro_str[2:4])
-                fmax = int(filtro_str[4:6])
-                if orden and fmin and fmax:
-                    stcanal.filter('bandpass', freqmin=fmin, freqmax=fmax, corners=orden, zerophase=True)
-            except (ValueError, IndexError):
-                pass  # No se aplica filtro
-
-            # Guardar archivo .mseed
-            nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][i] + fecha_real.strftime('_%Y%m%d_%H%M%S.mseed'))
-            print(nombre_mseed)
-            stcanal[0].data = stcanal[0].data.astype('int32')
-            stcanal.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
-
-            sismo_extraido[i] = stcanal[0].data
-            muestras = len(sismo_extraido[i])
-
-            if bandera_muestras == 0:
-                bandera_muestras = 1
-                muestras_64 = muestras
-            elif muestras != muestras_64:
-                sismo_extraido[i] = signal.resample(sismo_extraido[i], muestras_64)
-
-        # Crear archivo .sis si es evento sísmico
+            if stcanal:
+                if len(stcanal) == 0:
+                    mensaje = parametros['CODIGO'][i] + " no tiene señal a la hora escogida"
+                    continue
+                if parametros['POLARIDAD'][i] == 'N':
+                    print('Canal con polaridad negativa: ', parametros['CODIGO'][i])
+                    stcanal[0].data *= -1
+                nombreMseed = directorios['Directorio_eventos'] + "/" + parametros['CODIGO'][i] + fecha_real.strftime('_%Y%m%d_%H%M%S.mseed')
+                stcanal.write(nombreMseed, format='MSEED', encoding='STEIM1', reclen=512)
+                sismo_extraido[i] = stcanal[0].data
+                muestras = len(sismo_extraido[i])
+                if bandera_muestras == 0:
+                    bandera_muestras = 1
+                    muestras_64 = muestras
+                if muestras != muestras_64:
+                    VectorRemuestreado = signal.resample(sismo_extraido[i], muestras_64)
+                    sismo_extraido[i] = VectorRemuestreado
         if tipo_evento == "SISMO":
             archivo_cabecera = archivo[0:-12] + "cabecera_sismo"
-            try:
-                with open(archivo_cabecera, 'rb') as archivo_leer:
-                    cabecera = b''
-                    contador = 0
-                    while contador < 2:
-                        marcador = archivo_leer.read(2)
-                        if marcador == b'\x08\x00':
-                            cabecera_0 = archivo_leer.read(2)
-                            num_caracteres = struct.unpack("<H", cabecera_0)[0]
-                            archivo_leer.read(num_caracteres)
-                            contador += 1
-                    puntero = archivo_leer.tell()
-                    archivo_leer.seek(0)
-                    cabecera = archivo_leer.read(puntero) + b'\x08\x00\x0B\x00' + hora_formateada.encode('utf-8') + archivo_leer.read()
-
-                with open(nombre_sis, 'wb') as archivo_escribir:
-                    archivo_escribir.write(cabecera)
-                    segundo_ = fecha_real.hour * 3600 + fecha_real.minute * 60 + fecha_real.second
-                    segundo_string = f'{segundo_:05}'
-                    archivo_escribir.write(segundo_string.encode())
-
-                    k = 0
-                    for n in range(len(sismo_extraido[0])):
-                        if k == 0:
-                            archivo_escribir.write(
-                                b'\x02\x20\x02\x00\x40\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00'
-                            )
-                        k += 1
-                        if k == 64:
-                            k = 0
-                        for m in range(16):
-                            if parametros['HAB_CANAL'][m] == "1":
-                                valor = int(sismo_extraido[m][n]) if sismo_extraido[m] != [] else 0
-                                archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
-                            else:
-                                archivo_escribir.write((0).to_bytes(2, byteorder='little', signed=True))
-            except FileNotFoundError:
-                print("Cabecera binaria no encontrada:", archivo_cabecera)
-
-    # Registro CSV
-    nombre_evento = fecha_real.strftime('%y%m%d_%H%M%S.sis')
-    xxx = f"{n_evento};{nombre_evento};{tipo_evento}"
+            contador = 0
+            with open(archivo_cabecera, 'rb') as archivo_leer:
+                cabecera = b''
+                while contador < 2:
+                    auxiliar_lectura = archivo_leer.read(2)
+                    if auxiliar_lectura == b'\x08\x00':
+                        cabecera_0 = archivo_leer.read(2)
+                        numero_caracteres = struct.unpack("<H", cabecera_0)[0]
+                        archivo_leer.read(numero_caracteres)
+                        contador += 1
+                puntero = archivo_leer.tell()
+                archivo_leer.seek(0)
+                cabecera = archivo_leer.read(puntero) + b'\x08\x00\x0B\x00' + hora_formateada.encode('utf-8') + archivo_leer.read()
+            with open(nombre_sis, 'wb') as archivo_escribir:
+                archivo_escribir.write(cabecera)
+                segundo_ = fecha_real.hour * 3600 + fecha_real.minute * 60 + fecha_real.second
+                segundo_string = f'{segundo_:05}'
+                archivo_escribir.write(segundo_string.encode())
+                k = 0
+                for n in range(len(sismo_extraido[0])):
+                    if k == 0:
+                        archivo_escribir.write(b'\x02\x20\x02\x00\x40\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00')
+                    k += 1
+                    if k == 64:
+                        k = 0
+                    for m in range(16):
+                        if parametros['HAB_CANAL'][m] == "1":
+                            valor_muestra = int(sismo_extraido[m][n])
+                            archivo_escribir.write(valor_muestra.to_bytes(2, byteorder='little', signed=True))
+                        else:
+                            archivo_escribir.write((0).to_bytes(2, byteorder='little', signed=True))
+    xxx = f"{n_evento};{fecha_real.strftime('%y%m%d_%H%M%S.sis;')}{tipo_evento}"
     ahora = datetime.now()
     yyy = f"{xxx};{ahora.strftime('%Y/%m/%d_%H:%M:%S')};{t_inicio};{t_final}\n"
-
     indice = 0
     for i in range(num_canales):
         xxx += ";"
-        if indice < len(estaciones_eventos_total) and estaciones_eventos_total[indice] == i:
+        if estaciones_eventos_total[indice] == i:
             if tipo_evento == "Ruido":
                 xxx += '-'
             else:
                 estacion = estaciones_eventos_total[indice]
-                esta_activa = '1' if estacion in estaciones_eventos else '0'
+                aux_ = '1' if estaciones_eventos_total[indice] in estaciones_eventos else '0'
                 filtro_ = filtros[indice]
-                xxx += parametros['CODIGO'][estacion] + parametros['COMPONENTE'][estacion] + esta_activa + filtro_
-            indice += 1
+                xxx += parametros['CODIGO'][estacion] + parametros['COMPONENTE'][estacion] + aux_ + filtro_
+            if indice < (len(estaciones_eventos_total) - 1):
+                indice += 1
         else:
             xxx += "-"
-
     evento = xxx.split(';')
-    eventos = lectura_archivo(directorios['archivo_csv']) or []
+    eventos = lectura_archivo(directorios['archivo_csv'])
+    if eventos is None:
+        eventos = []
     eventos.append(evento)
     eventos = revisar_csv(eventos)
     escritura_archivo(directorios['archivo_csv'], eventos)
-
-    eventos_auxiliar = lectura_archivo(directorios['archivo_auxiliar']) or []
-    eventos_auxiliar.append(yyy)
+    eventos_auxiliar=lectura_archivo(directorios['archivo_auxiliar'])
+    evento_aux = yyy.split(';')
+    eventos_auxiliar.append(evento_aux)
     escritura_archivo(directorios['archivo_auxiliar'], eventos_auxiliar)
+    return ()
 
-    print("Evento extraído y guardado correctamente.")
-    return
 
 def espectro_respuesta(acelerograma, dt,factor,directorio):
     """
@@ -2546,6 +2327,7 @@ def recolectar_evt(directorio_base):
                         ruta_archivo = os.path.join(ruta_subitem, archivo)
                         if os.path.isfile(ruta_archivo) and archivo.lower().endswith(".evt"):
                             archivos_evt.append(ruta_archivo)
+
     return archivos_evt
 
 
@@ -2678,6 +2460,16 @@ def Guardar_dia(eventos_reporte,catalogo,eventos,root,responsables,resumen,direc
     # Escribir el archivo XML
     tree.write(directorios['archivo_xml'], encoding="utf-8", xml_declaration=True)
 
+
+def extraer_hasta_directorio(ruta_completa, nombre_directorio):
+    partes = Path(ruta_completa).parts
+    if nombre_directorio in partes:
+        indice = partes.index(nombre_directorio)
+        ruta_recortada = Path(*partes[:indice + 1])
+        return str(ruta_recortada) + '/'
+    else:
+        return ''
+          
 def referencia_directorio_completa(archivo):
     archivo_base = Path(archivo).name      # Esto aísla el nombre del archivo
     extension = Path(archivo).suffix  # Esto obtiene la extensión (incluye el punto .)
@@ -2777,9 +2569,7 @@ def extraer_kinemetrics_evt(ruta_shd_txt):
     return evt_dict
 
 def ejecutar_en_vm(evt_path,virtual_path):
-    evt_path = Path(evt_path)            # 👈 convierte evt_path en Path
-    virtual_path = Path(virtual_path)    # 👈 igual para virtual_path, si es string    
-    try:
+        try:
             usuario = "vbox"
             password = "rsa"
 
@@ -2821,7 +2611,7 @@ def ejecutar_en_vm(evt_path,virtual_path):
                 if archivo.exists():
                     os.remove(archivo)
             return stream
-    except Exception as e:
+        except Exception as e:
             print(e)
             return None
             pass

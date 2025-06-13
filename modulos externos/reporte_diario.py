@@ -19,8 +19,10 @@ if ruta_librerias not in sys.path:
 if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from metodos_rsa import leer_mseed,grafico_evento,calidad_estacion,cargar_evento,cargar_dia
+from metodos_rsa import leer_mseed,grafico_evento_int,calidad_estacion,cargar_evento,cargar_dia
 from metodos_rsa import insertar_evento_otras_redes,Guardar_dia
 from metodos_graficos_rsa import reporte_resumen
 from metodos_gestion import parametros_estaciones,obtener_directorios
@@ -64,7 +66,7 @@ def filtro_evento(stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaciones_e
         stLeido[canal_].filter("bandpass",freqmin=freqmin_,freqmax=freqmax_,corners=grado_)
     aux=t_final-t_inicio
     plt.close()
-    grafico_evento(stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
+    grafico_evento_int(stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
 
 class MyApp(QMainWindow):
     def __init__(self,parent=None):#Constructor de la clase
@@ -79,6 +81,9 @@ class MyApp(QMainWindow):
 
         #QtWidgets.QMainWindow.__init__(self)#Constructor
         #Ui_MainWindow.__init__(self)#Constructor
+        self.visor = Figure(figsize=(8, 4), dpi=100)
+        self.canvas = FigureCanvas(self.visor)
+
         self.eventos_reporte=[[0,"Fecha; Hora (UTC)","Evento","Magn.","Prof.(km)","Lat.","Long.","Ubicación"]]
         self.catalogo=[["Id","año","mes","día","hora","min","seg","lat","long","prof","rms","e-x","e-y","e-0","e-z","Mag","Tipo Mag","Fuente","ruta","Ubicación"]]
         self.eventos=[]
@@ -198,9 +203,8 @@ class MyApp(QMainWindow):
 
     def cargar_dia(self):
         self.eventos_reporte,self.catalogo,self.eventos, \
-            self.vector,self.evento_canales, \
-            self.root,self.responsables,self.resumen=cargar_dia(self.directorios['archivo_csv'])
-            #eventos_reporte,catalogo,eventos,vector,canales_eventos_dia,root,contador_n_canales
+        self.vector,self.evento_canales, \
+        self.root,self.responsables,self.resumen=cargar_dia(self.directorios['archivo_csv'])
         self.Btn_graficar.setEnabled(False)
         self.Btn_pagina.setEnabled(False)
         self.cmbx_evento.setEnabled(False)
@@ -351,7 +355,7 @@ class MyApp(QMainWindow):
         plt.close()
         t_inicio=self.trCanal[self.estaciones_eventos[0]][0].stats.starttime
         t_final=self.trCanal[self.estaciones_eventos[0]][0].stats.endtime
-        grafico_evento(self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,0) #El ultimo parametro es la página, hay que gestionarla para que se despleigue
+        grafico_evento_int(self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,0) #El ultimo parametro es la página, hay que gestionarla para que se despleigue
         
     def cambio_pagina(self):
         plt.close()
@@ -361,7 +365,7 @@ class MyApp(QMainWindow):
             self.pagina=0
         t_inicio=self.trCanal[self.estaciones_eventos[0]][0].stats.starttime
         t_final=self.trCanal[self.estaciones_eventos[0]][0].stats.endtime
-        grafico_evento(self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,self.pagina)
+        grafico_evento_int(self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,self.pagina)
 
     def Modificar_(self):
         self.eventos_reporte[self.indice][2]=self.cmbx_evento.currentText()

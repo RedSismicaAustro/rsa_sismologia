@@ -47,7 +47,9 @@ from PyQt5.QtCore import QDate
 
 
 
+# %%
 # Cargar la interfaz desde el archivo .ui directamente en esta instancia
+# %%
 ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", "acelerografos.ui")
 ruta_ui = os.path.abspath(ruta_ui)
 
@@ -207,10 +209,10 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.est_digitales_=lectura_archivo(archivo)
         self.estaciones_=parametros_estaciones()
         self.estacion_habilitada=self.estaciones_['HAB_CANAL']
-        self.plt_habilitado=self.estaciones_['HAB_PLT']
+        #self.plt_habilitado=self.estaciones_['HAB_PLT']
         self.nombre_estacion=self.estaciones_['NOMBRE']
         self.codigo_estacion=self.estaciones_['CODIGO']
-        self.ganancia=list(map(float, self.estaciones_['GAN_PLT']))#Transforma al tipo de variable dada por el primer argumento la lista del segundo argumento.
+        self.ganancia=list(map(float, self.estaciones_['GANANCIA']))#Transforma al tipo de variable dada por el primer argumento la lista del segundo argumento.
         self.diezmado=list(map(int, self.estaciones_['DIEZMADO_PLT']))
         self.factor_mult=list(map(float, self.estaciones_['FACTOR_MUL']))
         self.canal_=list(map(int, self.estaciones_['COMPONENTE']))

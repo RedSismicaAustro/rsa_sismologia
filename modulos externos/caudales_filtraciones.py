@@ -47,10 +47,8 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         QtWidgets.QMainWindow.__init__(self)#Constructor
         Ui_MainWindow.__init__(self)#Constructor
         self.setupUi(self)# Método Constructor de la ventana
-
         self.setWindowTitle("CAUDALES    --")
         self.setGeometry(200, 150, 600, 500)
-
         hoy = QDate.currentDate()
         semana_atras = hoy.addDays(-7)
         self.selector_fecha_inicio.setDate(semana_atras)
@@ -61,7 +59,6 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.combo_diezmado.setCurrentText("10")
         self.combo_traza.setFixedWidth(200)
         self.Lbl_directorio.setText("Directorio de trabajo: G:/Mi unidad/DIA/")
-
         # === Formulario de configuración ===
         self.boton_cargar_eventos_control.clicked.connect(self.cargar_eventos_control)
         self.boton_directorio.clicked.connect(self.seleccionar_directorio_trabajo)
@@ -69,8 +66,6 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.boton_guardar_marcas.clicked.connect(self.guardar_marcas)
         self.boton_graficar_caudales.clicked.connect(self.graficar_caudales)
         self.boton_salir.clicked.connect(self.close)
-
-
         # === Variables internas ===
         self.directorio_trabajo = "G:/Mi unidad/DIA/"
         self.stream = None
@@ -81,6 +76,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.marcas_usuario = []
         self.tr_segmento = None
         self.caudales = []
+        self.cargar_componentes_fecha()
 
     def seleccionar_directorio_trabajo(self):
         folderpath = QFileDialog.getExistingDirectory(self, 'Selecciona el directorio de trabajo')
@@ -89,34 +85,24 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                 folderpath += '/'
             self.directorio_trabajo = folderpath
             self.Lbl_directorio.setText(f"Directorio de trabajo: {self.directorio_trabajo}")
-            self.cargar_componentes_fecha()
+            
 
     def cargar_componentes_fecha(self):
         fecha = self.selector_fecha_grafico.date()
         self.archivo_mseed = f"CHA2_{fecha.toString('yyyyMMdd')}_000000.mseed"
         self.archivo = os.path.join(self.directorio_trabajo, fecha.toString("yyMMdd") + "000000")
+        self.directorios = obtener_directorios(self.archivo)
+        ruta_archivo = os.path.join(self.directorios['Directorio_registros'], self.archivo_mseed)
+        self.stream = read(ruta_archivo)
+        self.cargar_componentes(self.stream)
+        archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
+        if os.path.isfile(archivo_caudales):
+            self.caudales = lectura_archivo(archivo_caudales)
+            self.recalcular_caudales()  # ✅ Recalcula siempre los caudales, incluso si la bandera es 0 o 1
+            escritura_archivo(archivo_caudales, self.caudales)
+        else:
+            self.caudales = []
 
-        try:
-            self.directorios = obtener_directorios(self.archivo)
-            ruta_archivo = os.path.join(self.directorio_trabajo, self.directorios['Directorio_registros'], self.archivo_mseed)
-            if os.path.isfile(ruta_archivo):
-                self.stream = read(ruta_archivo)
-                self.cargar_componentes(self.stream)
-            else:
-                self.combo_traza.clear()
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"No se pudo cargar el archivo: {str(e)}")
-
-        try:
-            archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
-            if os.path.isfile(archivo_caudales):
-                self.caudales = lectura_archivo(archivo_caudales)
-                self.recalcular_caudales()  # ✅ Recalcula siempre los caudales, incluso si la bandera es 0 o 1
-                escritura_archivo(archivo_caudales, self.caudales)
-            else:
-                self.caudales = []
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"No se pudo cargar caudales.csv: {str(e)}")
 
 
     def recalcular_caudales(self):
@@ -129,14 +115,11 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             # Ordenamos los eventos por nombre
             eventos_ordenados = sorted(self.caudales, key=lambda fila: fila[0])
             nuevos_caudales = []
-
             for i, fila in enumerate(eventos_ordenados):
                 evento = fila[0]
                 bandera = fila[2] if len(fila) > 2 else "0"
-
                 try:
                     dt_evento = datetime.strptime(evento.replace(".sis", ""), "%y%m%d_%H%M%S")
-
                     if i > 0:
                         evento_anterior = eventos_ordenados[i - 1][0]
                         dt_anterior = datetime.strptime(evento_anterior.replace(".sis", ""), "%y%m%d_%H%M%S")
@@ -144,54 +127,13 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                         caudal = int(3500000 / segundos) if segundos > 0 else 0
                     else:
                         caudal = 0
-
                     nuevos_caudales.append([evento, str(caudal), bandera])
-
                 except Exception as e:
                     print(f"[ERROR] Fallo al procesar evento '{evento}': {e}")
                     nuevos_caudales.append([evento, "0", bandera])  # Al menos conservamos el evento
-
             self.caudales = nuevos_caudales
-
         except Exception as e:
             print(f"[ERROR] Error general al recalcular caudales: {e}")
-
-
-
-
-    def recalcular_caudales__(self):
-        """
-        Recalcula el valor de caudal para todos los eventos en self.caudales,
-        sin importar la bandera. El cálculo se realiza como: caudal = 3500000 / (segundos entre eventos consecutivos).
-        """
-        if not self.caudales or len(self.caudales) < 2:
-            return  # No hay suficientes eventos para calcular diferencias
-
-        # Ordenar por nombre de evento (formato: yyMMdd_HHmmss.sis)
-        self.caudales.sort(key=lambda fila: fila[0])
-
-        for i in range(1, len(self.caudales)):
-            evento_actual = self.caudales[i][0]
-            evento_anterior = self.caudales[i - 1][0]
-
-            try:
-                dt_actual = datetime.strptime(evento_actual.replace(".sis", ""), "%y%m%d_%H%M%S")
-                dt_anterior = datetime.strptime(evento_anterior.replace(".sis", ""), "%y%m%d_%H%M%S")
-
-                segundos = int((dt_actual - dt_anterior).total_seconds())
-
-                if segundos <= 0:
-                    caudal = 0  # Valor inválido o simultáneo
-                else:
-                    caudal = int(3500000 / segundos)
-
-                self.caudales[i][1] = str(caudal)
-
-            except Exception as e:
-                print(f"[ERROR] No se pudo calcular caudal entre {evento_anterior} y {evento_actual}: {e}")
-        print(self.caudales)
-
-
 
     def cargar_componentes(self, stream):
         self.combo_traza.clear()
@@ -208,50 +150,6 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             QMessageBox.warning(self, "Archivo no cargado", "Debes seleccionar una fecha válida.")
             return
 
-        self.caudales.sort(key=lambda fila: fila[0])
-        eventos_control = []
-
-        # === Recopilación de eventos CONTROL para análisis (caudales) ===
-        fecha_ini = self.selector_fecha_inicio.date().toPyDate()
-        fecha_fin = self.selector_fecha_fin.date().toPyDate()
-        fecha_actual = fecha_ini
-
-        while fecha_actual <= fecha_fin:
-            nombre_archivo = fecha_actual.strftime("%y%m%d") + "000000"
-            try:
-                directorios_dia = obtener_directorios(os.path.join(self.directorio_trabajo, nombre_archivo))
-                archivo_csv = os.path.join(self.directorio_trabajo, directorios_dia['archivo_csv'])
-                if os.path.isfile(archivo_csv):
-                    lista_eventos = lectura_archivo(archivo_csv)
-                    for fila in lista_eventos:
-                        if len(fila) > 2 and fila[2].strip().upper() == "CONTROL":
-                            eventos_control.append(fila[1])
-            except Exception as e:
-                print(f"No se pudo procesar el día {fecha_actual}: {e}")
-            fecha_actual += timedelta(days=1)
-
-        eventos_control = sorted(set(eventos_control))
-        caudales_dict = {fila[0]: fila for fila in self.caudales}
-        for i, evento in enumerate(eventos_control):
-            try:
-                dt_actual = datetime.strptime(evento.replace(".sis", ""), "%y%m%d_%H%M%S")
-                if i > 0:
-                    dt_anterior = datetime.strptime(eventos_control[i - 1].replace(".sis", ""), "%y%m%d_%H%M%S")
-                    segundos = int((dt_actual - dt_anterior).total_seconds())
-                    caudal = 3500000. /segundos
-                else:
-                    segundos = 0
-
-                if evento not in caudales_dict:
-                    self.caudales.append([evento, str(caudal), "1"])
-                else:
-                    caudales_dict[evento][1] = str(caudal)
-            except Exception as e:
-                print(f"Error con evento '{evento}': {e}")
-
-        self.caudales.sort(key=lambda fila: fila[0])
-
-        # === Graficar ===
         plt.close('all')
         self.marcas_usuario.clear()
         self.traza_id = self.combo_traza.currentText()
@@ -262,8 +160,6 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         hora_fin = hora_inicio + timedelta(days=1)
 
         self.tr_segmento = tr.copy()
-        self.tr_segmento.trim(UTCDateTime(hora_inicio), UTCDateTime(hora_fin))
-
         factor_diezmado = int(self.combo_diezmado.currentText())
         if factor_diezmado > 1:
             self.tr_segmento.decimate(factor_diezmado, no_filter=True)
@@ -273,57 +169,24 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         datos = self.tr_segmento.data
         ax.plot(tiempo, datos, label=f"{self.tr_segmento.id} (x{factor_diezmado})")
 
-        # === Zonas rojas desde auxiliar ===
-        archivo_aux = os.path.join(self.directorio_trabajo, self.directorios['archivo_auxiliar'])
-
-
-
-        if os.path.isfile(archivo_aux):
-            lista_aux = lectura_archivo(archivo_aux)
-            for fila in lista_aux:
-                if len(fila) > 5:
-                    evento = fila[1]
-                    try:
-                        if fila[4].isdigit() and fila[5].isdigit():
-                            t_ini = int(fila[4])
-                            t_fin = int(fila[5])
-                            dt_evento = datetime.strptime(evento.replace(".sis", ""), "%y%m%d_%H%M%S")
-                            if dt_evento.date() == fecha_grafico:
-                                ax.axvspan(self.tr_segmento.stats.starttime.matplotlib_date + t_ini / 86400,
-                                           self.tr_segmento.stats.starttime.matplotlib_date + t_fin / 86400,
-                                           color='red', alpha=0.3)
-                                ax.text(self.tr_segmento.stats.starttime.matplotlib_date + t_ini / 86400,
-                                        max(datos) * 0.9, evento,
-                                        rotation=90, fontsize=8, verticalalignment='bottom', color='red')
-                    except Exception as e:
-                        print(f"Error al graficar zona roja para {fila}: {e}")
-
         # === Eventos CONTROL del día gráfico ===
         eventos_control_dia = []
-        nombre_archivo = fecha_grafico.strftime("%y%m%d") + "000000"
-        try:
-            directorios_dia = obtener_directorios(os.path.join(self.directorio_trabajo, nombre_archivo))
-            archivo_csv = os.path.join(self.directorio_trabajo, directorios_dia['archivo_csv'])
-            if os.path.isfile(archivo_csv):
-                lista_eventos = lectura_archivo(archivo_csv)
-                for fila in lista_eventos:
-                    if len(fila) > 2 and fila[2].strip().upper() == "CONTROL":
-                        eventos_control_dia.append(fila[1])
-        except Exception as e:
-            print(f"No se pudo cargar eventos CONTROL para el día gráfico: {e}")
-
+        eventos = lectura_archivo(self.directorios['archivo_csv'])
+        for evento in eventos:
+                    if evento[2] == "CONTROL":
+                        eventos_control_dia.append(evento[1])
         for evento in eventos_control_dia:
             try:
-                # Verificamos en self.caudales si el evento tiene bandera "1"
                 fila = next((f for f in self.caudales if f[0] == evento and f[2] == "1"), None)
                 if not fila:
-                    continue  # El evento no está o tiene bandera "0", no se grafica
-
+                    color_linea='red'
+                else:
+                    color_linea='green'
                 dt_evento = datetime.strptime(evento.replace(".sis", ""), "%y%m%d_%H%M%S")
                 tiempo_relativo = mdates.date2num(dt_evento)
                 ax.axvline(x=tiempo_relativo, color='green', linestyle=':', linewidth=1)
                 ax.text(tiempo_relativo, max(datos) * 0.95, evento, rotation=90,
-                        fontsize=7, verticalalignment='bottom', color='green')
+                        fontsize=7, verticalalignment='bottom', color=color_linea)
             except Exception as e:
                 print(f"Error al graficar evento CONTROL del día: {evento} → {e}")
 
@@ -340,7 +203,6 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                 tolerancia = 1 / 1440
                 limite_x = ax.get_xlim()
                 limite_y = ax.get_ylim()
-
                 for marca in self.marcas_usuario:
                     if abs(marca - tiempo_click) < tolerancia:
                         self.marcas_usuario.remove(marca)
@@ -348,12 +210,10 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                 else:
                     if len(self.marcas_usuario) < 2:
                         self.marcas_usuario.append(tiempo_click)
-
                 for line in ax.lines[1:]:
                     line.remove()
                 for marca in self.marcas_usuario:
                     ax.axvline(marca, color='red', linestyle='--', linewidth=1)
-
                 ax.set_xlim(limite_x)
                 ax.set_ylim(limite_y)
                 fig.canvas.draw_idle()

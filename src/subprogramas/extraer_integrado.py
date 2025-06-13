@@ -12,11 +12,11 @@ def extraer_hasta_directorio(ruta_completa, nombre_directorio):
 ruta_librerias=os.path.dirname(__file__)
 ruta_proyecto=extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
 ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
-
+ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
+ruta_ui = os.path.abspath(os.path.join(ruta_proyecto, 'src','ui'))
 # Insertar la ruta al inicio del sys.path
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
-
 
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -25,42 +25,41 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
                              QLabel, QMessageBox, QCheckBox)
 from PyQt5 import uic
 from PyQt5 import QtWidgets
-from metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,
-                         filtro_evento,extraccion_, diagnostico_memoria)
+from metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,lectura_archivo,
+                         escritura_archivo,revisar_csv,filtro_evento)
 
 from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
-
+import struct
 datos_sismo={}
-
+import copy
 from PyQt5.QtWidgets import (QDialog,QSpinBox)
 
-import matplotlib.pyplot as plt
+
 from datetime import datetime
 from PyQt5.QtCore import QDate
 import csv
+import os
+datos_sismo={}
 #import obspy.realtime #obspy.realtime.signal.offset
-import copy
-
-#from obspy import read, UTCDateTime
+import os
 import gc
-import psutil
-from obspy.core.trace import Trace
-    
+#from obspy import read, UTCDateTime
+from obspy import Stream
+
+
 class Extraer_evento(QMainWindow):
     def __init__(self, directorio_trabajo, usuario, parent=None):
-        super().__init__()
+        super().__init__(parent)
+        self.directorio_trabajo = directorio_trabajo
         self.setWindowTitle('Extraer Eventos')
         # Configurar el layout principal
         layout_principal = QHBoxLayout()
         # Panel izquierdo
         panel_izquierdo = QVBoxLayout()
-
-
         # Cargar la interfaz desde el archivo .ui directamente en esta instancia
-        ruta_ui =  os.path.join(ruta_proyecto,"src",  "ui", 'Extraer.ui')
-        ruta_ui = os.path.abspath(ruta_ui)
-        uic.loadUi(ruta_ui, self)
-
+        
+        extrar_ui=os.path.join(ruta_ui,'Extraer.ui')
+        uic.loadUi(extrar_ui, self)
         # Añadir la interfaz cargada al panel izquierdo
         panel_izquierdo.addWidget(self.centralWidget())  # Ahora centralWidget es la UI cargada
         layout_principal.addLayout(panel_izquierdo, 1)
@@ -68,7 +67,6 @@ class Extraer_evento(QMainWindow):
         panel_derecho = QVBoxLayout()
         self.visor = Figure(figsize=(8, 4), dpi=100)
         self.canvas = FigureCanvas(self.visor)
-        self.canvas.setParent(self)# Importante para que Qt lo maneje bien
         panel_derecho.addWidget(self.canvas)
         layout_principal.addLayout(panel_derecho, 4)
         # Establecer el layout principal en el widget central
@@ -80,6 +78,7 @@ class Extraer_evento(QMainWindow):
         self.Btn_drive.clicked.connect(self.seleccionar_drive)
         self.Btn_eventos.clicked.connect(self.cargar_eventos)
         self.Btn_filtrar.clicked.connect(self.filtrar_evento)
+        #self.Btn_guardar.clicked.connect(self.testeo_botones)
         self.Btn_guardar.clicked.connect(self.guardar_evento)
         self.Btn_recargar.clicked.connect(self.recargar_evento)
         self.Btn_extraer_fijo.clicked.connect(self.cargar_eventos_fijo)
@@ -113,18 +112,13 @@ class Extraer_evento(QMainWindow):
             self.comboBox_segundo.addItem(str(i))
             if i<24:
                 self.comboBox_hora.addItem(str(i))
-        lista_filtros = ["Ruido", "FF", "FC","TELESISMO","SISMO","INDEFINIDO","Evento_local","CONTROL","REVISION"]
+        lista_filtros = ["Ruido", "FF", "FC","TELESISMO","SISMO","INDEFINIDO","Evento_local","CONTROL"]
         self.Cmb_bx_tipo_evento.addItems(lista_filtros)
         horario=["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
         self.cmbx_horario.addItems(horario)
         lista_resp=[]
-
-        RAIZ_PROYECTO = os.path.dirname(os.path.abspath(__file__))
-        RAIZ_PROYECTO=os.path.join(RAIZ_PROYECTO, "..","..")
-        ruta_csv =  os.path.join(RAIZ_PROYECTO, "datos", "responsables.csv")
-        ruta_csv = os.path.abspath(ruta_csv)
-
-        with open(ruta_csv ,newline='') as f:
+        reponsables=os.path.join(ruta_datos,"responsables.csv")
+        with open(reponsables,newline='') as f:
             datos=csv.reader(f,delimiter=';',quotechar=';')
             for r in datos:
                 lista_resp.append(r[0])
@@ -132,7 +126,6 @@ class Extraer_evento(QMainWindow):
         self.parametros=parametros_estaciones()#(nombre_canal_total_,nombre_canal,tipo_canal_,n_canales_,hab_canal)
         self.hab_grafico=self.parametros['HAB_GRAFICO']
         self.pagina=0
-        self.registro_tiempo=0
         d=datetime.today()              #obtención de la fecha y hora actual
         d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
         self.dateEdit.setDate(d)    #Conficuración de los datos de fecha en el DataEdit
@@ -140,18 +133,6 @@ class Extraer_evento(QMainWindow):
         self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
         self.Lbl_directorio.setText(self.directorio_trabajo)
         self.showDate(d)
-
-    def limpiar_visor(self):
-        """Limpieza profunda del visor para evitar saturación de memoria."""
-        if hasattr(self, 'visor'):
-            for ax in list(self.visor.axes):
-                self.visor.delaxes(ax)
-            self.visor.clf()
-            gc.collect()
-            self.canvas.draw_idle()
-            diagnostico_memoria("Después de limpiar visor")
-
-
 
     def habilitacion_(self, event):
         indice=self.cmbx_resp_1.currentIndex()
@@ -186,18 +167,21 @@ class Extraer_evento(QMainWindow):
 # en el directorio del día procesado.
 # EL método lectura_eventos(archivo) da como resultado la lista
     def Abrir_archivo(self):  #Depurado
-        directorio_=obtener_directorios(self.archivo)
-        self.directorio=directorio_['Directorio_base']
-        self.directorio_dia=directorio_['Directorio_dia']
-        self.directorio_eventos=directorio_['Directorio_eventos']
-        self.directorio_registros=directorio_['Directorio_registros']
+        self.responsable=self.cmbx_resp_1.currentText()
+        self.directorios=obtener_directorios(self.archivo)
+        self.directorio=self.directorios['Directorio_base']
+        self.directorio_dia=self.directorios['Directorio_dia']
+        self.directorio_eventos=self.directorios['Directorio_eventos']
+        self.directorio_registros=self.directorios['Directorio_registros']
         self.fecha_=obtencion_hora(self.archivo) 
+        self.eventos_auxiliar=lectura_archivo(self.directorios['archivo_auxiliar'])
+        print(self.eventos_auxiliar)
         resultado=lectura_eventos(self.archivo)
         mensaje=resultado[0]
-        hora_sismo=resultado[1]
-        if hora_sismo!=0:
-            for i in range(0,len(hora_sismo)):
-                h=hora_sismo[i]/(64*3600)
+        self.hora_sismos=resultado[1]
+        if self.hora_sismos!=0:
+            for i in range(0,len(self.hora_sismos)):
+                h=self.hora_sismos[i]/(64*3600)
                 h_s=str(int(h))
                 if int(h)<10:
                     h_s="0"+h_s
@@ -216,164 +200,93 @@ class Extraer_evento(QMainWindow):
             self.Lbl_Mensajes.setText("Actual: Marca 1. ")               
         self.Lbl_Mensajes_2.setText(mensaje)
 
+        self.lectura_mseed_dia = self.filtrar_streams_invalidos(leer_mseed(self.archivo, 0))
+            
 
+    def filtrar_streams_invalidos(self, lista_streams):
+        """
+        Filtra una lista de objetos Stream, conservando la estructura,
+        y descartando aquellos que están vacíos, tienen NaN o son inválidos.
+
+        :param lista_streams: Lista original de Streams o [].
+        :return: Lista de la misma longitud con Streams válidos o [].
+        """
+        from obspy import Stream
+        import numpy as np
+
+        lista_filtrada = []
+        for i, stream in enumerate(lista_streams):
+            if isinstance(stream, Stream) and len(stream) > 0 and len(stream[0].data) > 0:
+                try:
+                    # Verificamos que los datos no tengan NaN
+                    if not np.isnan(stream[0].data).any():
+                        lista_filtrada.append(stream)
+                    else:
+                        print(f"[Descartado] Canal {i} con NaN en los datos")
+                        lista_filtrada.append([])
+                except Exception as e:
+                    print(f"[Descartado] Canal {i} inválido: {e}")
+                    lista_filtrada.append([])
+            else:
+                lista_filtrada.append([])  # Mantener estructura
+        return lista_filtrada
+
+    def copiar_stream_dia(self):
+        print("Copiando el stream del dia")
+        if hasattr(self, 'trCanal'):
+            del self.trCanal
+        gc.collect()
+        self.trCanal = []
+        for idx, stream in enumerate(self.lectura_mseed_dia):
+            if isinstance(stream, Stream):
+                try:
+                    copia = stream.copy()
+                    self.trCanal.append(copia)
+                except Exception as e:
+                    print(f"⚠️ Error copiando stream en posición {idx}: {e}")
+                    self.trCanal.append([])
+            else:
+                self.trCanal.append([])
 
     def guardar_evento(self):
-        print(f"Guardando evento: {self.archivo}")
-
-        # 🔄 Limpieza del visor antes de guardar
-        try:
-            print(">> Limpiando visor")
-            self.limpiar_visor()
-        except Exception as e:
-            print("[ERROR] Fallo al limpiar visor:", e)
-
-        # 🧼 Liberar estructuras grandes manualmente
-        try:
-            print(">> Liberando estructuras internas")
-            if hasattr(self, 'trCanal'):
-                self.trCanal = None
-            if hasattr(self, 'lectura_mseed_dia'):
-                self.lectura_mseed_dia = None
-            gc.collect()
-            diagnostico_memoria("Después de liberar memoria antes de guardar")
-        except Exception as e:
-            print("[ERROR] al liberar estructuras:", e)
-
-        # ✅ Llamada segura a extraccion_
-        try:
-            print(">> Llamando a extraccion_()")
-            extraccion_(
-                self.archivo,
-                self.cmbx_eventos.currentIndex() + 1,
-                self.Cmb_bx_tipo_evento.currentText(),
-                self.t_inicio,
-                self.t_final,
-                self.estaciones_eventos_total,
-                self.estaciones_eventos,
-                self.filtros_estaciones
-            )
-        except Exception as e:
-            import traceback
-            print("[ERROR] en extraccion_():", e)
-            traceback.print_exc()
-            QMessageBox.critical(self, "Error al guardar", f"Fallo en la extracción:\n{e}")
-            return
-
-        # 🧹 Limpiar visor de nuevo después del guardado
-        try:
-            self.limpiar_visor()
-            diagnostico_memoria("Después de guardar evento")
-            self.Lbl_Mensajes_2.setText("Último: Marca " + str(self.cmbx_eventos.currentIndex() + 1))
-            self.grupo_evento.setEnabled(False)
-        except Exception as e:
-            print("[ERROR] al limpiar después de guardar:", e)
-
-        # 🔁 Refrescar estructura de control
-        try:
-            self.trCanal = None
-            self.lectura_mseed_dia = None
-            gc.collect()
-            diagnostico_memoria("Memoria tras limpieza final")
-        except Exception as e:
-            print("[ERROR] final al liberar memoria:", e)
-
-        print("Evento guardado correctamente.")
-
-
-
- 
+        print("Guardand evento ", )
+        self.visor.clf()
+        self.canvas.draw_idle()
+        bandera_ajuste=0
+        if self.chkBx_ajuste.checkState()==2:
+            bandera_ajuste=1
+        print("Entrando a extraccion")
+        n_evento = self.cmbx_eventos.currentIndex() + 1
+        tipo_evento = self.Cmb_bx_tipo_evento.currentText()
+        fecha_real = self.tiempo + self.t_inicio  # Usado solo para generar nombre
+        nombre_sis = fecha_real.strftime('%y%m%d_%H%M%S.sis')
+        ahora = datetime.now()
+        estaciones=""
+        for i,n_estacion in enumerate(self.estaciones_eventos_total):
+            indice=int(n_estacion)
+            aporta="0"
+            if n_estacion in self.estaciones_eventos:
+                aporta="1"
+            estacion=self.parametros['CODIGO'][indice]+self.parametros['COMPONENTE'][indice]+aporta+self.filtros_estaciones[i]+" "
+            estaciones=estaciones+estacion
+        evento_auxiliar=(n_evento,nombre_sis,tipo_evento,ahora, self.t_inicio, self.t_final,self.responsable,estaciones,self.hora_sismos[self.cmbx_eventos.currentIndex()])
+        print(evento_auxiliar)
+        self.eventos_auxiliar.append(evento_auxiliar)
+        escritura_archivo(self.directorios['archivo_auxiliar'],self.eventos_auxiliar)
+        self.Lbl_Mensajes_2.setText("Ultimo : Marca "+str(self.cmbx_eventos.currentIndex()+1))
+        self.grupo_evento.setEnabled(False)
     
     def lista_filtros(self, text):
         text="F inf ="+str(self.sp_Box_finf.value())+"F sup ="+str(self.sp_Box_fsup.value())+" orden ="+str(self.sp_Box_orden.value())
         self.Lbl_Mensajes_2.setText(text)
 
     def cargar_eventos(self):
-        print(">> Iniciando carga de eventos")
-        
-        # Limpiar visor y estructuras anteriores
-        self.limpiar_visor()
-        self.trCanal = None
-        self.lectura_mseed_dia = None
-        gc.collect()
-        diagnostico_memoria("Después de limpiar estructuras previas")
-
-        # Estado de controles de la GUI
-        self.grupo_evento.setEnabled(True)
-        self.grupo_guardar.setEnabled(False)
-        self.grupo_cortar.setEnabled(True)
-        self.grupo_desplazar.setEnabled(False)
-
-        self.bandera_marcas = 1
-        self.estaciones_eventos = []
-        self.filtros_estaciones = []
-
-        # Verificar archivos mseed existentes
-        for i in range(len(self.parametros['CODIGO'])):
-            nombreMseed = os.path.join(
-                self.directorio_registros,
-                self.parametros['CODIGO'][i] + self.fecha_.strftime('_%Y%m%d_%H%M%S.mseed')
-            )
-            try:
-                with open(nombreMseed, 'r'):
-                    self.estaciones_eventos.append(self.parametros['NUM_ESTACION'][i])
-                    self.filtros_estaciones.append('000000')
-            except FileNotFoundError:
-                pass
-
-        self.estaciones_eventos_total = self.estaciones_eventos.copy()
-
-        # Obtener tiempo del evento desde el CSV
-        hora_sismo = lectura_eventos(self.archivo)[1]
-        indice_evento = self.cmbx_eventos.currentIndex()
-
-        tiempo_segundo = hora_sismo[indice_evento] / 64
-
-        self.t_inicio = tiempo_segundo - 420
-        self.t_final = tiempo_segundo + 420
-
-        # Leer mseed completo
-        print(">> Leyendo mseed desde archivo")
-        self.lectura_mseed_dia = leer_mseed(self.archivo, 0)
-
-        # ⚠️ Copia segura del Stream
-        self.trCanal = self.lectura_mseed_dia.copy()
-
-        # Determinar tiempo inicial del registro
-        for i in range(min(101, len(self.trCanal))):
-            traza = self.trCanal[i]
-            if isinstance(traza, Trace) and hasattr(traza, 'data') and len(traza.data) > 0:
-                self.registro_tiempo = i
-                break
- 
-
-        # Graficar el evento
-        print(">> Graficando evento en visor")
-        grafico_evento_int(
-            self.visor,
-            self.canvas,
-            self.trCanal,
-            self.t_inicio,
-            self.t_final,
-            self.estaciones_eventos,
-            self.hab_grafico,
-            self.bandera_marcas,
-            self.pagina
-        )
-
-        self.Lbl_Mensajes.setText(f"Actual: Evento {indice_evento + 1}")
-
-        
-    def cargar_eventos_fijo(self):
         # Limpia la figura antes de graficar un nuevo evento
-        self.visor.clear()  # Agregar esta línea
+        self.visor.clear()
         self.grupo_evento.setEnabled(True)
         self.grupo_guardar.setEnabled(False)
         self.grupo_cortar.setEnabled(True)
         self.grupo_desplazar.setEnabled(False)
-        tiempo_segundo=self.comboBox_hora.currentIndex()*3600+self.comboBox_minuto.currentIndex()*60+self.comboBox_segundo.currentIndex()
-        self.lectura_mseed_dia=leer_mseed(self.archivo,0)#leer_mseed(self.archivo,tipo):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
         self.bandera_marcas=1
         self.estaciones_eventos=[]
         self.filtros_estaciones=[]
@@ -387,10 +300,56 @@ class Extraer_evento(QMainWindow):
             except FileNotFoundError:
                 pass
         self.estaciones_eventos_total=self.estaciones_eventos
-        self.limpiar_visor()
+        hora_sismo=lectura_eventos(self.archivo)[1]
+        a= self.cmbx_eventos.currentIndex()
+        
+        self.trCanal = [
+                        stream.copy() if isinstance(stream, Stream) else []
+                        for stream in self.lectura_mseed_dia
+                        ]
+
+        self.tiempo = obtencion_hora(self.archivo)
+        hora=self.tiempo.hour
+        minuto=self.tiempo.minute
+        segundo=self.tiempo.second
+        hora_inicio=(hora*3600+minuto*60+segundo)
+        tiempo_segundo=(hora_sismo[a])/64-hora_inicio  #t=trCanal[0][0].stats.starttime
+        self.visor.clf()
+        self.canvas.draw_idle()
         self.t_inicio=tiempo_segundo-420
         self.t_final=tiempo_segundo+420
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        #el metodo grafico_evento grafica el evento con los canales habilitados en trCanal(los 16 canales 
+        #del registro contínuo, con t_inicio y t_final como límites)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        self.Lbl_Mensajes.setText("Actual: Evento " + str(a+1)) #self.Lbl_Mensajes.setText("Evento " + str(a)+"    Hora:"+text)
+        
+    def cargar_eventos_fijo(self):
+        # Limpia la figura antes de graficar un nuevo evento
+        self.visor.clear()  # Agregar esta línea
+        self.grupo_evento.setEnabled(True)
+        self.grupo_guardar.setEnabled(False)
+        self.grupo_cortar.setEnabled(True)
+        self.grupo_desplazar.setEnabled(False)
+        tiempo_segundo=self.comboBox_hora.currentIndex()*3600+self.comboBox_minuto.currentIndex()*60+self.comboBox_segundo.currentIndex()
+        self.copiar_stream_dia()
+        self.bandera_marcas=1
+        self.estaciones_eventos=[]
+        self.filtros_estaciones=[]
+        for i in range(0, len(self.parametros['CODIGO'])):#Verifica todos los archivos MSEED de registro continuo encontrados en la base de datos.
+            nombreMseed = self.directorio_registros+"/"+self.parametros['CODIGO'][i]+self.fecha_.strftime('_%Y%m%d_%H%M%S.mseed')
+            try:
+                auxiliar=open(nombreMseed,'r')
+                auxiliar.close
+                self.estaciones_eventos.append(self.parametros['NUM_ESTACION'][i])
+                self.filtros_estaciones.append('000000')
+            except FileNotFoundError:
+                pass
+        self.estaciones_eventos_total=self.estaciones_eventos
+        self.visor.clf()
+        self.canvas.draw_idle()
+        self.t_inicio=tiempo_segundo-420
+        self.t_final=tiempo_segundo+420
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
         self.grupo_evento.setEnabled(True)       
     
     def lista_eventos(self, text):
@@ -409,153 +368,179 @@ class Extraer_evento(QMainWindow):
             QMessageBox.information(self, 'Advertencia', 'Periodo incorrecto.')
 
     def cambio_pagina(self):
-        self.limpiar_visor()
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
+        self.visor.clf()
+        self.canvas.draw_idle()
+        self.copiar_stream_dia()
         self.pagina=self.pagina+1
         auxiliar=self.pagina*6
         if auxiliar > len(self.estaciones_eventos):
             self.pagina=0
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def mas_6_minutos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        #tiempo_segundo=hora_sismo[a]/64
-        self.limpiar_visor()
+        
+        self.visor.clf()
+        self.canvas.draw_idle()
+
+        self.copiar_stream_dia()
         self.t_inicio=self.t_inicio+360
         self.t_final=self.t_final+360
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def menos_6_minutos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        #tiempo_segundo=hora_sismo[a]/64
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_inicio=self.t_inicio-360
         self.t_final=self.t_final-360
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def mas_2_segundos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        #tiempo_segundo=hora_sismo[a]/64
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_inicio=self.t_inicio+2
         self.t_final=self.t_final+2
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def mas_10_segundos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        #tiempo_segundo=hora_sismo[a]/64
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_inicio=self.t_inicio+10
         self.t_final=self.t_final+10
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
         
     def mas_30_segundos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        #tiempo_segundo=hora_sismo[a]/64
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_inicio=self.t_inicio+30
         self.t_final=self.t_final+30
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
         
     def menos_2_segundos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        #tiempo_segundo=hora_sismo[a]/64
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_inicio=self.t_inicio-2
         self.t_final=self.t_final-2
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def menos_10_segundos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        #tiempo_segundo=hora_sismo[a]/64
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_inicio=self.t_inicio-10
         self.t_final=self.t_final-10
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
         
     def menos_30_segundos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        #tiempo_segundo=hora_sismo[a]/64
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_inicio=self.t_inicio-30
         self.t_final=self.t_final-30
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def cortar_evento(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.bandera_marcas=0
         self.t_inicio=self.t_inicio+410
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
         self.grupo_cortar.setEnabled(False)
         self.grupo_desplazar.setEnabled(True)
         self.grupo_guardar.setEnabled(True)
 
     def menos_3_minutos(self):
-        self.limpiar_visor()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_final=self.t_final-180
         aux=self.t_final-self.t_inicio
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,0,aux,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,0,aux,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def menos_1_minutos(self):
-        self.limpiar_visor()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_final=self.t_final-60
         aux=self.t_final-self.t_inicio
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,0,aux,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,0,aux,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
         
     def menos_0_5_minutos(self):
-        self.limpiar_visor()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_final=self.t_final-30
         aux=self.t_final-self.t_inicio
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,0,aux,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,0,aux,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
     
     def menos_0_2_minutos(self):
-        self.limpiar_visor()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_final=self.t_final-10
         aux=self.t_final-self.t_inicio
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,0,aux,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,0,aux,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def mas_3_minutos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_final=self.t_final+180
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def mas_1_minutos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_final=self.t_final+60
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
         
     def mas_0_5_minutos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_final=self.t_final+30
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
     
     def mas_0_2_minutos(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        self.limpiar_visor()
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
         self.t_final=self.t_final+10
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def filtrar_evento(self):
         b=self.sp_Box_finf.value()|self.sp_Box_fsup.value()|self.sp_Box_orden.value()
         if b != 0:
-            self.limpiar_visor()
+            self.visor.clf()
+            self.canvas.draw_idle()
+
             #self.Btn_estaciones.enabled()
-            filtro_evento(self.canvas, self.visor, self.trCanal,
-              self.sp_Box_finf.value(), self.sp_Box_fsup.value(), self.sp_Box_orden.value(),
-              self.t_inicio, self.t_final,
-              self.estaciones_eventos, self.hab_grafico,
-              self.bandera_marcas, self.pagina,
-              self.filtros_estaciones, self.estaciones_eventos_total,
-              self.Btn_estaciones.isEnabled())
+            filtro_evento(self.visor,self.trCanal,self.sp_Box_finf.value(),self.sp_Box_fsup.value(),self.sp_Box_orden.value(),self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina,self.filtros_estaciones,self.estaciones_eventos_total,self.Btn_estaciones.isEnabled())
 
     def recargar_evento(self):
-        self.trCanal=copy.deepcopy(self.lectura_mseed_dia)
-        self.limpiar_visor()
-        grafico_evento_int(self.visor,self.canvas,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)        
+        self.copiar_stream_dia()
+        self.visor.clf()
+        self.canvas.draw_idle()
+
+        grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)        
 
     def verificar_estaciones(self):
         estaciones_(self.hab_grafico,self.estaciones_eventos,self.filtros_estaciones,self).exec_()
@@ -664,11 +649,8 @@ class estaciones_(QDialog):
         self.hab_grafico=hab_grafico
         self.setFixedSize(410, 420)
         QDialog.__init__(self)
-
-        ruta_ui =  os.path.join(ruta_proyecto,"src",  "ui", "secundaria.ui")
-        ruta_ui = os.path.abspath(ruta_ui)
-        uic.loadUi(ruta_ui, self)
-
+        secundaria_ui=os.path.join(ruta_ui,"secundaria.ui")
+        uic.loadUi(secundaria_ui,self)
         self.ck_box_hab_canal={}
         self.lbl_nombre={}
         self.lbl_codigo={}
@@ -809,5 +791,4 @@ class estaciones_(QDialog):
                 self.parent.hab_grafico[canal_]='0'
     def Salir_(self):
         self.destroy()
-
 

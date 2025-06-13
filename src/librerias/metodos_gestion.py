@@ -8,6 +8,30 @@ from PyQt5.QtWidgets import QApplication, QMessageBox
 import sys
 
 
+def lectura_archivo(archivo):
+
+    import codecs
+    codificaciones_posibles = ['utf-8', 'latin-1', 'cp1252']
+    valores = []
+    for codificacion in codificaciones_posibles:
+        try:
+            with codecs.open(archivo, 'r', encoding=codificacion, errors='strict') as file:
+                for linea in file:
+                    elementos = linea.strip().split(';')
+                    if elementos != ['']:
+                        valores.append(elementos)
+            return valores  # Si se logra leer correctamente, retornamos aquí
+        except UnicodeDecodeError:
+            continue  # Intenta con la siguiente codificación
+        except FileNotFoundError:
+            print(f"El archivo {archivo} no fue encontrado.")
+            return None
+        except Exception as e:
+            print(f"Ocurrió un error al leer el archivo con codificación {codificacion}: {e}")
+            return []
+    print("No se pudo leer el archivo con ninguna de las codificaciones conocidas.")
+    return []
+
 
 def lectura_eventos(archivo):
 #########################################################################################    
@@ -73,10 +97,7 @@ def parametros_estaciones():
     ruta_csv =  os.path.join(RAIZ_PROYECTO, "datos", "estaciones.csv")
     ruta_csv = os.path.abspath(ruta_csv)
 
-    with open(ruta_csv,newline='') as f:
-            datos=csv.reader(f,delimiter=';',quotechar=';')
-            for r in datos:
-                estaciones_.append(r)
+    estaciones_=lectura_archivo(ruta_csv)
     nombre_canal_total_=[] #Variable que guarda el nombre completo de las estaciones       
     nombre_canal=[]        #Variable que guarda el nombre codigo del canal de las estaciones
     tipo_sensor=[]         #Variable que guarda el tipo de sensor de la estacion (Velocidad o aceleracion)

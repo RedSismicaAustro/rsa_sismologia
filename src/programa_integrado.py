@@ -21,6 +21,8 @@ if ruta_datos not in sys.path:
 
 import os
 import sys
+import matplotlib
+matplotlib.use('Qt5Agg')  # Alternativamente: 'Qt5Agg' si necesitas interactividad
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMessageBox, QToolBar, QLabel, QVBoxLayout, QWidget,QGridLayout,QComboBox,QFileDialog,QPushButton
 from PyQt5.QtGui import QIcon, QPainter, QPixmap, QFont, QColor, QBrush
 from PyQt5.QtCore import Qt, QTimer, QDateTime,QTime

@@ -19,7 +19,7 @@ if ruta_librerias not in sys.path:
 
 
 from metodos_gis_rsa import widget_grafico_mpl
-from metodos_rsa import obtencion_hora,leer_mseed,parametros_estaciones,grafico_evento,archivos_fast,verificar_coincidencias
+from metodos_rsa import obtencion_hora,leer_mseed,parametros_estaciones,grafico_evento_int,archivos_fast,verificar_coincidencias
 from metodos_rsa import copiar_archivos,lectura_archivo,escritura_archivo,guardar_informacion_diaria,guardar_intento,ordenar_y_eliminar_duplicados,insertar_evento_otras_redes,cargar_dia,cargar_evento
 from metodos_gestion import obtener_directorios
 from metodos_reportes_individuales import generar_reporte_sismo
@@ -32,7 +32,8 @@ from PyQt5.QtCore import QDate
 from PyQt5.QtCore import Qt,QTimer
 import time
 import threading
-
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 def activar_hilo(self):
         #archivo_monitoreo=self.parent.archivos_procesamiento_virtual[2]
@@ -133,6 +134,10 @@ class MyApp(QMainWindow):
         ruta_ui = os.path.abspath(os.path.join(ruta_proyecto, 'src','ui',"Proceso.ui"))
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui,self)
+
+        self.visor = Figure(figsize=(8, 4), dpi=100)
+        self.canvas = FigureCanvas(self.visor)
+
         self.setWindowTitle("PROCESAMIENTO")
         self.btn_abrir.clicked.connect(self.Abrir_archivo)
         self.Btn_drive.clicked.connect(self.seleccionar_drive)
@@ -219,9 +224,9 @@ class MyApp(QMainWindow):
         escritura_archivo(self.directorio['archivo_reporte'],self.eventos_reporte)
         escritura_archivo(self.directorio['archivo_catalogo'],self.catalogo)
 
-
     def preparar_evento(self, text):
         print("Preparar evento:")
+        print(self.responsables)
         for i,evento in enumerate(self.eventos):
             if evento[1]==self.cmbx_eventos.currentText():
                 self.indice_evento_procesar=i
@@ -234,9 +239,9 @@ class MyApp(QMainWindow):
             indice_hora=1
         elif aux<180000:
             indice_hora=2
-        else:
+        elif aux<240000:
             indice_hora=3
-        horario=["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
+        horario=['',"00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
         self.responsable_evento=self.responsables[indice_hora][0]
         self.Cmb_bx_tipo_evento.setCurrentText(self.evento_procesar[2])
         self.txt_responsables.setText(self.responsable_evento)
@@ -252,7 +257,6 @@ class MyApp(QMainWindow):
             if self.eventos_reporte[i][1]==self.evento_procesar[1]:
                 self.indice_rep=i
                 break
-
         self.indice, self.indice_local, self.indice_catalogo, self.archivo_escogido, \
         self.evento_reporte_escogido, self.canales, self.trCanal, self.archivo_reporte, \
         self.parametros['HAB_GRAFICO'],self.estaciones_eventos = cargar_evento(
@@ -665,7 +669,7 @@ class estaciones_(QDialog):
         self.trCanal=leer_mseed(archivo,1)
         t_inicio=self.trCanal[self.estaciones_eventos[0]][0].stats.starttime
         t_final=self.trCanal[self.estaciones_eventos[0]][0].stats.endtime
-        grafico_evento(self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,0) #El ultimo parametro es la página, hay que gestionarla para que se despleigue
+        grafico_evento_int(self.visor,self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,0) #El ultimo parametro es la página, hay que gestionarla para que se despleigue
 
 
     def Ubicacion_(self):

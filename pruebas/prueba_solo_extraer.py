@@ -21,7 +21,7 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QCalendarWidget, QMessageBox
 )
 from obspy import read
-from metodos_rsa import (obtencion_hora,lectura_archivo)
+from metodos_rsa import (obtencion_hora,lectura_archivo,escritura_archivo,ordenar_y_eliminar_duplicados)
 
 from metodos_gestion import parametros_estaciones,obtener_directorios
 import scipy.signal as signal
@@ -30,17 +30,15 @@ import matplotlib
 import numpy as np
 matplotlib.use('Qt5Agg')  # Asegúrate de que esto está antes de importar matplotlib.pyplot
 
-def extraccion(archivo, tipo_evento, t_inicio, t_final,
-                estaciones_eventos_total):
+def extraccion(evento_auxiliar,solo_eventos,archivo):
     """
-    archivo:                     archivo con formato G:\DIA\AAMMDD000000
-    tipo_evento:                 Tipo de evento, SISMO, CONTROL, FF, FC, Indefinido, etc.
-    t_inicio:                    Tiempo de inicio en segundos
-    t_final:                     Tiempo final en segundos
-    estaciones_eventos_total:    las estaciones que tienen señal
+    evento_auxiliar              linea de lectura del archivo AAMMDD_aux.csv 
+    solo_eventos                 Todos los eventos procesados del día, se puede extraer un evento pasando solo_eventos=[]
+    archivo:                     archivo con formato ..\DIA\AAMMDD000000
     """
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
+    evento,tipo_evento,t_inicio, t_final = evento_auxiliar[1],evento_auxiliar[2], float(evento_auxiliar[4]), float(evento_auxiliar[5])
     fecha_ = obtencion_hora(archivo)
     t_ini = fecha_ + t_inicio
     t_fin = fecha_ + t_final
@@ -50,25 +48,37 @@ def extraccion(archivo, tipo_evento, t_inicio, t_final,
     if t_inicio > t_final:
         QMessageBox.about(None, "Advertencia", "Hora incorrecta: Tiempo de inicio mayor a final")
         return
+    if evento not in solo_eventos:
+        estaciones=evento_auxiliar[7]
+        lista_estaciones =estaciones.split()
+        estaciones_eventos_total=[]
+        for estaciones_aportantes in lista_estaciones:
+            codigo_estacion=estaciones_aportantes[:4]
+            indice=parametros['CODIGO'].index(codigo_estacion)
+            estaciones_eventos_total.append(indice)
+    else:
+        return 
     if tipo_evento != "Ruido":
-        print(nombre_sis[-17:],tipo_evento,numero_de_muestras)
         sismo_extraido=[]
         for numero_estacion in range(0,16):
             componente=int(parametros['COMPONENTE'][numero_estacion])-1
+
             if numero_estacion not in estaciones_eventos_total:
                 stcanal=[]
                 sis_extraido=np.array([])
             else:
                 archivo_mseed_dia=os.path.join(directorios['Directorio_registros'],parametros['CODIGO'][numero_estacion]+directorios['sufijo_mseed'])
                 stcanal = read(archivo_mseed_dia, format="MSEED", starttime=t_ini, endtime=t_fin, nearest_sample=False)
+                if len(stcanal)==0:
+                    continue
                 # Aplica corrección de polaridad si es necesario
                 if parametros['POLARIDAD'][numero_estacion] == 'N':
                     print('Canal con polaridad negativa: ', parametros['CODIGO'][numero_estacion])
                     stcanal[componente].data *= -1
                 # Guardar archivo .mseed
                 nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
-                stcanal[componente].data = stcanal[componente].data.astype('int32')
                 stcanal.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
+                stcanal[componente].data = stcanal[componente].data.astype('int32')
                 sis_extraido = stcanal[componente].data
                 muestras = stcanal[componente].stats.sampling_rate
                 if muestras!=64:
@@ -80,9 +90,7 @@ def extraccion(archivo, tipo_evento, t_inicio, t_final,
                     else:
                         faltantes = numero_de_muestras - sis_extraido.size
                         sis_extraido = np.pad(sis_extraido, (0, faltantes), mode='constant')
-
             sismo_extraido.append(sis_extraido)
-          
         # Crear archivo .sis si es evento sísmico
         if tipo_evento == "SISMO":
             archivo_cabecera = archivo[0:-12] + "cabecera_sismo"
@@ -125,8 +133,19 @@ def extraccion(archivo, tipo_evento, t_inicio, t_final,
             except FileNotFoundError:
                 print("Cabecera binaria no encontrada:", archivo_cabecera)
 
-    print("Evento extraído y guardado correctamente.")
-    return
+
+    if evento not in solo_eventos:
+        evento=evento_auxiliar[:3]
+        estaciones_eventos_total=[]
+        lista_guiones = ['-'] * 101
+        for estacion_aportante in lista_estaciones:
+            codigo_estacion=estacion_aportante[:4]
+            indice=parametros['CODIGO'].index(codigo_estacion)
+            nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][indice] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
+            lista_guiones[indice]=estacion_aportante
+        evento=evento+lista_guiones
+    print("Evento extraído y guardado correctamente.")        
+    return evento
 
 
 class AplicacionEventos(QWidget):
@@ -159,22 +178,15 @@ class AplicacionEventos(QWidget):
         fecha_qt = self.calendario.selectedDate()
         archivo = os.path.join(self.directorio_trabajo, fecha_qt.toString("yyMMdd") + "000000")
         directorios = obtener_directorios(archivo)
-
         eventos_auxiliar = lectura_archivo(directorios['archivo_auxiliar'])
         eventos = lectura_archivo(directorios['archivo_csv'])
         solo_eventos = [fila[1] for fila in eventos]
-
-        for linea_evento_auxiliar in eventos_auxiliar:
-            evento, t_inicio, t_fin = linea_evento_auxiliar[1], float(linea_evento_auxiliar[4]), float(linea_evento_auxiliar[5])
-            indice = solo_eventos.index(evento)
-            evento_completo=eventos[indice]
-            tipo_evento = evento_completo[2]
-            evento_completo=evento_completo[3:]
-            estaciones_eventos_total=[i for i, valor in enumerate(evento_completo) if valor != '-']
-            extraccion(archivo, tipo_evento, t_inicio, t_fin, estaciones_eventos_total)
-
-
-
+        for evento_auxiliar in eventos_auxiliar:
+            evento=extraccion(evento_auxiliar,solo_eventos,archivo)
+            if evento!=None:
+                eventos.append(evento)
+        ordenar_y_eliminar_duplicados(eventos,1)
+        escritura_archivo(directorios['archivo_csv'],eventos)
 
 def main():
     app = QApplication(sys.argv)

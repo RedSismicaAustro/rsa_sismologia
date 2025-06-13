@@ -1,3 +1,25 @@
+import sys
+import os
+from pathlib import Path
+def extraer_hasta_directorio(ruta_completa, nombre_directorio):
+    partes = Path(ruta_completa).parts
+    if nombre_directorio in partes:
+        indice = partes.index(nombre_directorio)
+        ruta_recortada = Path(*partes[:indice + 1])
+        return str(ruta_recortada) + '/'
+    else:
+        return ''
+ruta_librerias=os.path.dirname(__file__)
+ruta_proyecto=extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
+ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
+ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
+# Insertar la ruta al inicio del sys.path
+if ruta_librerias not in sys.path:
+    sys.path.insert(0, ruta_librerias)
+if ruta_datos not in sys.path:
+    sys.path.insert(0, ruta_datos)
+
+
 import time
 import sys
 from PyQt5 import uic, QtWidgets
@@ -15,7 +37,11 @@ import csv
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 
 from PyQt5.QtWidgets import ( QMainWindow,QMessageBox,QFileDialog)
-qtCreatorFile="automatico.ui"# Nuestro archivo UI aquí.
+
+ruta_ui = os.path.abspath(os.path.join(ruta_proyecto, 'src','ui',"automatico.ui"))
+ruta_ui = os.path.abspath(ruta_ui)
+
+qtCreatorFile=ruta_ui# Nuestro archivo UI aquí.
 Ui_MainWindow,QtBassClass=uic.loadUiType(qtCreatorFile)#El modulo ui carga
 
 
@@ -118,7 +144,9 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         super(MyApp,self).__init__(parent)
         QMainWindow.__init__(self) #Constructor
         #Carga la configuración del archivo .ui en el objeto
-        uic.loadUi("automatico.ui",self)
+        ruta_ui = os.path.abspath(os.path.join(ruta_proyecto, 'src','ui',"automatico.ui"))
+        ruta_ui = os.path.abspath(ruta_ui)
+        uic.loadUi(ruta_ui,self)
         self.setWindowTitle("PROCESAMIENTO SISMICO")
         self.btn_abrir.clicked.connect(self.Abrir_archivo)
         self.btn_graficos.clicked.connect(self.Generar_)
@@ -132,8 +160,8 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.hab_canal=self.parametros['HAB_CANAL']
         self.componente=self.parametros['COMPONENTE']
         self.grafico=self.parametros['HAB_GRAFICO']        
-        self.hab_plt=self.parametros['HAB_PLT']
-        self.gan_plt=self.parametros['GAN_PLT']
+        self.hab_plt=self.parametros['HAB_GRAFICO']
+        self.gan_plt=self.parametros['GANANCIA']
         self.diez_plt=self.parametros['DIEZMADO_PLT']
         self.bits_=self.parametros['FACTOR_MUL']
         now = datetime.now()
