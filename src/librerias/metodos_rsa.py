@@ -1340,7 +1340,7 @@ def guardar_informacion_diaria(archivo,directorio_trabajo,catalogo_anterior,even
 
 
 
-def ordenar_y_eliminar_duplicados(catalogo, indice):
+def ordenar_y_eliminar_duplicados(catalogo, indice, bandera=True):
     """
     Ordena una lista de listas o tuplas y elimina duplicados.
 
@@ -1350,20 +1350,23 @@ def ordenar_y_eliminar_duplicados(catalogo, indice):
 
     Returns:
         Lista ordenada y sin duplicados.
-    """
+    """    
 
-    if not catalogo or not isinstance(catalogo, list):
-        raise ValueError("El catálogo debe ser una lista no vacía.")
+    if bandera:
+        print("catalogo")
+        if not catalogo or not isinstance(catalogo, list):
+            raise ValueError("El catálogo debe ser una lista no vacía.")
 
-    encabezado = catalogo[0]
-    datos = [fila for fila in catalogo[1:] if fila]  # Eliminar filas vacías
+        encabezado = catalogo[0]
+        datos = [fila for fila in catalogo[1:] if fila]  # Eliminar filas vacías
 
-    # Validar índice
-    if not all(len(fila) > indice for fila in datos):
-        raise IndexError(f"El índice {indice} es inválido para algunas filas.")
+        # Validar índice
+        if not all(len(fila) > indice for fila in datos):
+            raise IndexError(f"El índice {indice} es inválido para algunas filas.")
 
-    # Ordenar por el índice especificado, convirtiendo el elemento a str temporalmente
-    datos.sort(key=lambda x: str(x[indice]))
+    else:
+        print("eventos")
+        datos=catalogo
 
     # Eliminar duplicados
     vistos = set()
@@ -1374,9 +1377,12 @@ def ordenar_y_eliminar_duplicados(catalogo, indice):
             vistos.add(clave)
             sin_duplicados.append(fila)
 
-    # Agregar el encabezado
-    sin_duplicados.insert(0, encabezado)
+    # Ordenar por el índice especificado, convirtiendo el elemento a str temporalmente
+    sin_duplicados.sort(key=lambda x: x[indice])
 
+    if bandera:    
+        # Agregar el encabezado
+        sin_duplicados.insert(0, encabezado)
     return sin_duplicados
 
 
@@ -1486,6 +1492,124 @@ def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaci
     #stLeido[0][0] = obspy.realtime.signal.offset(stLeido[0][0], offset=5.0, rtmemory_list=None)
     grafico_evento_int(visor,stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
 
+
+def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
+    """
+    evento_auxiliar              linea de lectura del archivo AAMMDD_aux.csv 
+    solo_eventos                 Todos los eventos procesados del día, se puede extraer un evento pasando solo_eventos=[]
+    archivo:                     archivo con formato ..\DIA\AAMMDD000000
+    """
+
+    directorios = obtener_directorios(archivo)
+    parametros = parametros_estaciones()
+    evento,tipo_evento,t_inicio, t_final = evento_auxiliar[1],evento_auxiliar[2], float(evento_auxiliar[4]), float(evento_auxiliar[5])
+    fecha_ = obtencion_hora(archivo)
+    t_ini = fecha_ + t_inicio
+    t_fin = fecha_ + t_final
+    numero_de_muestras=int((t_fin-t_ini)*64)
+    nombre_sis = os.path.join(directorios['Directorio_dia'] , t_ini.strftime('%y%m%d_%H%M%S.sis'))
+    hora_formateada = t_ini.strftime(" %H: %M: %S")
+    if t_inicio > t_final:
+        QMessageBox.about(None, "Advertencia", "Hora incorrecta: Tiempo de inicio mayor a final")
+        return
+    if evento not in solo_eventos:
+        estaciones=evento_auxiliar[7]
+        lista_estaciones =estaciones.split()
+        estaciones_eventos_total=[]
+        for estaciones_aportantes in lista_estaciones:
+            codigo_estacion=estaciones_aportantes[:4]
+            indice=parametros['CODIGO'].index(codigo_estacion)
+            estaciones_eventos_total.append(indice)
+    else:
+        return 
+    if tipo_evento != "Ruido":
+        sismo_extraido=[]
+        for numero_estacion in range(0,16):
+            componente=int(parametros['COMPONENTE'][numero_estacion])-1
+
+            if numero_estacion not in estaciones_eventos_total:
+                stcanal=[]
+                sis_extraido=np.array([])
+            else:
+                archivo_mseed_dia=os.path.join(directorios['Directorio_registros'],parametros['CODIGO'][numero_estacion]+directorios['sufijo_mseed'])
+                stcanal = read(archivo_mseed_dia, format="MSEED", starttime=t_ini, endtime=t_fin, nearest_sample=False)
+                if len(stcanal)==0:
+                    continue
+                # Aplica corrección de polaridad si es necesario
+                if parametros['POLARIDAD'][numero_estacion] == 'N':
+                    #print('Canal con polaridad negativa: ', parametros['CODIGO'][numero_estacion])
+                    stcanal[componente].data *= -1
+                # Guardar archivo .mseed
+                nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
+                stcanal.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
+                stcanal[componente].data = stcanal[componente].data.astype('int32')
+                sis_extraido = stcanal[componente].data
+                muestras = stcanal[componente].stats.sampling_rate
+                if muestras!=64:
+                    sis_extraido = signal.resample(sis_extraido, numero_de_muestras)
+                # Forzar tamaño correcto
+                if sis_extraido.size != numero_de_muestras:
+                    if sis_extraido.size > numero_de_muestras:
+                        sis_extraido = sis_extraido[:numero_de_muestras]
+                    else:
+                        faltantes = numero_de_muestras - sis_extraido.size
+                        sis_extraido = np.pad(sis_extraido, (0, faltantes), mode='constant')
+            sismo_extraido.append(sis_extraido)
+        # Crear archivo .sis si es evento sísmico
+        if tipo_evento == "SISMO":
+            archivo_cabecera = archivo[0:-12] + "cabecera_sismo"
+            try:
+                with open(archivo_cabecera, 'rb') as archivo_leer:
+                    cabecera = b''
+                    contador = 0
+                    while contador < 2:
+                        marcador = archivo_leer.read(2)
+                        if marcador == b'\x08\x00':
+                            cabecera_0 = archivo_leer.read(2)
+                            num_caracteres = struct.unpack("<H", cabecera_0)[0]
+                            archivo_leer.read(num_caracteres)
+                            contador += 1
+                    puntero = archivo_leer.tell()
+                    archivo_leer.seek(0)
+                    cabecera = archivo_leer.read(puntero) + b'\x08\x00\x0B\x00' + hora_formateada.encode('utf-8') + archivo_leer.read()
+                with open(nombre_sis, 'wb') as archivo_escribir:
+                    archivo_escribir.write(cabecera)
+                    segundo_ = t_ini.hour * 3600 + t_ini.minute * 60 + t_ini.second
+                    segundo_string = f'{segundo_:05}'
+                    archivo_escribir.write(segundo_string.encode())
+                    k = 0
+                    for n in range( numero_de_muestras):
+                        if k == 0:
+                            archivo_escribir.write(
+                                b'\x02\x20\x02\x00\x40\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00'
+                            )
+                        k += 1
+                        if k == 64:
+                            k = 0
+                        for m in range(16):
+                            if parametros['HAB_CANAL'][m] == "1" and sismo_extraido[m].size>0:
+                                valor = int(sismo_extraido[m][n])
+                            else:
+                                valor=0
+                            if parametros['BITS'][m]=='20':
+                                valor= int(valor*(32767 / 524287))
+                            archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
+            except FileNotFoundError:
+                print("Cabecera binaria no encontrada:", archivo_cabecera)
+
+
+    if evento not in solo_eventos:
+        print("Evento ",evento_auxiliar[1]," colocado")
+        evento=evento_auxiliar[:3]
+        estaciones_eventos_total=[]
+        lista_guiones = ['-'] * 101
+        for estacion_aportante in lista_estaciones or bandera_forzar:
+            codigo_estacion=estacion_aportante[:4]
+            indice=parametros['CODIGO'].index(codigo_estacion)
+            nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][indice] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
+            lista_guiones[indice]=estacion_aportante
+        evento=evento+lista_guiones
+    return evento
 
 def extraccion_(archivo, n_evento, tipo_evento, t_inicio, t_final, estaciones_eventos_total, estaciones_eventos, bandera_ajuste, registro_tiempo, filtros):
     """

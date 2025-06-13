@@ -26,7 +26,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
 from PyQt5 import uic
 from PyQt5 import QtWidgets
 from metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,lectura_archivo,
-                         escritura_archivo,revisar_csv,filtro_evento)
+                         escritura_archivo,revisar_csv,filtro_evento,extraccion,ordenar_y_eliminar_duplicados)
 
 from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
 import struct
@@ -546,7 +546,6 @@ class Extraer_evento(QMainWindow):
         estaciones_(self.hab_grafico,self.estaciones_eventos,self.filtros_estaciones,self).exec_()
         
     def Salir_(self):
-        
         message_box = QMessageBox(
             QMessageBox.Question,
             "¡Importante!",
@@ -569,8 +568,6 @@ class Extraer_evento(QMainWindow):
             archivo_guardar=directorio+"/reportes/"+b+"_tiempos.csv"
             if os.path.exists(archivo_guardar):
                 pass
-
-
             with open(nombre_archivo,newline='') as lista_csv:
                 lista_eventos=csv.reader(lista_csv,delimiter=';',quotechar=';')
                 cont_sismo=[0,0,0]
@@ -634,6 +631,16 @@ class Extraer_evento(QMainWindow):
                 if(total!=0):
                     archivo_dato.write(self.cmbx_resp_1.currentText()+";"+str(hora_[i])+"H;"+str(total)+";"+str(cont_sismo[i])+";"+str(cont_FF[i])+";"+str(cont_FC[i])+";"+str(cont_indefinido[i])+";"+str(cont_tele[i])+";"+str(cont_local[i])+";"+str(cont_ruido[i])+'\n')
             archivo_dato.close        
+            eventos=lectura_archivo(self.directorios['archivo_csv'])
+            solo_eventos = [fila[1] for fila in eventos]
+            for evento_auxiliar in self.eventos_auxiliar:
+                evento=extraccion(evento_auxiliar,solo_eventos,self.archivo,False)
+                if evento!=None:
+                    eventos.append(evento)
+            eventos=ordenar_y_eliminar_duplicados(eventos,1,False)
+            for i,evento in enumerate(eventos):
+                evento[0]=i+1
+            escritura_archivo(self.directorios['archivo_csv'],eventos)
         self.close()
 
 

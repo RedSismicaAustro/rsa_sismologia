@@ -18,7 +18,7 @@ if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QPushButton, QCalendarWidget, QMessageBox
+    QApplication, QWidget, QVBoxLayout, QPushButton, QCalendarWidget, QMessageBox,QCheckBox
 )
 from obspy import read
 from metodos_rsa import (obtencion_hora,lectura_archivo,escritura_archivo,ordenar_y_eliminar_duplicados)
@@ -30,12 +30,13 @@ import matplotlib
 import numpy as np
 matplotlib.use('Qt5Agg')  # Asegúrate de que esto está antes de importar matplotlib.pyplot
 
-def extraccion(evento_auxiliar,solo_eventos,archivo):
+def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
     """
     evento_auxiliar              linea de lectura del archivo AAMMDD_aux.csv 
     solo_eventos                 Todos los eventos procesados del día, se puede extraer un evento pasando solo_eventos=[]
     archivo:                     archivo con formato ..\DIA\AAMMDD000000
     """
+
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
     evento,tipo_evento,t_inicio, t_final = evento_auxiliar[1],evento_auxiliar[2], float(evento_auxiliar[4]), float(evento_auxiliar[5])
@@ -73,7 +74,7 @@ def extraccion(evento_auxiliar,solo_eventos,archivo):
                     continue
                 # Aplica corrección de polaridad si es necesario
                 if parametros['POLARIDAD'][numero_estacion] == 'N':
-                    print('Canal con polaridad negativa: ', parametros['CODIGO'][numero_estacion])
+                    #print('Canal con polaridad negativa: ', parametros['CODIGO'][numero_estacion])
                     stcanal[componente].data *= -1
                 # Guardar archivo .mseed
                 nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
@@ -135,16 +136,16 @@ def extraccion(evento_auxiliar,solo_eventos,archivo):
 
 
     if evento not in solo_eventos:
+        print("Evento ",evento_auxiliar[1]," colocado")
         evento=evento_auxiliar[:3]
         estaciones_eventos_total=[]
         lista_guiones = ['-'] * 101
-        for estacion_aportante in lista_estaciones:
+        for estacion_aportante in lista_estaciones or bandera_forzar:
             codigo_estacion=estacion_aportante[:4]
             indice=parametros['CODIGO'].index(codigo_estacion)
             nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][indice] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
             lista_guiones[indice]=estacion_aportante
         evento=evento+lista_guiones
-    print("Evento extraído y guardado correctamente.")        
     return evento
 
 
@@ -165,13 +166,19 @@ class AplicacionEventos(QWidget):
         self.boton_ejecutar.clicked.connect(self.procesar_evento)
         layout.addWidget(self.boton_ejecutar)
 
+        # Checkbox para forzar extracción (por defecto desmarcado)
+        self.checkbox_forzar_extraccion = QCheckBox("Forzar extracción", self)
+        self.checkbox_forzar_extraccion.setChecked(False)
+        layout.addWidget(self.checkbox_forzar_extraccion)
+
+
         # Botón para salir
         self.boton_salir = QPushButton("Salir", self)
         self.boton_salir.clicked.connect(self.close)
         layout.addWidget(self.boton_salir)
 
-        self.directorio_trabajo = 'G:\Mi unidad\DIA'
-        #self.directorio_trabajo = 'C:\DIA'
+        #self.directorio_trabajo = 'G:\Mi unidad\DIA'
+        self.directorio_trabajo = 'C:\DIA'
         self.setLayout(layout)
 
     def procesar_evento(self):
@@ -180,12 +187,18 @@ class AplicacionEventos(QWidget):
         directorios = obtener_directorios(archivo)
         eventos_auxiliar = lectura_archivo(directorios['archivo_auxiliar'])
         eventos = lectura_archivo(directorios['archivo_csv'])
+        if self.checkbox_forzar_extraccion.isChecked():
+            eventos=[]
         solo_eventos = [fila[1] for fila in eventos]
+
+            
         for evento_auxiliar in eventos_auxiliar:
-            evento=extraccion(evento_auxiliar,solo_eventos,archivo)
+            evento=extraccion(evento_auxiliar,solo_eventos,archivo,False)
             if evento!=None:
                 eventos.append(evento)
-        ordenar_y_eliminar_duplicados(eventos,1)
+        eventos=ordenar_y_eliminar_duplicados(eventos,1,False)
+        for i,evento in enumerate(eventos):
+            evento[0]=i+1
         escritura_archivo(directorios['archivo_csv'],eventos)
 
 def main():
