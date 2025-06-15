@@ -75,6 +75,9 @@ Npts: {stats.npts}
 Factor de calibración: {stats.calib}
 """
         print(stats)
+        traza=self.st[0]
+        print(type(traza.data))         # Tipo de array (normalmente numpy.ndarray)
+        print(traza.data.dtype)         # Tipo de datos internos (por ejemplo int32, float32, etc.)
         if starttime != fecha_inicio or endtime != fecha_fin:
             mensaje += "\n⚠️ El archivo NO cubre un día completo. Se recomienda corregirlo."
 

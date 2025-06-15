@@ -498,3 +498,30 @@ def revisar_csv(eventos):
     print("Saliendo revisar csv")
     return eventos_filtrados
 
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar
+from PyQt5.QtCore import Qt, QCoreApplication
+
+class VentanaProgreso(QDialog):
+    def __init__(self, mensaje="Procesando...", maximo=100, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Progreso")
+        self.setFixedSize(300, 100)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        
+        layout = QVBoxLayout(self)
+        self.etiqueta = QLabel(mensaje)
+        layout.addWidget(self.etiqueta)
+
+        self.barra = QProgressBar(self)
+        self.barra.setRange(0, maximo)
+        self.barra.setValue(0)
+        layout.addWidget(self.barra)
+
+        self.show()  # IMPORTANTE para que se dibuje
+
+    def actualizar(self, valor):
+        self.barra.setValue(valor)
+        QCoreApplication.processEvents()  # Fuerza a Qt a redibujar la barra
+
+    def cerrar(self):
+        self.accept()

@@ -1540,7 +1540,7 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
         for estacion_analogica in estaciones_analogicas:
             if estacion_analogica[0]=='ESTACION':
                 continue
-            
+           
             numero_estacion=int(estacion_analogica[0])
             componente=int(parametros['COMPONENTE'][numero_estacion])-1
             if numero_estacion not in estaciones_eventos_total:
@@ -1602,13 +1602,17 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
                         k += 1
                         if k == 64:
                             k = 0
-                        for m in range(16):
-                            if parametros['HAB_CANAL'][m] == "1" and sismo_extraido[m].size>0:
+                        for i,estacion_analogica in enumerate(estaciones_analogicas):
+                            if estacion_analogica[0]=='ESTACION':
+                                continue
+                            m=i-1
+                            estacion=int(estacion_analogica[0])
+                            if parametros['HAB_CANAL'][estacion] == "1" and sismo_extraido[m].size>0:
                                 valor = int(sismo_extraido[m][n])
                             else:
                                 valor=0
-                            if parametros['BITS'][m]=='20':
-                                valor= int(valor*(32767 / 524287))
+                            if parametros['BITS'][estacion]=='20':
+                                valor= valor>>4
                             archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
             except FileNotFoundError:
                 print("Cabecera binaria no encontrada:", archivo_cabecera)
@@ -1931,8 +1935,6 @@ def cargar_dia(archivo_csv):
             variable_responsables.append(aux)
     resumen=[["SISMO","FF","FC","TELESISMOS","Local_CONTROL","INDEFINIDO","Ruido"],[sum(cont_sismo),sum(cont_FF),sum(cont_FC),sum(cont_tele),sum(cont_local),sum(cont_indefinido),sum(cont_ruido)]]
     return eventos_reporte,catalogo,eventos,vector,canales_eventos_dia,root,variable_responsables,resumen
-
-
 
 def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,magnitud_,tipo_magnitud,texto,texto2,evento_reporte_escogido,indice,indice_local):
     #red_:          cmbx_red.currentIndex

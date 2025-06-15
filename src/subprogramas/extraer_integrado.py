@@ -28,7 +28,7 @@ from PyQt5 import QtWidgets
 from metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,lectura_archivo,
                          escritura_archivo,revisar_csv,filtro_evento,extraccion,ordenar_y_eliminar_duplicados)
 
-from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
+from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios,VentanaProgreso
 import struct
 datos_sismo={}
 import copy
@@ -175,7 +175,6 @@ class Extraer_evento(QMainWindow):
         self.directorio_registros=self.directorios['Directorio_registros']
         self.fecha_=obtencion_hora(self.archivo) 
         self.eventos_auxiliar=lectura_archivo(self.directorios['archivo_auxiliar'])
-        print(self.eventos_auxiliar)
         resultado=lectura_eventos(self.archivo)
         mensaje=resultado[0]
         self.hora_sismos=resultado[1]
@@ -629,10 +628,13 @@ class Extraer_evento(QMainWindow):
                     archivo_dato.write(self.cmbx_resp_1.currentText()+";"+str(hora_[i])+"H;"+str(total)+";"+str(cont_sismo[i])+";"+str(cont_FF[i])+";"+str(cont_FC[i])+";"+str(cont_indefinido[i])+";"+str(cont_tele[i])+";"+str(cont_local[i])+";"+str(cont_ruido[i])+'\n')
             archivo_dato.close        
             eventos=lectura_archivo(self.directorios['archivo_csv'])
+            maximo=len(eventos)
+            ventana = VentanaProgreso("Extrayendo eventos...", maximo)
             if self.chkBx_forzar.isChecked():
                 eventos=[]
             solo_eventos = [fila[1] for fila in eventos]
-            for evento_auxiliar in self.eventos_auxiliar:
+            for i,evento_auxiliar in enumerate(self.eventos_auxiliar):
+                ventana.actualizar(i + 1)
                 evento=extraccion(evento_auxiliar,solo_eventos,self.archivo,False)
                 if evento!=None:
                     eventos.append(evento)
@@ -640,6 +642,7 @@ class Extraer_evento(QMainWindow):
             for i,evento in enumerate(eventos):
                 evento[0]=i+1
             escritura_archivo(self.directorios['archivo_csv'],eventos)
+            ventana.cerrar()
         self.close()
 
 
