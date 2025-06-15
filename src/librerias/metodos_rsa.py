@@ -1498,8 +1498,10 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
     evento_auxiliar              linea de lectura del archivo AAMMDD_aux.csv 
     solo_eventos                 Todos los eventos procesados del día, se puede extraer un evento pasando solo_eventos=[]
     archivo:                     archivo con formato ..\DIA\AAMMDD000000
+    bandera_forzar               bandera para forzar la lectura, así esté en el archivo AAMMDD000000.csv
     """
-
+    
+    estaciones_analogicas=lectura_archivo(os.path.join(ruta_datos,'analogicas.csv'))
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
     evento,tipo_evento,t_inicio, t_final = evento_auxiliar[1],evento_auxiliar[2], float(evento_auxiliar[4]), float(evento_auxiliar[5])
@@ -1513,8 +1515,19 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
         QMessageBox.about(None, "Advertencia", "Hora incorrecta: Tiempo de inicio mayor a final")
         return
     if evento not in solo_eventos:
-        estaciones=evento_auxiliar[7]
-        lista_estaciones =estaciones.split()
+        if len(evento_auxiliar)>6:
+            estaciones=evento_auxiliar[7]
+            lista_estaciones =estaciones.split()
+        else:
+            eventos=lectura_archivo(directorios['archivo_csv'])
+            lista_estaciones=[]
+            for evento in eventos:
+                if evento[1]==evento_auxiliar[1]:
+                    break
+            for estacion_aportante in evento[3:]:
+                if estacion_aportante!='-':
+                    lista_estaciones.append(estacion_aportante)
+            
         estaciones_eventos_total=[]
         for estaciones_aportantes in lista_estaciones:
             codigo_estacion=estaciones_aportantes[:4]
@@ -1524,9 +1537,12 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
         return 
     if tipo_evento != "Ruido":
         sismo_extraido=[]
-        for numero_estacion in range(0,16):
+        for estacion_analogica in estaciones_analogicas:
+            if estacion_analogica[0]=='ESTACION':
+                continue
+            
+            numero_estacion=int(estacion_analogica[0])
             componente=int(parametros['COMPONENTE'][numero_estacion])-1
-
             if numero_estacion not in estaciones_eventos_total:
                 stcanal=[]
                 sis_extraido=np.array([])
@@ -1596,18 +1612,16 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
                             archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
             except FileNotFoundError:
                 print("Cabecera binaria no encontrada:", archivo_cabecera)
-
-
     if evento not in solo_eventos:
-        print("Evento ",evento_auxiliar[1]," colocado")
         evento=evento_auxiliar[:3]
         estaciones_eventos_total=[]
         lista_guiones = ['-'] * 101
-        for estacion_aportante in lista_estaciones or bandera_forzar:
-            codigo_estacion=estacion_aportante[:4]
-            indice=parametros['CODIGO'].index(codigo_estacion)
-            nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][indice] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
-            lista_guiones[indice]=estacion_aportante
+        if lista_estaciones != []:#if tipo_evento != "Ruido":
+            for estacion_aportante in lista_estaciones or bandera_forzar:
+                codigo_estacion=estacion_aportante[:4]
+                indice=parametros['CODIGO'].index(codigo_estacion)
+                nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][indice] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
+                lista_guiones[indice]=estacion_aportante
         evento=evento+lista_guiones
     return evento
 

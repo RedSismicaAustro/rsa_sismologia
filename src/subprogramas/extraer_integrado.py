@@ -249,13 +249,11 @@ class Extraer_evento(QMainWindow):
                 self.trCanal.append([])
 
     def guardar_evento(self):
-        print("Guardand evento ", )
         self.visor.clf()
         self.canvas.draw_idle()
         bandera_ajuste=0
         if self.chkBx_ajuste.checkState()==2:
             bandera_ajuste=1
-        print("Entrando a extraccion")
         n_evento = self.cmbx_eventos.currentIndex() + 1
         tipo_evento = self.Cmb_bx_tipo_evento.currentText()
         fecha_real = self.tiempo + self.t_inicio  # Usado solo para generar nombre
@@ -270,7 +268,6 @@ class Extraer_evento(QMainWindow):
             estacion=self.parametros['CODIGO'][indice]+self.parametros['COMPONENTE'][indice]+aporta+self.filtros_estaciones[i]+" "
             estaciones=estaciones+estacion
         evento_auxiliar=(n_evento,nombre_sis,tipo_evento,ahora, self.t_inicio, self.t_final,self.responsable,estaciones,self.hora_sismos[self.cmbx_eventos.currentIndex()])
-        print(evento_auxiliar)
         self.eventos_auxiliar.append(evento_auxiliar)
         escritura_archivo(self.directorios['archivo_auxiliar'],self.eventos_auxiliar)
         self.Lbl_Mensajes_2.setText("Ultimo : Marca "+str(self.cmbx_eventos.currentIndex()+1))
@@ -632,6 +629,8 @@ class Extraer_evento(QMainWindow):
                     archivo_dato.write(self.cmbx_resp_1.currentText()+";"+str(hora_[i])+"H;"+str(total)+";"+str(cont_sismo[i])+";"+str(cont_FF[i])+";"+str(cont_FC[i])+";"+str(cont_indefinido[i])+";"+str(cont_tele[i])+";"+str(cont_local[i])+";"+str(cont_ruido[i])+'\n')
             archivo_dato.close        
             eventos=lectura_archivo(self.directorios['archivo_csv'])
+            if self.chkBx_forzar.isChecked():
+                eventos=[]
             solo_eventos = [fila[1] for fila in eventos]
             for evento_auxiliar in self.eventos_auxiliar:
                 evento=extraccion(evento_auxiliar,solo_eventos,self.archivo,False)
