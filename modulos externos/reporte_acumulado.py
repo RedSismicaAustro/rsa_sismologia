@@ -406,7 +406,21 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         bandera_relleno=self.ck_box_relleno.isChecked()
 
         #             reporte_resumen(archivo,              subtitulo,           fecha_ini,      fecha_fin,      catalogo,      resumen,          mapa_,                          detalle,                  banderas,estaciones,     directorio          ,arbol,    resumen responsables) 
-        acelerogramas=reporte_resumen(self.archivo_1_pdf,   self.periodo_reporte,self.fecha_ini,self.fecha_fin, self.catalogo,self.resumen,self.cmbx_zona.currentIndex(),self.cmbx_mapa.currentIndex(),     banderas,       0      ,  self.directorio_trabajo,self.arbol,self.reporte_total,self.eventos,bandera_relleno)
+        acelerogramas=reporte_resumen(self.archivo_1_pdf,
+                                      self.periodo_reporte,
+                                      self.fecha_ini,
+                                      self.fecha_fin, 
+                                      self.catalogo,
+                                      self.resumen,
+                                      self.cmbx_zona.currentIndex(),
+                                      self.cmbx_mapa.currentIndex(),     
+                                      banderas,       
+                                      0      ,  
+                                      self.directorio_trabajo,
+                                      self.arbol,
+                                      self.reporte_total,
+                                      self.eventos,
+                                      bandera_relleno)
         registro1=[]
         registro2=[]
         xxx=['Evento','Estación','Canal 0'  ,''        ,''         ,'Canal 1'  ,''        ,''         ,'Canal 2'  ,''         ,'']

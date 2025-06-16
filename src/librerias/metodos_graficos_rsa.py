@@ -328,16 +328,19 @@ def caja_simbologia(lienzo,resumen,vector,ubicacion_caja,mapa_,bandera_dia,bande
     #bandera_dia
     pos_x=ubicacion_caja[0]#pos_x=55
     pos_y=ubicacion_caja[1]#pos_y=234
-    lienzo.rect(pos_x+295,pos_y,215,64)
-    lienzo.rect(pos_x,pos_y,295,64)
+
     lienzo.setFont('Helvetica', 11)
     lienzo.drawString(pos_x+105,pos_y+50,"SIMBOLOGIA:")
     lienzo.setFont('Helvetica', 9)
     lienzo.drawString(pos_x+31,pos_y+48,"Magnitud(Md):")
     lienzo.drawString(pos_x+5,pos_y+38,"3.0 - 3.5 - 4.0 - 4.5 - 5.0")
     if mapa_==2:#Reporte a la Facultad
+        lienzo.rect(pos_x+240,pos_y,200,64)
+        lienzo.rect(pos_x,pos_y,240,64)
         lienzo.drawString(pos_x+105,pos_y+27,"Sismos procesados")
     else:
+        lienzo.rect(pos_x+295,pos_y,215,64)
+        lienzo.rect(pos_x,pos_y,295,64)
         lienzo.drawString(pos_x+105,pos_y+27,"Sismo superficial, < 40 km.")
         lienzo.drawString(pos_x+105,pos_y+16,"Sismo con profundidad media, de 40 a 70 Km.")
         lienzo.drawString(pos_x+105,pos_y+5,"Sismo profundo, > 70 Km.")
@@ -350,10 +353,18 @@ def caja_simbologia(lienzo,resumen,vector,ubicacion_caja,mapa_,bandera_dia,bande
             promedio_sismos_localizados=round(resumen[1][1]/(len(resumen)-2),1)
             promedio_sismos_no_localizados=round(resumen[1][2]/(len(resumen)-2),1)
         promedio_total=round(promedio_sismos_localizados+promedio_sismos_no_localizados,1)
-        lienzo.drawString(pos_x+340,pos_y+50,"Promedio diario de registros")
-        lienzo.drawString(pos_x+305,pos_y+28,"Sismos localizados:    "+str(promedio_sismos_localizados)+" sismos/dia")
-        lienzo.drawString(pos_x+305,pos_y+17,"Eventos sin localizar:  "+str(promedio_sismos_no_localizados)+" eventos/dia")
-        lienzo.drawString(pos_x+305,pos_y+6,"Total:                         "+str(promedio_total)+" registros/dia")
+        if mapa_==2:
+            lienzo.drawString(pos_x+280,pos_y+50,"Promedio diario de registros")
+            lienzo.drawString(pos_x+250,pos_y+28,"Sismos localizados:    "+str(promedio_sismos_localizados)+" sismos/dia")
+            lienzo.drawString(pos_x+250,pos_y+17,"Eventos sin localizar:  "+str(promedio_sismos_no_localizados)+" eventos/dia")
+            lienzo.drawString(pos_x+250,pos_y+6,"Total:                         "+str(promedio_total)+" registros/dia")
+        else:
+            lienzo.drawString(pos_x+340,pos_y+50,"Promedio diario de registros")
+            lienzo.drawString(pos_x+305,pos_y+28,"Sismos localizados:    "+str(promedio_sismos_localizados)+" sismos/dia")
+            lienzo.drawString(pos_x+305,pos_y+17,"Eventos sin localizar:  "+str(promedio_sismos_no_localizados)+" eventos/dia")
+            lienzo.drawString(pos_x+305,pos_y+6,"Total:                         "+str(promedio_total)+" registros/dia")
+
+
     else: #Reporte de periodo desde Austro en adelante.
         aux=sum(resumen)
         promedio_sismos_localizados=round(aux/(len(resumen)-2),1)
@@ -424,17 +435,17 @@ def formato(marca_agua,tamanio_hoja,titulo, subtitulo,formato_,lienzo):
         lienzo.drawString((PAGE_HEIGHT - text_width) / 2.0,495,subtitulo)
     else:
         canvas.Canvas.setPageSize(lienzo, A4)
-        lienzo.drawImage(cabecera, 30, 780, 550, 50)# posx, posy, ancho, alto
-        lienzo.drawImage(pie, 456, 10, 140, 50)# posx, posy, ancho, alto
+        lienzo.drawImage(cabecera, 61, 744, 474, 43)# posx, posy, ancho, alto
+        lienzo.drawImage(pie, 426, 53, 109, 39)# posx, posy, ancho, alto
         lienzo.drawImage(logoRSA, xpos, ypos, ancho, alto)# posx, posy, ancho, alto
         lienzo.setFillColor('Black')
-        lienzo.setFont('Helvetica-Bold', 30)
+        lienzo.setFont('Helvetica-Bold', 20)
         lienzo.setFillColor('Gray')
-        text_width = stringWidth(titulo,'Helvetica-Bold', 30)
-        lienzo.drawString((PAGE_WIDTH - text_width) / 2.0,720,titulo)
-        lienzo.setFont('Helvetica', 18)
-        text_width = stringWidth(subtitulo,'Helvetica', 18)
-        lienzo.drawString((PAGE_WIDTH - text_width) / 2.0,690,subtitulo)
+        text_width = stringWidth(titulo,'Helvetica-Bold', 20)
+        lienzo.drawString((PAGE_WIDTH - text_width) / 2.0,700,titulo)
+        lienzo.setFont('Helvetica', 16)
+        text_width = stringWidth(subtitulo,'Helvetica', 16)
+        lienzo.drawString((PAGE_WIDTH - text_width) / 2.0,670,subtitulo)
         lienzo.setFillColor('Black')
     return lienzo
 
@@ -592,11 +603,11 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
         pos_y=234
 
     else:
-        tamanio=(63,200,470,470)#xpos,ypos,ancho,alto
-        marca_agua=(250, 20, 100, 45)#xpos,ypos,ancho,alto
+        tamanio=(81,216,432,432)#xpos,ypos,ancho,alto
+        marca_agua=(261, 66, 79, 36)#xpos,ypos,ancho,alto
         lienzo=formato(marca_agua,tamanio_hoja,titulo,subtitulo,2,lienzo)
-        pos_x=50
-        pos_y=100
+        pos_x=85
+        pos_y=109
     lienzo=mapa(lienzo,mapa_despliegue,tamanio,coordenadas,salto,bandera_marca)
     lienzo=dibujo_sismos_(lienzo,vector,coordenadas,tamanio,mapa_,bandera_dia,bandera_relleno)
     ubicacion_caja=(pos_x,pos_y)
@@ -616,13 +627,11 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
         ##### REPORTE DE PERIODO
         ################################################################
     if bandera_dia:
-        #print("Reporte de Período:")
         #Impresión del resumen diario de eventos procesados a travez de un chart de barras.
         lienzo=estadistica_(lienzo,resumen,fecha_ini,mapa_,bandera_dia)
         ####################################################
         ####SOLO PARA CONTROL INTENO mapa_=1
         ####################################################
-
         if mapa_==1:
             ####################################################
             ####HORAS LABORADAS
@@ -754,7 +763,6 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
         ####################################################################
     else:   
         print("Reporte diario")
-        print(archivo_pdf)
         archivo=referencia_directorio_completa(archivo_pdf)
         directorios=obtener_directorios(archivo)
         #Impresión del resumen dea actividades por responsable de procesamiento.
