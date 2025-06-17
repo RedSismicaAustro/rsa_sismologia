@@ -323,6 +323,7 @@ class MyApp(QMainWindow):
         tipo_magnitud=self.cmbx_tipo_mag.currentText()
         texto=self.textEdit.toPlainText()
         texto2=self.textEdit_2.toPlainText()
+        print(texto,texto2)
         self.catalogo,self.eventos_reporte=insertar_evento_otras_redes(
             self.catalogo,
             self.indice_catalogo,

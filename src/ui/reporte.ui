@@ -89,7 +89,7 @@
       <rect>
        <x>30</x>
        <y>424</y>
-       <width>151</width>
+       <width>241</width>
        <height>121</height>
       </rect>
      </property>
@@ -131,7 +131,7 @@
       <rect>
        <x>30</x>
        <y>564</y>
-       <width>151</width>
+       <width>231</width>
        <height>31</height>
       </rect>
      </property>
@@ -142,7 +142,7 @@
      </property>
      <property name="geometry">
       <rect>
-       <x>300</x>
+       <x>310</x>
        <y>470</y>
        <width>51</width>
        <height>40</height>
@@ -174,7 +174,7 @@
      </property>
      <property name="geometry">
       <rect>
-       <x>220</x>
+       <x>260</x>
        <y>510</y>
        <width>121</width>
        <height>40</height>
@@ -188,7 +188,8 @@
       </font>
      </property>
      <property name="text">
-      <string>TIPO DE MAGNITUD</string>
+      <string> TIPO DE
+MAGNITUD</string>
      </property>
      <property name="scaledContents">
       <bool>false</bool>

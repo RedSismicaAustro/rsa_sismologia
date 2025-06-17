@@ -945,7 +945,7 @@ def lectura_archivo(archivo):
 def escritura_archivo(archivo, valores):
     try:
         # Abrimos el archivo en modo escritura
-        with open(archivo, 'w') as file:
+        with open(archivo, 'w', encoding='utf-8') as file:
             # Iteramos a través de las listas en valores
             for sublist in valores:
                 if sublist!=[]:
@@ -1954,37 +1954,37 @@ def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,ma
             QMessageBox.information(None, "Error", '¡Falta información del sismo!')
             return  
     lectura=extraccion_dato(texto,"\n")
-
+    print(lectura)
     if(red_==1):#Cuando la red es IGEPN
-            if(lectura[2]!='Location'):
-                QMessageBox.information(None, "Error de formato", '¡Revise la información del sismo en la página de la IGEPN!')
-                return
-            if(texto2==""):
-                QMessageBox.information(None, "Error", '¡Falta información del sismo!\nRevise la ubicación del sismo en la página de la IGEPN!')
-                return 
-            tiempo=lectura[1]
-            catalogo_temp[0]=tiempo[0:4]+tiempo[5:7]+tiempo[8:10]+tiempo[11:13]+tiempo[14:16]+"01"#ID
-            catalogo_temp[1]=str(int(tiempo[0:4]))#año
-            catalogo_temp[2]=str(int(tiempo[5:7]))#mes
-            catalogo_temp[3]=str(int(tiempo[8:10]))#dia
-            catalogo_temp[4]=str(int(tiempo[11:13]))#hora
-            catalogo_temp[5]=str(int(tiempo[14:16]))#min
-            catalogo_temp[6]=str(int(tiempo[17:19]))#seg
-            localizacion=extraccion_dato(lectura[3]," ")
-            #Bandera_signo es una vacirable para diferenciar los hemisferios norte y sur.
-            if(localizacion[1]=='S'):
-                bandera_signo=-1
-            else:
-                bandera_signo=1
-            catalogo_temp[7]=str(bandera_signo*(float(localizacion[0][0:len(localizacion[0])-1])))#Longitud
-            catalogo_temp[8]=str(-1*(float(localizacion[2][0:len(localizacion[2])-1])))#Latitud
-            profundidad=extraccion_dato(lectura[5]," ")
-            catalogo_temp[9]=str(float(profundidad[0]))
-            try:
-                catalogo_temp[15]=str(float(lectura[7]))#Magnitud9*+9999999999999+9+9+9+9+9+9+9+9+9+9+9+
-            except ValueError:
-                aux=extraccion_dato(lectura[7],' ')
-                catalogo_temp[15]=str(float(aux[0]))   #Magnitud        
+        try:
+            indice_utc = lectura.index('Tiempo UTC:')
+            fecha_utc = lectura[indice_utc + 1]
+            anio, mes, dia = fecha_utc[:10].split('-')
+            hora, minuto, segundo = fecha_utc[11:].split(':')
+            valor_formateado = f"{anio}{mes}{dia}{hora}{minuto}01"
+            catalogo_temp[0]=valor_formateado#ID
+            catalogo_temp[1]=str(int(anio))#año
+            catalogo_temp[2]=str(int(mes))#mes
+            catalogo_temp[3]=str(int(dia))#dia
+            catalogo_temp[4]=str(int(hora))#hora
+            catalogo_temp[5]=str(int(minuto))#min
+            catalogo_temp[6]=str(int(segundo))#seg
+            indice_localizacion = lectura.index('Localización:')
+            localizacion=lectura[indice_localizacion + 1]
+            partes = localizacion.split()
+            latitud = float(partes[0].replace('°', '')) * (-1 if partes[1] == 'S' else 1)
+            longitud = float(partes[2].replace('°', '')) * (-1 if partes[3] == 'W' else 1)
+            catalogo_temp[7]=str(longitud)#Longitud
+            catalogo_temp[8]=str(latitud)#Latitud
+            indice_profundidad = lectura.index('Profundidad:')
+            profundidad_str=lectura[indice_profundidad + 1]
+            profundidad = float(profundidad_str.replace(' km', ''))
+            catalogo_temp[9]=str(profundidad)
+            indice_magnitud = lectura.index('Magnitud:')
+            magnitud_str=lectura[indice_magnitud + 1]
+            valor_magnitud, tipo_magnitud = magnitud_str.split()
+            valor_magnitud = float(valor_magnitud)
+            catalogo_temp[15]=str(valor_magnitud)   #Magnitud        
             catalogo_temp[16]=tipo_magnitud         #Tipo de Magnitud
             catalogo_temp[17]="IGEPN"               #Fuente
             catalogo_temp[18]=evento_reporte_escogido[0][1]#Ruta
@@ -1992,15 +1992,19 @@ def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,ma
                 catalogo_temp[18]=catalogo_temp[18][1:-1]
             if catalogo_temp[18][-1]=="\n":
                 catalogo_temp[18]=catalogo_temp[18][0:-2]
-            catalogo_temp[19]=ubicacion(float(catalogo_temp[7]),float(catalogo_temp[8]))#Ubicacion
+            catalogo_temp[19]=ubicacion(longitud,latitud)#Ubicacion
             eventos_temp[0]=indice_local
-            eventos_temp[1]=tiempo[0:4]+"/"+tiempo[5:7]+"/"+tiempo[8:10]+"_"+tiempo[11:13]+":"+tiempo[14:16]+":"+tiempo[17:19]#Fecha; Hora (UTC)
+            eventos_temp[1]=anio+"/"+mes+"/"+dia+"_"+hora+":"+minuto+":"+segundo#Fecha; Hora (UTC)
             eventos_temp[2]="IGEPN"#Evento
-            eventos_temp[3]=catalogo_temp[15]#Magnitud
-            eventos_temp[4]=float(profundidad[0])#Profundidad
-            eventos_temp[5]=catalogo_temp[7]#Longitud
-            eventos_temp[6]=catalogo_temp[8]#Latitud
+            eventos_temp[3]=str(valor_magnitud)#Magnitud
+            eventos_temp[4]=str(profundidad)#Profundidad
+            eventos_temp[5]=str(longitud)#Longitud
+            eventos_temp[6]=str(latitud)#Latitud
             eventos_temp[7]=catalogo_temp[19]#Ubicacion
+        except Exception as e:
+            QMessageBox.information(None, e, '¡Revise la información del sismo en la página de la IGEPN!')
+            return
+
     if(red_==2):#Cuando la red es USGS
             if(texto==""):
                 QMessageBox.information(None, "Error", '¡Falta información del sismo!\nRevise la ubicación del sismo en la página de la USGS!')
