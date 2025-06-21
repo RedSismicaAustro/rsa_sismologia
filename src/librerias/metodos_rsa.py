@@ -1617,7 +1617,6 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
             except FileNotFoundError:
                 print("Cabecera binaria no encontrada:", archivo_cabecera)
     if evento not in solo_eventos:
-        evento=evento_auxiliar[:3]
         estaciones_eventos_total=[]
         lista_guiones = ['-'] * 101
         if lista_estaciones != []:#if tipo_evento != "Ruido":
@@ -1626,7 +1625,7 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
                 indice=parametros['CODIGO'].index(codigo_estacion)
                 nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][indice] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
                 lista_guiones[indice]=estacion_aportante
-        evento=evento+lista_guiones
+        evento=list(evento_auxiliar[:3])+lista_guiones
     return evento
 
 def espectro_respuesta(acelerograma, dt,factor,directorio):
