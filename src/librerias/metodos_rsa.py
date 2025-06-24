@@ -943,20 +943,22 @@ def lectura_archivo(archivo):
     return []
 
 def escritura_archivo(archivo, valores):
+    from PyQt5.QtWidgets import QMessageBox
+
     try:
-        # Abrimos el archivo en modo escritura
         with open(archivo, 'w', encoding='utf-8') as file:
-            # Iteramos a través de las listas en valores
             for sublist in valores:
-                if sublist!=[]:
-                # Convertimos la sublista en una cadena separada por punto y coma
-                    lista_como_cadenas = [str(elemento) for elemento in sublist]    
+                if sublist != []:
+                    lista_como_cadenas = [str(elemento) for elemento in sublist]
                     linea = ';'.join(lista_como_cadenas)
-                # Escribimos la línea en el archivo, seguida de una nueva línea
                     file.write(linea + '\n')
-                    #print(linea)
+
     except Exception as e:
-        print(f"Error al escribir en el archivo {archivo}: {str(e)}")
+        mensaje = f"No se pudo escribir en el archivo:\n{archivo}\n\nEs posible que esté abierto en otro programa como Excel.\n\nDetalles: {str(e)}"
+        print(mensaje)
+        QMessageBox.warning(None, "Error al escribir archivo", mensaje)
+
+
 
 def copiar_archivos(archivos_origen, archivos_destino):
 
