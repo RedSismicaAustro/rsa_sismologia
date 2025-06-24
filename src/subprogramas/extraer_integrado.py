@@ -178,7 +178,25 @@ class Extraer_evento(QMainWindow):
         resultado=lectura_eventos(self.archivo)
         mensaje=resultado[0]
         self.hora_sismos=resultado[1]
+        print(self.hora_sismos)
         if self.hora_sismos!=0:
+            self.cargar_lista_eventos()
+            self.grupo_carga.setEnabled(True)
+            self.grupo_hora_especifica.setEnabled(True)
+            self.grupo_evento.setEnabled(False)
+            self.Lbl_Mensajes.setText("Actual: Marca 1. ")               
+        self.Lbl_Mensajes_2.setText(mensaje)
+        self.lectura_mseed_dia = self.filtrar_streams_invalidos(leer_mseed(self.archivo, 0))
+
+    def cargar_lista_eventos(self):
+            from PyQt5 import QtCore
+            indice_actual = self.cmbx_eventos.currentIndex()
+            self.cmbx_eventos.clear() 
+            
+            self.hora_sismos_extraidos = [
+                 int(fila[8]) for fila in self.eventos_auxiliar
+                 if len(fila) > 8 and fila[8] != 'Caudales'
+                 ]   
             for i in range(0,len(self.hora_sismos)):
                 h=self.hora_sismos[i]/(64*3600)
                 h_s=str(int(h))
@@ -192,15 +210,12 @@ class Extraer_evento(QMainWindow):
                 s_s=str(s)
                 if s<10:
                     s_s="0"+s_s
-                self.cmbx_eventos.addItem("Marca " +str(i+1)+":   "+h_s+":"+m_s+":"+s_s)
-            self.grupo_carga.setEnabled(True)
-            self.grupo_hora_especifica.setEnabled(True)
-            self.grupo_evento.setEnabled(False)
-            self.Lbl_Mensajes.setText("Actual: Marca 1. ")               
-        self.Lbl_Mensajes_2.setText(mensaje)
-
-        self.lectura_mseed_dia = self.filtrar_streams_invalidos(leer_mseed(self.archivo, 0))
-            
+                etiqueta = "Marca " + str(i + 1) + ":   " + h_s + ":" + m_s + ":" + s_s
+                self.cmbx_eventos.addItem(etiqueta)
+                if self.hora_sismos[i] in self.hora_sismos_extraidos:
+                    self.cmbx_eventos.setItemData(i, False, QtCore.Qt.UserRole - 1)
+           
+            self.cmbx_eventos.setCurrentIndex(indice_actual)
 
     def filtrar_streams_invalidos(self, lista_streams):
         """
@@ -248,8 +263,17 @@ class Extraer_evento(QMainWindow):
                 self.trCanal.append([])
 
     def guardar_evento(self):
+        try:
+            with open(self.directorios['archivo_auxiliar'], 'w', encoding='utf-8') as file:
+                # escribir normalmente
+                pass
+        except PermissionError as e:
+            print("Archivo ocupado:", e)
+        except Exception as e:
+            print("Otro error:", e)
         self.visor.clf()
         self.canvas.draw_idle()
+        
         bandera_ajuste=0
         if self.chkBx_ajuste.checkState()==2:
             bandera_ajuste=1
@@ -269,6 +293,7 @@ class Extraer_evento(QMainWindow):
         evento_auxiliar=(n_evento,nombre_sis,tipo_evento,ahora, self.t_inicio, self.t_final,self.responsable,estaciones,self.hora_sismos[self.cmbx_eventos.currentIndex()])
         self.eventos_auxiliar.append(evento_auxiliar)
         escritura_archivo(self.directorios['archivo_auxiliar'],self.eventos_auxiliar)
+        self.cargar_lista_eventos()
         self.Lbl_Mensajes_2.setText("Ultimo : Marca "+str(self.cmbx_eventos.currentIndex()+1))
         self.grupo_evento.setEnabled(False)
     
