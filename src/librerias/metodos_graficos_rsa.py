@@ -1045,7 +1045,7 @@ def impresion_reporte_acelerograma(archivo,trcanal,estacion,datos_sismo,bandera)
     # bandera------- 1 es reporte de periodo , 0 es reporte diario.
     maximos=[estacion]
     seniales_ascii=[]
-    datos_=parametros_estaciones()
+    parametros=parametros_estaciones()
     segundo_real=float(datos_sismo[IDX_SEGUNDO])
     fecha_hora = datetime(int(datos_sismo[IDX_ANIO]),int( datos_sismo[IDX_MES]), int(datos_sismo[IDX_DIA]), int(datos_sismo[IDX_HORA]), int(datos_sismo[IDX_MINUTO]), int(segundo_real), int((segundo_real - int(segundo_real)) * 100))
     latitud=str(datos_sismo[IDX_LATITUD])
@@ -1053,11 +1053,11 @@ def impresion_reporte_acelerograma(archivo,trcanal,estacion,datos_sismo,bandera)
     profundidad=str(datos_sismo[IDX_PROFUNDIDAD])
     magnitud=str(datos_sismo[IDX_MAGNITUD])+" "+str(datos_sismo[IDX_UNIDAD_MAG])
     fuente=str(datos_sismo[IDX_FUENTE])
-    dist_ep=str(round(111*((float(datos_['LATITUD'][estacion])-float(datos_sismo[IDX_LATITUD]))**2+(float(datos_['LONGITUD'][estacion])-float(datos_sismo[IDX_LONGITUD]))**2)**(0.5),2))
-    factor=float(datos_['FACTOR_MUL'][estacion]) #Es el factor de multiplicacion para convertirlos en punto flotante.
+    dist_ep=str(round(111*((float(parametros['LATITUD'][estacion])-float(datos_sismo[IDX_LATITUD]))**2+(float(parametros['LONGITUD'][estacion])-float(datos_sismo[IDX_LONGITUD]))**2)**(0.5),2))
+    factor=float(parametros['FACTOR_MUL'][estacion]) #Es el factor de multiplicacion para convertirlos en punto flotante.
     lugar=str(datos_sismo[IDX_LUGAR])
     cadena_fecha_hora = fecha_hora.strftime("%Y/%m/%d   %H:%M:%S.%f")
-    linea_1="Estacion:"+datos_['NOMBRE'][estacion]+"      Ubicación: Lat:"+datos_['LATITUD'][estacion]+"°  Long:"+datos_['LONGITUD'][estacion]+"°  Alt(msnm):"+datos_['ALTITUD'][estacion]
+    linea_1="Estacion:"+parametros['NOMBRE'][estacion]+"      Ubicación: Lat:"+parametros['LATITUD'][estacion]+"°  Long:"+parametros['LONGITUD'][estacion]+"°  Alt(msnm):"+parametros['ALTITUD'][estacion]
     if bandera:
         lienzo=archivo
     else:
@@ -1072,18 +1072,21 @@ def impresion_reporte_acelerograma(archivo,trcanal,estacion,datos_sismo,bandera)
         linea_4=linea_4+"         "+fuente+"           "+dist_ep+"                  "+lugar
     marca_agua=(200, 120, 500, 250)
     tamanio_hoja=A4
+    
+    diccionario_componentes = {
+    "XYZ": ("X", "Y", "Z"),
+    "LTV": ("LONGITUDINAL", "TRANSVERSAL", "VERTICAL"),
+    "ENZ": ("ESTE", "NORTE", "Z" ),
+    "TRV": ("TANGENCIAL", "RADIAL", "VERTICAL")
+}
 
+    nombre_componentes=diccionario_componentes[parametros["CANAL"]]
     for componente in range(0,3):
 #####################################################################
 #  Aqui se debe cambiar para corregir el error de los acelerogaramas.       
         
-        canal=trcanal[componente].stats.channel
-        if canal=='ENR':
-                dato="RADIAL        "#"RADIAL        "
-        elif canal=='ENT':
-                dato="TRANSVERSAL   "#"TRANSVERSAL   "
-        else:
-                dato="VERTICAL      "#"VERTICAL      "
+        dato=nombre_componentes[componente]
+        dato = dato.ljust(14)
 
 #
 #####################################################################

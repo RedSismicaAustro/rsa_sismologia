@@ -30,7 +30,7 @@ import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 
 from metodos_gestion import obtener_directorios
-from metodos_rsa import lectura_archivo, extraccion_, escritura_archivo
+from metodos_rsa import lectura_archivo, extraccion, escritura_archivo,obtencion_hora,ordenar_y_eliminar_duplicados
 
 
 # Cargar la interfaz desde el archivo .ui directamente en esta instancia
@@ -171,10 +171,10 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # === Eventos CONTROL del día gráfico ===
         eventos_control_dia = []
-        eventos = lectura_archivo(self.directorios['archivo_csv'])
-        for evento in eventos:
-                    if evento[2] == "CONTROL":
-                        eventos_control_dia.append(evento[1])
+        self.eventos = lectura_archivo(self.directorios['archivo_csv'])
+        for evento in self.eventos:
+            if evento[2] == "CONTROL":
+                eventos_control_dia.append(evento[1])
         for evento in eventos_control_dia:
             try:
                 fila = next((f for f in self.caudales if f[0] == evento and f[2] == "1"), None)
@@ -225,24 +225,38 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         if len(self.marcas_usuario) != 2:
             QMessageBox.warning(self, "Error", "Debes seleccionar exactamente 2 marcas.")
             return
-
         marcas_ordenadas = sorted(self.marcas_usuario)
         marca_dt_inicio = mdates.num2date(marcas_ordenadas[0]).replace(tzinfo=None)
         marca_dt_fin = mdates.num2date(marcas_ordenadas[1]).replace(tzinfo=None)
-
         tiempo_inicio = int((marca_dt_inicio - datetime(marca_dt_inicio.year, marca_dt_inicio.month, marca_dt_inicio.day)).total_seconds())
         tiempo_fin = int((marca_dt_fin - datetime(marca_dt_fin.year, marca_dt_fin.month, marca_dt_fin.day)).total_seconds())
+        
+#########################################
+#########################################
+        eventos_auxiliar=lectura_archivo(self.directorios['archivo_auxiliar'])        
+        tiempo = obtencion_hora(self.archivo)
+        n_evento = 0
+        tipo_evento = 'CONTROL'
+        fecha_real = tiempo +tiempo_inicio  # Usado solo para generar nombre
+        nombre_sis = fecha_real.strftime('%y%m%d_%H%M%S.sis')
+        ahora = datetime.now()
+        estaciones="CHA231000000"
+        evento_auxiliar=(n_evento,nombre_sis,tipo_evento,ahora, tiempo_inicio, tiempo_fin,'RSA',estaciones,'Caudales')
+        eventos_auxiliar.append(evento_auxiliar)
+        escritura_archivo(self.directorios['archivo_auxiliar'],eventos_auxiliar)
+ 
+########################################
+########################################
 
-        extraccion_(
-            self.archivo,
-            1,
-            'CONTROL',
-            tiempo_inicio,
-            tiempo_fin,
-            [['53']], [['53']],
-            0, 0, '000000'
-        )
-
+        solo_eventos = [fila[1] for fila in self.eventos]
+        for i,evento_auxiliar in enumerate(eventos_auxiliar):
+            evento=extraccion(evento_auxiliar,solo_eventos,self.archivo,False)
+            if evento!=None:
+                self.eventos.append(evento)
+        self.eventos=ordenar_y_eliminar_duplicados(self.eventos,1,False)
+        for i,evento in enumerate(self.eventos):
+            evento[0]=i+1
+        escritura_archivo(self.directorios['archivo_csv'],self.eventos)
         self.marcas_usuario.clear()
         self.cargar_componentes_fecha()
         self.desplegar_grafico()
