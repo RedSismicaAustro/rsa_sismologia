@@ -48,3 +48,6 @@ dist/
 *.egg-info/
 *.spec
 
+Spyder.bat
+Spyder.bat
+*.bat
