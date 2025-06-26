@@ -2282,22 +2282,24 @@ def recolectar_evt(directorio_base):
         return re.fullmatch(r"\d{6}", nombre) is not None
 
     # Revisar el contenido del directorio base
-    for item in os.listdir(directorio_base):
-        ruta_item = os.path.join(directorio_base, item)
-
-        if os.path.isfile(ruta_item):
-            if item.lower().endswith(".evt"):
-                archivos_evt.append(ruta_item)
-
-        elif os.path.isdir(ruta_item) and es_formato_aaaammdd(item):
+    print("Revisando en dicrectorio ",directorio_base )
+    subdirectorios_encontrados=os.listdir(directorio_base)
+    print("Subdirectorios encontrados:",subdirectorios_encontrados)
+    for subdirectorio in subdirectorios_encontrados:
+        print("Trabajando sobre ",subdirectorio)
+        ruta_subdirectorio = os.path.join(directorio_base, subdirectorio)
+        if os.path.isfile(ruta_subdirectorio):
+            if subdirectorio.lower().endswith(".evt"):
+                archivos_evt.append(ruta_subdirectorio)
+        elif os.path.isdir(ruta_subdirectorio) and es_formato_aaaammdd(subdirectorio):
             # Directorio tipo AAAAMMDD encontrado
-            for subitem in os.listdir(ruta_item):
-                ruta_subitem = os.path.join(ruta_item, subitem)
+            for subdirectorio_fecha in os.listdir(ruta_subdirectorio):
+                ruta_subdirectorio_fecha = os.path.join(ruta_subdirectorio, subdirectorio_fecha)
 
-                if os.path.isdir(ruta_subitem) and es_formato_aammdd(subitem):
+                if os.path.isdir(ruta_subdirectorio_fecha) and es_formato_aammdd(subdirectorio_fecha):
                     # Subdirectorio tipo AAMMDD encontrado
-                    for archivo in os.listdir(ruta_subitem):
-                        ruta_archivo = os.path.join(ruta_subitem, archivo)
+                    for archivo in os.listdir(ruta_subdirectorio_fecha):
+                        ruta_archivo = os.path.join(ruta_subdirectorio_fecha, archivo)
                         if os.path.isfile(ruta_archivo) and archivo.lower().endswith(".evt"):
                             archivos_evt.append(ruta_archivo)
 
