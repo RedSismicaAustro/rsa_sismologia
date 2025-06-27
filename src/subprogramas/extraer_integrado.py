@@ -718,7 +718,7 @@ class estaciones_(QDialog):
         self.spbox_canal={}
         lista_estaciones=[]
         for i in range(0, self.numero_estaciones):
-            canal_=self.estaciones_eventos[i]
+            canal_=int(self.estaciones_eventos[i])
             lista_estaciones.append(nombre_canal_total_[canal_])
             self.lbl_nombre[i]=QLabel(nombre_canal_total_[canal_],self)
             self.lbl_nombre[i].setGeometry(15, i*25+35, 150, 24)  #setGeometry(x, y, width, height)
