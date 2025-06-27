@@ -136,7 +136,7 @@ def grafico_evento_int(visor, stLeido, t_inicio, t_final, estaciones_evento, hab
 
     for i in range(pagina * 6, pagina * 6 + 6):
         if i < len(estaciones_evento):
-            canal_ = estaciones_evento[i]
+            canal_ = int(estaciones_evento[i])
             comp_ = int(parametros['COMPONENTE'][canal_]) - 1
             estaciones_graficar.append(canal_)
             st_graficar.append(stLeido[canal_][comp_])
@@ -1478,7 +1478,7 @@ def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaci
     num_canal=len(estaciones_eventos)
     for i in range(0, num_canal):
         indice=estaciones_eventos_total.index(estaciones_eventos[i])
-        canal_= estaciones_eventos[i]
+        canal_= int(estaciones_eventos[i])
         if bandera_todos:
             grado_=int(filtros_estaciones[indice][0:2])
             freqmin_=int(filtros_estaciones[indice][2:4])
@@ -2587,7 +2587,6 @@ def ejecutar_en_vm(evt_path,virtual_path):
         except Exception as e:
             print(e)
             return None
-            pass
 
 def diagnostico_memoria(etiqueta=''):
     proceso = psutil.Process(os.getpid())

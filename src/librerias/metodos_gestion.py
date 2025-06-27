@@ -1,14 +1,58 @@
-from obspy import UTCDateTime
+import sys
 import os
+from pathlib import Path
+def extraer_hasta_directorio(ruta_completa, nombre_directorio):
+    partes = Path(ruta_completa).parts
+    if nombre_directorio in partes:
+        indice = partes.index(nombre_directorio)
+        ruta_recortada = Path(*partes[:indice + 1])
+        return str(ruta_recortada) + '/'
+    else:
+        return ''
+ruta_librerias=os.path.dirname(__file__)
+ruta_proyecto=extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
+ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
+ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
+from obspy import UTCDateTime
 import csv
 import json
 import obspy
 import subprocess
 from PyQt5.QtWidgets import QApplication, QMessageBox
-import sys
-
 
 def lectura_archivo(archivo):
+    """
+    Lee un archivo de texto donde cada línea contiene valores separados por punto y coma.
+    Intenta detectar automáticamente la codificación entre varias comunes (UTF-8, Latin-1, cp1252).
+    Devuelve una lista de listas con los datos.
+    Args:
+        archivo (str): Ruta del archivo a leer.
+    Returns:
+        list: Lista de listas con los datos del archivo o None si ocurre un error.
+    """
+    import codecs
+    codificaciones_posibles = ['utf-8', 'latin-1', 'cp1252']
+    valores = []
+    for codificacion in codificaciones_posibles:
+        try:
+            with codecs.open(archivo, 'r', encoding=codificacion, errors='strict') as file:
+                for linea in file:
+                    elementos = linea.strip().split(';')
+                    if elementos != ['']:
+                        valores.append(elementos)
+            return valores  # Si se logra leer correctamente, retornamos aquí
+        except UnicodeDecodeError:
+            continue  # Intenta con la siguiente codificación
+        except FileNotFoundError:
+            print(f"El archivo {archivo} no fue encontrado.")
+            return []
+        except Exception as e:
+            print(f"Ocurrió un error al leer el archivo con codificación {codificacion}: {e}")
+            return None
+    print("No se pudo leer el archivo con ninguna de las codificaciones conocidas.")
+    return []
+
+def lectura_archivo____(archivo):
 
     import codecs
     codificaciones_posibles = ['utf-8', 'latin-1', 'cp1252']
@@ -90,14 +134,9 @@ def parametros_estaciones():
 #################################################################
 #Método de Extracción de datos de conficuración de las estaciones
 #Desde el archivo estaciones.csv que debe estar presente en el mismo directorio del ejecutable.
-    estaciones_=[]
-
-    RAIZ_PROYECTO = os.path.dirname(os.path.abspath(__file__))
-    RAIZ_PROYECTO=os.path.join(RAIZ_PROYECTO, "..","..")
-    ruta_csv =  os.path.join(RAIZ_PROYECTO, "datos", "estaciones.csv")
+    ruta_csv =  os.path.join(ruta_datos, "estaciones.csv")
     ruta_csv = os.path.abspath(ruta_csv)
-
-    estaciones_=lectura_archivo(ruta_csv)
+    estaciones=lectura_archivo(ruta_csv)
     nombre_canal_total_=[] #Variable que guarda el nombre completo de las estaciones       
     nombre_canal=[]        #Variable que guarda el nombre codigo del canal de las estaciones
     tipo_sensor=[]         #Variable que guarda el tipo de sensor de la estacion (Velocidad o aceleracion)
@@ -123,35 +162,34 @@ def parametros_estaciones():
     filtro_=[]
     polaridad_=[]
     reserva_1=[]
-    total_est=len(estaciones_)
-    for i in range(0, total_est):
-            if(i!=0):
-                nombre_canal_total_.append(estaciones_[i][1])
-                nombre_canal.append(estaciones_[i][2])
-                tipo_sensor.append(estaciones_[i][3])
-                n_canales_.append(estaciones_[i][4])
-                hab_canal.append(estaciones_[i][5])
-                componente_canal.append(estaciones_[i][6])
-                grafico_.append(estaciones_[i][7])
-                hab_plt.append(estaciones_[i][8])
-                gan_plt.append(estaciones_[i][9])
-                ganancia.append(estaciones_[i][10])
-                diez_plt.append(estaciones_[i][11])
-                factor_mult.append(estaciones_[i][12])
-                calidad_.append(estaciones_[i][13])
-                ubicacion_.append(estaciones_[i][14])
-                tipo_canal.append(estaciones_[i][15])
-                red_.append(estaciones_[i][16])
-                muestreo_.append(estaciones_[i][17])
-                longitud_.append(estaciones_[i][18])
-                latitud_.append(estaciones_[i][19])
-                altura_.append(estaciones_[i][20])
-                ruido_.append(int(estaciones_[i][21]))
-                numero_est.append(int(estaciones_[i][0]))
-                filtro_.append(estaciones_[i][22])
-                polaridad_.append(estaciones_[i][23])
-                reserva_1.append(estaciones_[i][24])              
-
+    for i,estacion in enumerate(estaciones):
+        if i==0:
+            continue
+        nombre_canal_total_.append(estacion[1])
+        nombre_canal.append(estacion[2])
+        tipo_sensor.append(estacion[3])
+        n_canales_.append(estacion[4])
+        hab_canal.append(estacion[5])
+        componente_canal.append(estacion[6])
+        grafico_.append(estacion[7])
+        hab_plt.append(estacion[8])
+        gan_plt.append(estacion[9])
+        ganancia.append(estacion[10])
+        diez_plt.append(estacion[11])
+        factor_mult.append(estacion[12])
+        calidad_.append(estacion[13])
+        ubicacion_.append(estacion[14])
+        tipo_canal.append(estacion[15])
+        red_.append(estacion[16])
+        muestreo_.append(estacion[17])
+        longitud_.append(estacion[18])
+        latitud_.append(estacion[19])
+        altura_.append(estacion[20])
+        ruido_.append((estacion[21]))
+        numero_est.append((estacion[0]))
+        filtro_.append(estacion[22])
+        polaridad_.append(estacion[23])
+        reserva_1.append(estacion[24])              
     return{'NOMBRE':nombre_canal_total_,    #Canal 0  'NOMBRE' Nombre con detalle
            'CODIGO':nombre_canal,           #Canal 1  'CODIGO' Nombre abrebiado 2n 4 letras mayusculas
            'SENSOR':tipo_sensor,            #Canal 2  'SENSOR' Tipo se sensor, sismico o acelerografio
