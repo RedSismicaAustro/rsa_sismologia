@@ -160,7 +160,6 @@ def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_eq
     # Extraer datos temporales desde el primer Trace
     tr = st[0]
     estacion = obtener_estacion(tr.stats.station)
-    serial_equipo=str(serial_equipo)
     inicio = tr.stats.starttime
 
     # Construcción del nombre del archivo: serial_YYYYMMDD_HHMMSS.mseed o estación_...
@@ -169,11 +168,10 @@ def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_eq
 
     # Si se usa serial, crear subdirectorio
     if serial_equipo:
-        directorio_grabar = os.path.join(directorio_grabar, serial_equipo)
+        directorio_grabar = os.path.join(directorio_grabar, str(serial_equipo))
         os.makedirs(directorio_grabar, exist_ok=True)
 
     ruta_completa = os.path.join(directorio_grabar, nombre_archivo)
-
     # Cargar parámetros de estación
     parametros = parametros_estaciones()
     estaciones = parametros['CODIGO']
@@ -186,7 +184,6 @@ def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_eq
     # Construir nombre del evento buscado (formato corto: AAMMDD_HHMMSS.sis)
     
     archivo_evento = f"{inicio.strftime('%y%m%d_%H%M%S')}.sis"
-    print(archivo_evento)
     segundos_elementos = [evento[1] for evento in eventos]
 
     if archivo_evento not in segundos_elementos:
@@ -196,19 +193,15 @@ def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_eq
     for tr in st:
         if not hasattr(tr.stats, "calib"):
             tr.stats.calib = 1.0  # Asumimos 1.0 si no se definió (caso común en algunos formatos)
-        print(tr.stats)   
-        
-    # Extraer codificación y tamaño de registro de la primera traza
-    codificacion = tr.stats.mseed.encoding if hasattr(tr.stats, "mseed") else 'STEIM2'
-    tam_registro = tr.stats.mseed.record_length if hasattr(tr.stats, "mseed") else 512
-    # Guardar el archivo MSEED
-    st.write(ruta_completa, format='MSEED', encoding=codificacion, reclen=tam_registro)
+  
+    st.write(ruta_completa, format='MSEED')
+
     # Actualizar eventos
     eventos[n_evento][indice + 3] = estacion + parametros['COMPONENTE'][indice] + '1000000'
 
     return eventos
 
-def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, bandera_insertar, directorio_serial_destino=None):
+def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, bandera_insertar, directorio_destino=None):
     datos_completos = []
     directorios_almacenamiento = re.split(r"[\\/]", archivo_evt)
     directorios = []
@@ -229,8 +222,8 @@ def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, b
     try:
         st = read(archivo_evt, format='KINEMETRICS_EVT')
         evt_info = st[0].stats.kinemetrics_evt
-        for stream in st:
-            stream.data = stream.data.astype(np.int32)
+        #for stream in st:
+            #stream.data = stream.data.astype(np.int32)
         bandera_formato = 1
     except:
         archivo_mseed = "No es compatible al formato"
@@ -256,9 +249,9 @@ def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, b
             print(f"Error obteniendo info de equipo: {e}")
         estacion =obtener_estacion(st[0].stats.station)
 
-        equipo_serial = str(equipo_serial) if directorio_serial_destino else None
+        equipo_serial = str(equipo_serial) if directorio_destino else None
 
-        directorio_final = directorio_serial_destino if directorio_serial_destino else directorios['Directorio_eventos']
+        directorio_final = directorio_destino if directorio_destino else directorios['Directorio_eventos']
 
         if os.path.exists(directorios['archivo_csv']):
             eventos = lectura_archivo(directorios['archivo_csv'])
@@ -330,10 +323,12 @@ def transformar_copiar_lista_EVT(self, lista_rutas_evt):
     self.progressBar.setValue(0)
 
     for contador, archivo_evt in enumerate(lista_rutas_evt, start=1):
-        datos = transformar_copiar_EVT(archivo_evt, self.directorio_trabajo,
-                               self.checkBox_verificacion.isChecked(),
-                               self.checkBox_insercion.isChecked(),
-                               self.directorio_serial_destino if self.radio_estacion_serial.isChecked() else None)
+        print(archivo_evt)
+        datos = transformar_copiar_EVT(archivo_evt,
+                                self.directorio_trabajo,
+                                self.checkBox_verificacion.isChecked(),
+                                self.checkBox_insercion.isChecked(),
+                                self.directorio_destino)
         
         
         datos_completos.extend(datos)
@@ -370,11 +365,9 @@ class MyApp(QMainWindow):
             aux_ = os.listdir(self.directorio_estacion)
             self.directorio_principal = sorted(aux_)
             self.cmbx_eventos.addItems(self.directorio_principal)
-
             # Limpiar y llenar el combobox de subdirectorios
             self.cmbx_subdirectorios.clear()
             self.cmbx_subdirectorios.addItem("Todos")  # Opción por defecto
-
             # Verifica que haya algo seleccionado
             if self.directorio_principal:
                 primer_subdir = os.path.join(self.directorio_estacion, self.directorio_principal[0])
@@ -384,7 +377,6 @@ class MyApp(QMainWindow):
                         self.cmbx_subdirectorios.addItems(sorted(subdirectorios))
         if self.radioLista.isChecked():
             self.ruta_csv, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Seleccionar archivo CSV", "", "CSV Files (*.csv)")
-
         if self.radioDirectorio2.isChecked():
             self.directorio_evt_completo = QtWidgets.QFileDialog.getExistingDirectory(None, 'Seleccione Directorio EVT (completo)')
             if self.directorio_evt_completo:
@@ -400,16 +392,12 @@ class MyApp(QMainWindow):
 
     def Iniciar(self):
         if self.radio_estacion_serial.isChecked():
-            self.directorio_serial_destino = QtWidgets.QFileDialog.getExistingDirectory(self, 'Seleccionar directorio destino por serial')
-            if not self.directorio_serial_destino:
+            self.directorio_destino = QtWidgets.QFileDialog.getExistingDirectory(self, 'Seleccionar directorio destino por serial')
+            if not self.directorio_destino:
                 QMessageBox.warning(self, "Advertencia", "No se seleccionó un directorio de destino para el serial. Se cancelará el proceso.")
                 return
         else:
-            self.directorio_serial_destino = None  # Por si se usa en el procesamiento, pero no se necesita
-
-
-
-
+            self.directorio_destino = None  # Por si se usa en el procesamiento, pero no se necesita
         if self.radioDirectorio1.isChecked():
             directorio_anio = self.cmbx_eventos.currentText()
             subdirectorio_filtro = self.cmbx_subdirectorios.currentText()
@@ -432,9 +420,6 @@ class MyApp(QMainWindow):
             else:
                 QMessageBox.warning(self, "Error", "No se ha seleccionado ningún directorio.")
                 return
-
-
-
         salida=os.path.join(self.directorio_trabajo, 'procesados_desde_csv.csv')
         escritura_archivo(salida, datos)
         QMessageBox.information(self, "Proceso finalizado", f"Archivo generado:\n{salida}")
