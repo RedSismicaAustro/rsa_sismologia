@@ -137,8 +137,6 @@ def parametros_estaciones():
     ruta_csv =  os.path.join(ruta_datos, "estaciones.csv")
     ruta_csv = os.path.abspath(ruta_csv)
     estaciones=lectura_archivo(ruta_csv)
-    print(ruta_csv)
-    print(estaciones)
     nombre_canal_total_=[] #Variable que guarda el nombre completo de las estaciones       
     nombre_canal=[]        #Variable que guarda el nombre codigo del canal de las estaciones
     tipo_sensor=[]         #Variable que guarda el tipo de sensor de la estacion (Velocidad o aceleracion)
@@ -167,7 +165,6 @@ def parametros_estaciones():
     for i,estacion in enumerate(estaciones):
         if i==0:
             continue
-        print(estacion,i-1)
         nombre_canal_total_.append(estacion[1])
         nombre_canal.append(estacion[2])
         tipo_sensor.append(estacion[3])

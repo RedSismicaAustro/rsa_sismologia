@@ -1080,7 +1080,7 @@ def impresion_reporte_acelerograma(archivo,trcanal,estacion,datos_sismo,bandera)
     "TRV": ("TANGENCIAL", "RADIAL", "VERTICAL")
 }
 
-    nombre_componentes=diccionario_componentes[parametros["CANAL"]]
+    nombre_componentes=diccionario_componentes[parametros["CANAL"][estacion]]
     for componente in range(0,3):
 #####################################################################
 #  Aqui se debe cambiar para corregir el error de los acelerogaramas.       
