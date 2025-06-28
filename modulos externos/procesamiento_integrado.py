@@ -448,7 +448,7 @@ class Cambio_Coeficientes_Filtro(QWidget):
         self.canales_habilitados=canales_habilitados
         self.numero_estaciones=len(canales_habilitados)
         for i in range(0, self.numero_estaciones):
-            canal_=self.canales_habilitados[i]
+            canal_=int(self.canales_habilitados[i])
             val_orden=2
             val_inf=1
             val_sup=10
@@ -524,7 +524,7 @@ class estaciones_(QDialog):
         self.procesamiento=self.parent.procesamiento
         lista_estaciones=[]
         for i in range(0, self.numero_estaciones):
-            canal_=self.estaciones_eventos[i]
+            canal_=int(self.estaciones_eventos[i])
             lista_estaciones.append(self.parametros['NOMBRE'][canal_])
             dato=self.parent.evento_procesar[canal_+3]
             self.lbl_nombre[i]=QLabel(self.parametros['NOMBRE'][canal_],self)
@@ -541,7 +541,7 @@ class estaciones_(QDialog):
             self.spbox_canal[i].setGeometry(250, i*25+35, 40, 24)            
             self.spbox_canal[i].setRange(1, 3)
             self.spbox_canal[i].setValue(int(dato[4:5]))
-            estacion_i=self.estaciones_eventos[i]
+            estacion_i=int(self.estaciones_eventos[i])
             indice=self.parent.estaciones_eventos_total.index(estacion_i)
             orden=int(self.filtros[indice][0:2])
             f_inf=int(self.filtros[indice][2:4])
@@ -629,9 +629,9 @@ class estaciones_(QDialog):
         self.parent.filtros_estaciones=self.filtros
         self.parent.procesamiento=self.procesamiento
         for i in range(0, self.numero_estaciones):
-            canal_=self.estaciones_eventos[i]
+            canal_=int(self.estaciones_eventos[i])
             indice_evento=self.parent.indice_evento_procesar
-            estacion_i=self.estaciones_eventos[i]
+            estacion_i=int(self.estaciones_eventos[i])
             indice_estacion=self.parent.estaciones_eventos_total.index(estacion_i)
             self.parent.componente_canal=str(self.spbox_canal[i])
             cadena=self.parent.eventos[indice_evento][canal_+3]

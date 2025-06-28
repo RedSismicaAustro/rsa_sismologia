@@ -801,7 +801,7 @@ class estaciones_(QDialog):
     def closeEvent(self, event):
         auxiliar=[]
         for i in range(0, self.numero_estaciones):
-            canal_=self.estaciones_eventos[i]
+            canal_=int(self.estaciones_eventos[i])
             estacion_i=self.estaciones_eventos[i]
             indice=self.parent.estaciones_eventos_total.index(estacion_i)
             if self.ck_box_hab_canal[i].checkState()==2:
@@ -817,7 +817,7 @@ class estaciones_(QDialog):
         self.parent.estaciones_eventos=auxiliar
         self.parent.filtros_estaciones=self.filtros
         for i in range(0, self.numero_estaciones):
-            canal_=self.estaciones_eventos[i]
+            canal_=int(self.estaciones_eventos[i])
             self.parent.componente_canal=str(self.spbox_canal[i])
             if self.ck_box_hab_canal[i].checkState()==2:
                 self.parent.hab_grafico[canal_]='1'
