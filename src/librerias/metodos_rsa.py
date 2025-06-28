@@ -1306,6 +1306,7 @@ def guardar_informacion_diaria(archivo,directorio_trabajo,catalogo_anterior,even
                 variable=[eventos[j-1][0],evento_otras_redes[18],evento_otras_redes[17],evento_otras_redes[15],evento_otras_redes[9],evento_otras_redes[7],evento_otras_redes[8]]
                 eventos_reporte.insert(j,variable)
                 break
+    catalogo=ordenar_y_eliminar_duplicados(catalogo,0)
     escritura_archivo(archivo_cat,catalogo)
     escritura_archivo(archivo_dat,eventos_reporte)
     cont_sismos=0
@@ -1765,7 +1766,7 @@ def cargar_evento(parametro,eventos_reporte,catalogo,eventos,canales_eventos_dia
     for i in range(0, len(parametros['CODIGO'])):#Verifica todos los archivos MSEED de registro continuo encontrados en la base de datos.
         nombreMseed = directorio_trabajo+'/'+directorios['Directorio_eventos']+"/"+parametros['CODIGO'][i]+'_20'+evento_reporte_escogido[0][1][0:-4]+".mseed"
         if os.path.exists(nombreMseed):            
-            estaciones_eventos.append(parametros['NUM_ESTACION'][i])
+            estaciones_eventos.append(int(parametros['NUM_ESTACION'][i]))
             parametros['HAB_GRAFICO'][i]="1"
         else:
             parametros['HAB_GRAFICO'][i]="0"

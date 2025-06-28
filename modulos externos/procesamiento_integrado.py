@@ -41,11 +41,11 @@ def activar_hilo(self):
             archivo_monitoreo=archivos_fast(self.parent.evento_procesar[1],self.parent.directorio_trabajo,self.parent.responsable_evento)[2]
             if not(os.path.exists(archivo_monitoreo)):
                 mensaje='Evento ' + archivo_monitoreo + " no encontrado\n Hay que ejecutar ProcesoV2"
-                self.parent.Lbl_Mensajes.setText(mensaje)
+                self.parent.Lbl_submensajes.setText(mensaje)
                 #QMessageBox.information(self, "AVISO", mensaje)
                 time.sleep(5)
                 mensaje=''
-                self.parent.Lbl_Mensajes.setText(mensaje)
+                self.parent.Lbl_submensajes.setText(mensaje)
                 time.sleep(5)
             else:
                 self.bandera_procesamiento=1
@@ -67,21 +67,17 @@ def activar_hilo(self):
 def cargar_combo_eventos(self,text):
     self.sismos_procesar=[]
     self.cmbx_eventos.clear()
-    eventos_base=int(self.eventos[-1:][0][0])
+
     if self.eventos_reporte!=None:
-            eventos_reporte=int(self.eventos_reporte[-1:][0][0])
+        eventos_reporte=int(self.eventos_reporte[-1:][0][0])
     else:
-            eventos_reporte=0
+        eventos_reporte=0
     for i in range(0,len(self.eventos)):
                 if self.eventos[i][2]==text:
                     aux_sismo=(int(self.eventos[i][0]),self.eventos[i][1])#aux_sismo tiene el numero de evento del csv y todo el registro
                     self.sismos_procesar.append(aux_sismo)
                     self.cmbx_eventos.addItem(self.eventos[i][1])
     self.preparar_evento('')
-    for indice,aux_event in enumerate(self.sismos_procesar):
-            evento_actual=aux_event[0]
-            #if evento_actual<=eventos_reporte and len(self.eventos_reporte[evento_actual])!=3:
-                #self.cmbx_eventos.model().item(indice).setFlags(Qt.NoItemFlags) #inhabilitar el elemento
 
 class FileMonitor:
     def __init__(self, file_path, update_callback, callback_params, procesamiento):
@@ -111,10 +107,7 @@ class FileMonitor:
             time.sleep(1)
 
 def verificar_drives_virtuales(responsable_evento):
-
     responsables = os.path.abspath(os.path.join(ruta_proyecto,'datos','responsables.csv'))
-
-
     responsables=lectura_archivo(responsables)
     for responsable in responsables:
         if responsable[0]==responsable_evento:
@@ -166,6 +159,7 @@ class MyApp(QMainWindow):
             if self.parametros['HAB_CANAL'][i]=='1':
                 self.canales_habilitados.append(i)
         self.numero_estaciones=len(self.canales_habilitados)
+        self.lbl_directorio_trabajo=self.directorio_trabajo
 
     
     def closeEvent(self, event):
@@ -192,6 +186,7 @@ class MyApp(QMainWindow):
             folderpath=folderpath+'/'
         self.directorio_trabajo=folderpath
         self.Lbl_directorio.setText(self.directorio_trabajo)
+
         self.showDate(self.date)
 
     def Abrir_archivo(self):  #Depurado
@@ -209,7 +204,7 @@ class MyApp(QMainWindow):
         self.eventos_reporte,self.catalogo,self.eventos,\
         vector,self.evento_canales,\
         root,self.responsables,self.resumen=cargar_dia(self.directorio['archivo_csv'])
-# %%return eventos_reporte,catalogo,eventos,vector,canales_eventos_dia,root,variable_responsables,resumen
+
         cargar_combo_eventos(self,'SISMO')
         self.archivo_estaciones=self.directorio['archivo_estaciones']
         self.ck_box_hab_canal={}
@@ -226,7 +221,6 @@ class MyApp(QMainWindow):
 
     def preparar_evento(self, text):
         print("Preparar evento:")
-        print(self.responsables)
         for i,evento in enumerate(self.eventos):
             if evento[1]==self.cmbx_eventos.currentText():
                 self.indice_evento_procesar=i
@@ -252,11 +246,6 @@ class MyApp(QMainWindow):
             if self.evento_procesar[i]!='-':
                 self.filtros_estaciones.append(self.evento_procesar[i][-6:])
                 self.estaciones_eventos.append(i-3)
-        self.estaciones_eventos_total=self.estaciones_eventos
-        for i in range(0,len(self.eventos_reporte)):
-            if self.eventos_reporte[i][1]==self.evento_procesar[1]:
-                self.indice_rep=i
-                break
         self.indice, self.indice_local, self.indice_catalogo, self.archivo_escogido, \
         self.evento_reporte_escogido, self.canales, self.trCanal, self.archivo_reporte, \
         self.parametros['HAB_GRAFICO'],self.estaciones_eventos = cargar_evento(
@@ -268,6 +257,7 @@ class MyApp(QMainWindow):
             self.directorio_trabajo,                 # Directorio de trabajo
             self.directorio['Directorio_reportes']   # Directorio de reportes
             )
+        self.estaciones_eventos_total=self.estaciones_eventos
 
     def cambio_evento(self, text):
         print('Cambio evento')
@@ -284,16 +274,18 @@ class MyApp(QMainWindow):
                 if self.evento_procesar[1]==evento[1]:
                     self.eventos[i][2]=self.Cmb_bx_tipo_evento.currentText()
                     break
-            #escritura_archivo(self.directorio['archivo_csv'],self.eventos)
         self.catalogo,self.eventos_reporte=guardar_informacion_diaria(self.directorio['archivo_csv'],self.directorio_trabajo,self.catalogo,self.eventos)
-        self.catalogo=ordenar_y_eliminar_duplicados(self.catalogo,0)
+        self.eventos_reporte,self.catalogo,self.eventos,\
+        vector,self.evento_canales,\
+        root,self.responsables,self.resumen=cargar_dia(self.directorio['archivo_csv'])
+
+        
+        
 
     def cargar_tipo_evento(self, text):
         cargar_combo_eventos(self,text)
 
     def procesar_(self,text):
-        print("Entro a procesar:")
-        print(self.evento_procesar[2])
         archivo=self.evento_procesar[1]
         if self.evento_procesar[2]=='SISMO':
             self.bandera_virtual=verificar_drives_virtuales(self.responsable_evento)
@@ -302,10 +294,8 @@ class MyApp(QMainWindow):
                 msg.setWindowFlags(msg.windowFlags() | Qt.WindowStaysOnTopHint)
                 msg.exec_()
             else:
-                
                 self.archivos_procesamiento_virtual=archivos_fast(archivo,self.directorio_trabajo,self.responsable_evento)
                 self.archivos_procesamiento_real=archivos_fast(archivo,self.directorio_trabajo,'')
-                print(self.archivos_procesamiento_real,self.archivos_procesamiento_virtual)
                 copiar_archivos(self.archivos_procesamiento_real,self.archivos_procesamiento_virtual)
         else:
             self.bandera_virtual=False
@@ -325,15 +315,16 @@ class MyApp(QMainWindow):
             path.mkdir(parents=True)
         except FileExistsError:
             pass
-        estaciones_(   self.estaciones_eventos,self.filtros_estaciones,self.responsable_evento,self).exec_()
+        print("Estaciones eventos:",self.estaciones_eventos)
+        estaciones_(self.estaciones_eventos,self.filtros_estaciones,self.responsable_evento,self).exec_()
 
 
     def reportar_(self):
-        print('Reportar')
+        #print('Reportar')
         generar_reporte_sismo(self.catalogo, self.evento_reporte_escogido, self.canales, self.trCanal, self.archivo_reporte)
 
     def insertar_(self,text):
-        print('Insertar de otas redes')
+        #print('Insertar de otas redes')
         reporte_(self).exec_()
         self.catalogo,self.eventos_reporte=guardar_informacion_diaria(self.directorio['archivo_csv'],self.directorio_trabajo,self.catalogo,self.eventos)
         self.catalogo=ordenar_y_eliminar_duplicados(self.catalogo,0)
@@ -342,7 +333,7 @@ class MyApp(QMainWindow):
 
 
     def renombrar_(self,text):
-        print("Renombrar:")
+        #print("Renombrar:")
         message_box = QMessageBox(
             QMessageBox.Question,
             "¡Importante!",
@@ -366,7 +357,6 @@ class MyApp(QMainWindow):
             archivos_destino[4]= archivos_destino[2][:-12]+archivo_modificado[-15:-11]+archivo_modificado[-10:-8]+'.'+archivo_modificado[-8:-6]+'L'
             archivos_destino[5]= archivos_destino[2][:-12]+archivo_modificado[-15:-11]+archivo_modificado[-10:-8]+'.'+archivo_modificado[-8:-6]+'P'
             archivos_destino[6]= archivos_destino[2][:-12]+archivo_modificado[-15:-11]+archivo_modificado[-10:-8]+'.'+archivo_modificado[-8:-6]+'S'
-            print("Archivos fast origen y destino:\n",archivos_origen,archivos_destino)
             self.eventos[self.indice_evento_procesar][1]=archivo_modificado
             for i,buscado in enumerate(self.eventos_reporte):
                 if buscado[1]==archivo:
@@ -384,17 +374,14 @@ class MyApp(QMainWindow):
                 if self.eventos[self.indice_evento_procesar][i+3]!='-':
                     estaciones.append(self.eventos[self.indice_evento_procesar][i+3][:4])
             for estacion in estaciones:
-                
                 archivo_mseed_origen=self.directorio['Directorio_eventos']+'/'+estacion+'_20'+archivo[:-3]+'mseed'
                 archivo_mseed_destino=self.directorio['Directorio_eventos']+'/'+estacion+'_20'+archivo_modificado[:-3]+'mseed'
-                print("Archivos mseed origen y destino:\n",archivo_mseed_origen,archivo_mseed_destino)
                 os.rename(archivo_mseed_origen,archivo_mseed_destino)
             for i in range(0,7):
                 os.rename(archivos_origen[i], archivos_destino[i])
             escritura_archivo(self.directorio['archivo_csv'],self.eventos)
             escritura_archivo(self.directorio['archivo_reporte'],self.eventos_reporte)
             escritura_archivo(self.directorio['archivo_catalogo'],self.catalogo)
-
             #self.guardar_evento()
 
     def Salir_(self):
@@ -448,7 +435,7 @@ class Cambio_Coeficientes_Filtro(QWidget):
         self.canales_habilitados=canales_habilitados
         self.numero_estaciones=len(canales_habilitados)
         for i in range(0, self.numero_estaciones):
-            canal_=self.canales_habilitados[i]
+            canal_=int(self.canales_habilitados[i])
             val_orden=2
             val_inf=1
             val_sup=10
@@ -474,7 +461,6 @@ class Cambio_Coeficientes_Filtro(QWidget):
         self.show()
 
 class estaciones_(QDialog):
-    
     def __init__(self, estaciones_eventos,filtros,responsable,parent=None):
         super(estaciones_,self).__init__(parent)
         self.setWindowTitle("ESTACIONES")
@@ -485,12 +471,10 @@ class estaciones_(QDialog):
         self.responsable=responsable
         self.numero_estaciones=len(self.estaciones_eventos)
         self.setFixedSize(600, 600)
-
         # Cargar la interfaz desde el archivo .ui directamente en esta instancia
         ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", "secundaria.ui")
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui, self)
-
 # Widgets gráficos
         self.widget_grafico = widget_grafico_mpl(self)
         layout = QVBoxLayout(self)
@@ -524,7 +508,7 @@ class estaciones_(QDialog):
         self.procesamiento=self.parent.procesamiento
         lista_estaciones=[]
         for i in range(0, self.numero_estaciones):
-            canal_=self.estaciones_eventos[i]
+            canal_=int(self.estaciones_eventos[i])
             lista_estaciones.append(self.parametros['NOMBRE'][canal_])
             dato=self.parent.evento_procesar[canal_+3]
             self.lbl_nombre[i]=QLabel(self.parametros['NOMBRE'][canal_],self)
@@ -541,7 +525,7 @@ class estaciones_(QDialog):
             self.spbox_canal[i].setGeometry(250, i*25+35, 40, 24)            
             self.spbox_canal[i].setRange(1, 3)
             self.spbox_canal[i].setValue(int(dato[4:5]))
-            estacion_i=self.estaciones_eventos[i]
+            estacion_i=int(self.estaciones_eventos[i])
             indice=self.parent.estaciones_eventos_total.index(estacion_i)
             orden=int(self.filtros[indice][0:2])
             f_inf=int(self.filtros[indice][2:4])
@@ -604,7 +588,7 @@ class estaciones_(QDialog):
         self.procesamiento = procesamiento
         if self.procesamiento[-1][2]!='Fallido':
             if self.procesamiento[-1][3]=='0.0':
-                self.parent.Lbl_Mensajes.setText("No se ha marcado el tiempo de coda")
+                self.parent.Lbl_submensajes.setText("No se ha marcado el tiempo de coda")
 
     def closeEvent(self, event):
         archivo=self.parent.evento_procesar[1]
@@ -624,14 +608,15 @@ class estaciones_(QDialog):
             self.file_monitor.stop()
             self.bandera_procesamiento=0
             self.parent.Lbl_Mensajes.setText("Seguimiento terminado")
+            self.parent.Lbl_submensajes.setText("")
         ################################################################
         self.parent.estaciones_eventos=auxiliar
         self.parent.filtros_estaciones=self.filtros
         self.parent.procesamiento=self.procesamiento
         for i in range(0, self.numero_estaciones):
-            canal_=self.estaciones_eventos[i]
+            canal_=int(self.estaciones_eventos[i])
             indice_evento=self.parent.indice_evento_procesar
-            estacion_i=self.estaciones_eventos[i]
+            estacion_i=int(self.estaciones_eventos[i])
             indice_estacion=self.parent.estaciones_eventos_total.index(estacion_i)
             self.parent.componente_canal=str(self.spbox_canal[i])
             cadena=self.parent.eventos[indice_evento][canal_+3]
@@ -683,7 +668,7 @@ class estaciones_(QDialog):
             mensaje = 'Procesar con fases claras'
         else:
             mensaje = 'No Procesar'
-        self.parent.Lbl_Mensajes.setText(mensaje)
+        self.parent.Lbl_submensajes.setText(mensaje)
 
 class reporte_(QDialog):
     def __init__(self, parent=None):
@@ -691,12 +676,10 @@ class reporte_(QDialog):
         super().__init__(parent)
         self.parent=parent
         QDialog.__init__(self)
-
         # Cargar la interfaz desde el archivo .ui directamente en esta instancia
         ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", "secundaria.ui")
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui, self)
-
         self.lbl_grafico_0=QLabel("Página principal",self)
         self.lbl_grafico_0.setGeometry(30, 20, 141, 21)  #setGeometry(x, y, width, height)
         self.lbl_grafico_1=QLabel("Página secundaria",self)
@@ -727,19 +710,12 @@ class reporte_(QDialog):
         self.Btn_insertar.setEnabled(True)
         self.Btn_insertar.clicked.connect(self.Insertar_)
         self.Btn_insertar.clearFocus()
-
         #self.evento_reporte_escogido=self.parent.evento_reporte_escogido
         #self.indice=self.parent.indice_evento_procesar
 
-
-
     def closeEvent(self, event):
-
         escritura_archivo(self.parent.directorio['archivo_reporte'],self.parent.eventos_reporte)
         escritura_archivo(self.parent.directorio['archivo_catalogo'],self.parent.catalogo)
-
-   
-        
 
     def Limpiar_(self):
         self.textEdit.clear()
@@ -750,8 +726,6 @@ class reporte_(QDialog):
         self.textEdit_2.clear()
         self.cmbx_red.setCurrentIndex(0)
         self.cmbx_tipo_mag.setCurrentIndex(0)
-
-
 
     def Insertar_(self):
         red_=self.cmbx_red.currentIndex()
@@ -772,7 +746,6 @@ class reporte_(QDialog):
             self.parent.indice,
             self.parent.indice_local
             )
-        
         self.textEdit.clear()
         self.textEdit_2.clear()
         self.cmbx_red.setCurrentIndex(0)
