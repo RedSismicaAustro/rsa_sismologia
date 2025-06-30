@@ -1476,6 +1476,7 @@ def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaci
     #filtros_estaciones    Todos los filtros estacion por estación
     #estaciones_eventos_total  Todas las estaciones que tienen registros mseed del evento
     #bandera_todos    Bandera para filtrar todos los canales con los parametros generales o con los filtros estacion por estación.
+    print(estaciones_eventos_total,estaciones_eventos)
     num_canal=len(estaciones_eventos)
     for i in range(0, num_canal):
         indice=estaciones_eventos_total.index(estaciones_eventos[i])

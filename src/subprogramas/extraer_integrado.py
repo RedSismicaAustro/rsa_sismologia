@@ -316,7 +316,7 @@ class Extraer_evento(QMainWindow):
             try:
                 auxiliar=open(nombreMseed,'r')
                 auxiliar.close
-                self.estaciones_eventos.append(self.parametros['NUM_ESTACION'][i])
+                self.estaciones_eventos.append(int(self.parametros['NUM_ESTACION'][i]))
                 self.filtros_estaciones.append('000000')
             except FileNotFoundError:
                 pass
@@ -361,7 +361,7 @@ class Extraer_evento(QMainWindow):
             try:
                 auxiliar=open(nombreMseed,'r')
                 auxiliar.close
-                self.estaciones_eventos.append(self.parametros['NUM_ESTACION'][i])
+                self.estaciones_eventos.append(int(self.parametros['NUM_ESTACION'][i]))
                 self.filtros_estaciones.append('000000')
             except FileNotFoundError:
                 pass

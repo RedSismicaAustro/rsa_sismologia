@@ -1,4 +1,25 @@
+import sys
 import os
+from pathlib import Path
+def extraer_hasta_directorio(ruta_completa, nombre_directorio):
+    partes = Path(ruta_completa).parts
+    if nombre_directorio in partes:
+        indice = partes.index(nombre_directorio)
+        ruta_recortada = Path(*partes[:indice + 1])
+        return str(ruta_recortada) + '/'
+    else:
+        return ''
+ruta_librerias=os.path.dirname(__file__)
+ruta_proyecto=extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
+ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
+ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
+# Insertar la ruta al inicio del sys.path
+if ruta_librerias not in sys.path:
+    sys.path.insert(0, ruta_librerias)
+if ruta_datos not in sys.path:
+    sys.path.insert(0, ruta_datos)
+
+
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 from datetime import datetime
@@ -10,6 +31,32 @@ from metodos_rsa import lectura_archivo, escritura_archivo
 #niveles.csv   archivo con kla información de los nivles de las presas salida
 #
 #
+
+
+def eliminar_repetidos_por_fecha_y_valor(tuplas_datos):
+        """
+        Elimina tuplas repetidas basadas en la fecha-hora (2do elemento) y el valor (3er elemento).
+        
+        Args:
+            tuplas_datos (list): Lista de tuplas con estructura (identificador, fecha_hora, valor).
+                             fecha_hora debe ser cadena con formato reconocible por datetime.
+    
+        Returns:
+            list: Lista de tuplas sin repeticiones ni en fecha-hora ni en valor.
+        """
+        fechas_vistas = set()
+        valores_vistos = set()
+        resultado_filtrado = []
+
+        for elemento in tuplas_datos:
+            identificador, fecha, valor = elemento
+            if fecha not in fechas_vistas and valor not in valores_vistos:
+                fechas_vistas.add(fecha)
+                valores_vistos.add(valor)
+                resultado_filtrado.append(elemento)
+                # Si la fecha o el valor ya están, se descarta automáticamente
+
+        return resultado_filtrado
 
 
 class ProcesadorNiveles(QWidget):
@@ -30,6 +77,7 @@ class ProcesadorNiveles(QWidget):
         self.setLayout(layout)
         self.setWindowTitle("Procesador de Niveles de Presa")
         self.setGeometry(300, 300, 400, 200)
+
 
     def seleccionar_directorio(self):
         directory = QFileDialog.getExistingDirectory(self, "Seleccionar Directorio")
@@ -82,7 +130,7 @@ class ProcesadorNiveles(QWidget):
                 fechas = [fila[1] for fila in datos[:313]]  # Tomar los primeros 313 registros para determinar el formato
 
                 formato_fecha = self.determinar_formato_fecha(fechas)
-
+                print(formato_fecha)
                 # Convertir fechas y acumular datos
                 for fila in datos:
                     try:
@@ -90,6 +138,7 @@ class ProcesadorNiveles(QWidget):
                         fila[1] = fecha  # Guardar la fecha convertida
                         nuevos_niveles.append(fila)
                     except ValueError:
+                        print("Error:",fila)
                         continue
 
                 # Registrar archivo procesado
@@ -108,15 +157,17 @@ class ProcesadorNiveles(QWidget):
 
         # Convertir las fechas de nuevo a cadenas antes de guardar
         for fila in niveles:
-            fila[1] = fila[1].strftime(formato_fecha)
+            fila[1] = fila[1].strftime("%d/%m/%y %H:%M:%S")
+           
 
+        #niveles=eliminar_repetidos_por_fecha_y_valor(niveles)
         escritura_archivo(archivo_niveles, niveles)
         escritura_archivo(archivo_archivos, nuevos_archivos_procesados)
 
         self.label.setText("Procesamiento completado.")
 
         # Llamar a la función para graficar los niveles
-        self.graficar_niveles(niveles, formato_fecha)
+        self.graficar_niveles(niveles, "%d/%m/%y %H:%M:%S")
 
     def graficar_niveles(self, niveles, formato_fecha):
         # Convertir fechas de vuelta a objetos datetime para graficar, usando el formato adecuado

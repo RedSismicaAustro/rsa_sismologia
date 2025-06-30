@@ -93,8 +93,13 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.archivo = os.path.join(self.directorio_trabajo, fecha.toString("yyMMdd") + "000000")
         self.directorios = obtener_directorios(self.archivo)
         ruta_archivo = os.path.join(self.directorios['Directorio_registros'], self.archivo_mseed)
-        self.stream = read(ruta_archivo)
-        self.cargar_componentes(self.stream)
+        if os.path.isfile(ruta_archivo):
+            self.stream = read(ruta_archivo)
+            self.cargar_componentes(self.stream)
+            print(ruta_archivo,"  no existe")
+        else:
+            self.stream=None
+        
         archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
         if os.path.isfile(archivo_caudales):
             self.caudales = lectura_archivo(archivo_caudales)
