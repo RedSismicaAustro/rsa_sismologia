@@ -1198,7 +1198,6 @@ def guardar_informacion_diaria(archivo,directorio_trabajo,catalogo_anterior,even
     directorios=obtener_directorios(archivo)
     archivo_csv=directorio_trabajo+'/'+directorios['Directorio_base']+'/'+archivo
     catalogo=[["Id","anio","mes","dia","hora","min","seg","lat","long","prof","rms","e-x","e-y","e-0","e-z","Mag","Tipo Mag","Fuente","ruta","Ubicacion"]]
-    datos_=[]
     eventos_reporte=[['0',"Fecha Hora (UTC)","Evento","Magn.","Prof.(km)","Lat.","Long.","Ubicación"]]
     archivo_xml=archivo_csv[:-4]+".xml"
     archivo_dat=archivo_csv[:-4]+"_rep.csv"
@@ -1245,7 +1244,6 @@ def guardar_informacion_diaria(archivo,directorio_trabajo,catalogo_anterior,even
                 catalogo_grabar=catalogo_grabar[0]
         catalogo.append(catalogo_grabar)
         eventos_reporte.append(evento_grabar)
-        datos_.append(evento_individual)
         evento_canales.append(evento_canales)
         
         ############################################################################

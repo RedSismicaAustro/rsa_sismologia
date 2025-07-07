@@ -274,12 +274,11 @@ class MyApp(QMainWindow):
                 if self.evento_procesar[1]==evento[1]:
                     self.eventos[i][2]=self.Cmb_bx_tipo_evento.currentText()
                     break
+        escritura_archivo(self.directorio['archivo_csv'],self.eventos)
         self.catalogo,self.eventos_reporte=guardar_informacion_diaria(self.directorio['archivo_csv'],self.directorio_trabajo,self.catalogo,self.eventos)
         self.eventos_reporte,self.catalogo,self.eventos,\
         vector,self.evento_canales,\
         root,self.responsables,self.resumen=cargar_dia(self.directorio['archivo_csv'])
-
-        
         
 
     def cargar_tipo_evento(self, text):
@@ -660,6 +659,7 @@ class estaciones_(QDialog):
     def Ubicacion_(self):
         print("Entró a ubicación")
         self.grafico_window = ventana_grafico(self.procesamiento, self.parent.directorio['archivo_estaciones'], self)
+        print(self.procesamiento, self.parent.directorio['archivo_estaciones'])
         self.grafico_window.show()
         bandera = self.grafico_window.get_bandera()
         if bandera[0]:
