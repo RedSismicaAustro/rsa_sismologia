@@ -666,7 +666,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         fecha=fecha_inicio
         while fecha <= fecha_fin:#while fecha < fecha_fin:
             fecha_ = QDate(fecha.year, fecha.month,fecha.day)
-            archivo=os.path.join(self.directorio_trabajo,fecha_.toString('yyMMdd000000'))
+            archivo=os.path.join(self.directorio_trabajo,fecha_.toString('yyyyMMdd000000'))
             self.directorios=obtener_directorios(archivo)
             if os.path.exists(self.directorios['Directorio_base']):
                 eventos_reporte,catalogo,\

@@ -143,7 +143,7 @@ class Extraer_evento(QMainWindow):
 
     def showDate(self, date):#Es como inicializar el dìa
         self.date=date
-        self.archivo=self.directorio_trabajo+date.toString('yyMMdd000000')
+        self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
         self.estaciones_eventos=[]
         self.filtros_estaciones=[]
         self.bandera_marcas=1

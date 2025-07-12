@@ -17,7 +17,7 @@ ruta_datos = os.path.abspath(os.path.join(ruta_proyecto,'datos'))
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
-
+import re
 import csv
 from PyQt5.QtWidgets import (QMessageBox,QGraphicsScene)
 from PyQt5.QtCore import QDate,QDateTime
@@ -984,15 +984,15 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
     archivo_rsa=archivo_[2]
     archivo_fase=archivo_[3]
     bandera_error=0
+    archivo_estaciones = Path(directorios['archivo_estaciones']).name
     if usuario=='':
-        archivo_estaciones= archivo_rsa[:-21]+ archivo[-17:-11]+"_estaciones.csv"
+        dir_dia = next(p for p in Path(archivo_rsa).parents if re.fullmatch(r"\d{4}_\d{2}_\d{2}", p.name))
     else:
-        archivo_estaciones= directorio_trabajo+directorios['Directorio_base']+'/'+archivo_fas[2][:-21]+ archivo[-17:-11]+"_estaciones.csv" 
-    lectura_estaciones=[]
-    with open(archivo_estaciones,newline='') as est_:
-        datos=csv.reader(est_,delimiter=';',quotechar=';')
-        for  r in datos:
-            lectura_estaciones.append(r)
+        dir_dia = next(p for p in Path(archivo_fas[2]).parents if re.fullmatch(r"\d{4}_\d{2}_\d{2}", p.name))
+        dir_dia=os.path.join(directorio_trabajo,dir_dia)
+    archivo_estaciones=os.path.join(dir_dia,archivo_estaciones)
+    lectura_estaciones=lectura_archivo(archivo_estaciones)
+
     aux=len(archivo)
     if archivo[-11:-10]=="_":
         sismo_aux=archivo[-17:-11]+archivo[-10:aux]
@@ -1143,29 +1143,32 @@ def archivos_fast(evento,dir_trabajo,usuario):
     directorios=obtener_directorios(evento)
     archivos_procesammiento=[]
     responsables=os.path.join(ruta_datos, "responsables.csv")
-    with open(responsables,newline='') as f:
-        datos=csv.reader(f,delimiter=';',quotechar=';')
-        for r in datos:
-            dir_dia_temp = r[1] 
-            dir_fastHypo_temp = r[2]
-            if r[0]==usuario:
-                break
+    datos=lectura_archivo(responsables)
+    for r in datos:
+        dir_dia_temp = r[1] 
+        dir_fastHypo_temp = r[2]
+        if r[0]==usuario:
+            break
     if usuario == "":
-        dir_dia_temp = dir_trabajo+directorios['Directorio_dia'] 
-        dir_fastHypo_temp = dir_trabajo+directorios['Directorio_fastHypo']
+        dir_dia_temp = os.path.join(dir_trabajo,directorios['Directorio_dia']) 
+        dir_fastHypo_temp = os.path.join(dir_trabajo,directorios['Directorio_fastHypo'])
+
     numero=float(evento[-8:-6]+'.'+evento[-6:-4])
     redondeado = str(round(numero))
     if len(redondeado)==1:
         redondeado='0'+redondeado
-    archivo_sis=dir_dia_temp+'/'+evento
+    archivo_sis=os.path.join(dir_dia_temp,evento) 
     archivos_procesammiento.append(archivo_sis)
-    archivo_fas=dir_dia_temp+'/'+evento[:-3]+'fas'
+    archivo_fas=os.path.join(dir_dia_temp,evento[:-3]+'fas') 
     archivos_procesammiento.append(archivo_fas)
-    archivo_rsa=dir_fastHypo_temp+'/'+evento[2:6]+evento[7:11]+'.rsa'
+    if len(evento)==19:
+        evento=evento[2:]
+    archivo_rsa=os.path.join(dir_fastHypo_temp,evento[7:11]+'.rsa') 
     if os.path.exists(archivo_rsa):
         pass
     else:
-        archivo_rsa=dir_fastHypo_temp+'/'+evento[2:6]+evento[7:9]+redondeado+'.rsa'
+        archivo_rsa=os.path.join(dir_fastHypo_temp,evento[2:6]+evento[7:9]+redondeado+'.rsa') 
+
     aux=len(evento)
     if evento[-11:-10]=="_":
         sismo_aux=evento[-17:-11]+evento[-10:aux]
@@ -1542,7 +1545,6 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
         for estacion_analogica in estaciones_analogicas:
             if estacion_analogica[0]=='ESTACION':
                 continue
-           
             numero_estacion=int(estacion_analogica[0])
             componente=int(parametros['COMPONENTE'][numero_estacion])-1
             if numero_estacion not in estaciones_eventos_total:
@@ -1575,7 +1577,7 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
             sismo_extraido.append(sis_extraido)
         # Crear archivo .sis si es evento sísmico
         if tipo_evento == "SISMO":
-            archivo_cabecera = archivo[0:-12] + "cabecera_sismo"
+            archivo_cabecera = os.path.join(directorios['directorio_trabajo'],"cabecera_sismo")
             try:
                 with open(archivo_cabecera, 'rb') as archivo_leer:
                     cabecera = b''
@@ -1755,15 +1757,14 @@ def cargar_evento(parametro,eventos_reporte,catalogo,eventos,canales_eventos_dia
     indice_catalogo=i
     evento_reporte_escogido=[]
     evento_reporte_escogido.append(eventos_reporte[indice]) #evento desde el reporte completo del día
-    archivo_escogido=directorio_trabajo+'\\'+eventos[indice_local-1][1][0:6]+eventos[indice_local-1][1][7:13]#Variable que tiene el nombre en el formato adecuado para la ubicación de los eventos.
-    print(archivo_escogido)
+    archivo_escogido=directorio_trabajo+'\\'+eventos[indice_local-1][1][0:8]+eventos[indice_local-1][1][9:15]#Variable que tiene el nombre en el formato adecuado para la ubicación de los eventos.
     canales=canales_eventos_dia[indice_local-1]
     trCanal=leer_mseed(archivo_escogido,1)
     dato_escogido=eventos[indice_local-1] #evento desde el formato simple del día, solo número de evento y tipo
-    archivo_reporte=directorio_reporte+'/'+dato_escogido[1][0:13]+'_rep.pdf'
+    archivo_reporte=directorio_reporte+'/'+dato_escogido[1][:-4]+'_rep.pdf'
     estaciones_eventos=[]
     for i in range(0, len(parametros['CODIGO'])):#Verifica todos los archivos MSEED de registro continuo encontrados en la base de datos.
-        nombreMseed = directorio_trabajo+'/'+directorios['Directorio_eventos']+"/"+parametros['CODIGO'][i]+'_20'+evento_reporte_escogido[0][1][0:-4]+".mseed"
+        nombreMseed = directorio_trabajo+'/'+directorios['Directorio_eventos']+"/"+parametros['CODIGO'][i]+'_'+evento_reporte_escogido[0][1][0:-4]+".mseed"
         if os.path.exists(nombreMseed):            
             estaciones_eventos.append(int(parametros['NUM_ESTACION'][i]))
             parametros['HAB_GRAFICO'][i]="1"
@@ -1779,9 +1780,9 @@ def cargar_dia(archivo_csv):
     Args:
         archivo_csv: Nombre del archivo para escoger el dian ia con formato AAMMDDhhmmss.
     """
-
     directorio_trabajo=extraer_hasta_directorio(archivo_csv,'DIA')
     archivo=referencia_directorio_completa(archivo_csv)
+    print(archivo)
     directorios=obtener_directorios(archivo)
     if not(os.path.exists(directorios['Directorio_base'])):
         return [],[],[],[],[],[],[],[]
@@ -1793,10 +1794,8 @@ def cargar_dia(archivo_csv):
 
     contador_n_canales=[[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0]]#Tupla que contiene el número de estaciones por evento sísmico.
     root = ET.Element("sismo")
-
-    with open(archivo_csv,newline='') as lista_csv:
-        lista_eventos=csv.reader(lista_csv,delimiter=';',quotechar=';')
-        for evento_individual in lista_eventos:
+    lista_eventos=lectura_archivo(archivo_csv)
+    for evento_individual in lista_eventos:
             if evento_individual==[]:
                 continue
             catalogo_grabar=[]#Variable donde se guarda lo que se va a grabar en el catalogo diario .csv
@@ -1848,10 +1847,9 @@ def cargar_dia(archivo_csv):
             eventos_reporte.append(evento_grabar)
             eventos.append(evento_individual)
             canales_eventos_dia.append(canales_evento)
-        if os.path.exists(directorios['archivo_catalogo']):
+    if os.path.exists(directorios['archivo_catalogo']):
             catalogo_existente=lectura_archivo(directorios['archivo_catalogo'])
             if catalogo_existente!=None:
-                
                 for evento_existente in catalogo_existente:
                     if evento_existente[0]=='Id':
                         continue
@@ -1864,8 +1862,7 @@ def cargar_dia(archivo_csv):
                             if int(evento_existente[0])<int(evento[0]):
                                 catalogo.insert(n_evento,evento_existente)
                                 break
-            catalogo=ordenar_y_eliminar_duplicados(catalogo,0)
-
+                catalogo=ordenar_y_eliminar_duplicados(catalogo,0)
     indice_responsables=[0,0,0]
     cont_sismo=[0,0,0]
     cont_indefinido=[0,0,0]
@@ -1876,7 +1873,7 @@ def cargar_dia(archivo_csv):
     cont_tele=[0,0,0]
     hora_=['12H','18H','24H']
     for evento_ in eventos:
-        h=int(evento_[1][7:9])
+        h=int(evento_[1][-10:-8])
         if h<12:
             indice_hora=0
         elif h<18 and h>11:
@@ -1898,6 +1895,7 @@ def cargar_dia(archivo_csv):
         else:
             cont_ruido[indice_hora]=cont_ruido[indice_hora]+1
     responsables=lectura_archivo(directorios['archivo_tiempos'])
+    print(directorios['archivo_tiempos'],responsables)
     aux=['','','']
     if responsables==None:
         aux[0]=['RSA','']
@@ -1908,7 +1906,6 @@ def cargar_dia(archivo_csv):
         indice_responsables[1]=1
         indice_responsables[2]=2
     else:
-
         aux=len(responsables)
         if aux==3:
             indice_responsables[0]=0#ind_0=0
@@ -1928,9 +1925,11 @@ def cargar_dia(archivo_csv):
             indice_responsables[2]=5#ind_2=5
 
     variable_responsables=[["RESPONSABLE","HORA","TOT.","SIS.","FF","FC","IND.","TEL.","Local_CONTROL.","Ruido","3 est","4 est","5 est","6 est","7 est","8 est"]]
+
     for i in range (0,3):
         total=cont_sismo[i]+cont_FF[i]+cont_FC[i]+cont_indefinido[i]+cont_tele[i]+cont_local[i]+cont_ruido[i]
         if(total!=0):
+            print(indice_responsables[i])
             aux=[responsables[indice_responsables[i]][0],hora_[i],total,cont_sismo[i],cont_FF[i],cont_FC[i],cont_indefinido[i],cont_tele[i],cont_local[i],cont_ruido[i]]
             aux=aux+contador_n_canales[i]
             variable_responsables.append(aux)
@@ -2445,7 +2444,60 @@ def extraer_hasta_directorio(ruta_completa, nombre_directorio):
     else:
         return ''
           
-def referencia_directorio_completa(archivo):
+
+def referencia_directorio_completa(archivo) -> str:
+    """
+    Devuelve la ruta estándar …\DIA\AAAAMMDD000000.
+
+    · Si la ruta ya es exactamente …\DIA\AAAAMMDD000000     → se devuelve tal cual.
+    · Si la ruta es …\DIA\AAAAMMDD000000.[ext]              → se quita la extensión.
+    · Para cualquier archivo bajo …\DIA\AAAA\AAAA_MM\AAAA_MM_DD\… →
+      se construye y devuelve …\DIA\AAAAMMDD000000.
+    """
+    ruta = Path(archivo).expanduser().resolve()
+    partes = ruta.parts
+
+    # ------------------------------------------------------------------ #
+    # 1) Ubicar la carpeta “DIA” en la ruta.
+    # ------------------------------------------------------------------ #
+    try:
+        idx_dia = next(i for i, p in enumerate(partes) if p.upper() == "DIA")
+    except StopIteration:
+        raise ValueError("La ruta no contiene un directorio 'DIA'.")
+
+    # ------------------------------------------------------------------ #
+    # 2) CASO 1: la entrada YA tiene la forma …\DIA\AAAAMMDD000000 o
+    #            …\DIA\AAAAMMDD000000.[ext]  → salir pronto.
+    # ------------------------------------------------------------------ #
+    if len(partes) == idx_dia + 2:                      # solo un elemento tras 'DIA'
+        nombre = Path(partes[-1]).stem                  # sin extensión
+        if nombre.isdigit() and len(nombre) == 14 and nombre.endswith("000000"):
+            return os.path.join(Path(*partes[:idx_dia + 1]), nombre)
+
+    # ------------------------------------------------------------------ #
+    # 3) CASO 2: ruta completa …\DIA\AAAA\AAAA_MM\AAAA_MM_DD\…\archivo.ext
+    #            → extraer AAAA, MM, DD de las carpetas.
+    # ------------------------------------------------------------------ #
+    try:
+        anio = partes[idx_dia + 1]                     # AAAA
+        mes  = partes[idx_dia + 2].split("_")[1]       # MM
+        dia  = partes[idx_dia + 3].split("_")[2]       # DD
+    except (IndexError, ValueError):
+        raise ValueError(
+            "La ruta no sigue el patrón esperado 'AAAA/AAAA_MM/AAAA_MM_DD/'."
+        )
+
+    referencia = f"{anio}{mes}{dia}000000"
+    directorio_dia = Path(*partes[:idx_dia + 1])       # …\DIA
+
+    return os.path.join(directorio_dia, referencia)
+
+
+
+
+
+
+def referencia_directorio_completa__(archivo):
     archivo_base = Path(archivo).name      # Esto aísla el nombre del archivo
     extension = Path(archivo).suffix  # Esto obtiene la extensión (incluye el punto .)
     if extension=='.sis':

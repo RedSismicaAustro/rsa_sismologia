@@ -245,90 +245,137 @@ def parametros_estaciones():
 
 
 
-def obtener_directorios(archivo):
-    #archivo:   archivo de evento con el formato AAMMDDhhmmss.sis,AAMMDD_hhmmss.sis,AAMMDDhhmmss o AAMMDDhhmmss.csv
-    #EN el formato AAMMDDhhmmss tiene que tener el directorio de trabajo.
-    bandera_extension=1
-    if archivo=='  ':
-        return
-    x = archivo.find(".sis")
-    if x!=-1:
-        archivo=archivo[0:x]
-        bandera_extension=0
-    y = archivo.find(".csv")
-    if y!=-1:
-        archivo=archivo[0:y]
-        bandera_extension=0
-    if archivo[-7]=='_':
-        archivo=archivo[0:-7]+archivo[-6:x]
-    aux_0=len(archivo)
-    if aux_0==12 or bandera_extension:
-        anio='20'+archivo[-12:-10]
-        directorio_trabajo=archivo[:-12]
-    else:
-        anio=archivo[-14:-10]
-        directorio_trabajo=archivo[:-14]
-    mes=archivo[-10:-8]
-    dia=archivo[-8:-6]
-    hora=archivo[-6:-4]
-    minuto=archivo[-4:-2]
-    segundo=archivo[-2:]
-    directorio_base=directorio_trabajo+anio+'/'+anio+'_'+mes+'/'+anio+'_'+mes+'_'+dia
+def obtener_directorios(ruta_archivo: str) -> dict:
+    """
+    Construye la estructura de carpetas y nombres de archivo estándar para un
+    evento sísmico a partir de cualquier ruta que contenga:
 
-#    if int(archivo[-12:-10])<95:
-#        directorio_mes=archivo[0:aux_0-12]+"20"+archivo[aux_0-12:aux_0-10]+"/20"+archivo[aux_0-12:aux_0-10]+"_"+archivo[aux_0-10:aux_0-8]+"/"
-#        directorio_base=directorio_mes+"20"+archivo[aux_0-12:aux_0-10]+"_"+archivo[aux_0-10:aux_0-8]+"_"+archivo[aux_0-8:aux_0-6]
-#    else:
-#        directorio_mes=archivo[0:aux_0-12]+"19"+archivo[aux_0-12:aux_0-10]+"/19"+archivo[aux_0-12:aux_0-10]+"_"+archivo[aux_0-10:aux_0-8]+"/"
-#        directorio_base=directorio_mes+"19"+archivo[aux_0-12:aux_0-10]+"_"+archivo[aux_0-10:aux_0-8]+"_"+archivo[aux_0-8:aux_0-6]
-        #directorio_base                                      
+    - Marca de tiempo de 14 dígitos (AAAAMMDDhhmmss)   → usa AAAA directamente.
+    - Marca de tiempo de 12 dígitos (AAMMDDhhmmss):
+        · Si el archivo está dentro de “.../DIA/AAMMDDhhmmss*”         → año = 20AA
+        · Si el path es “…/DIA/AAAA/.../AAMMDDhhmmss*”                 → año = AAAA
+    """
+    # --------------------------------------------------------------------- #
+    ruta_original = Path(ruta_archivo.strip())
+    nombre_base   = ruta_original.stem           # sin extensión
+    marca_tiempo  = nombre_base.replace("_", "") # quita guion bajo
 
-    directorio_dia=os.path.join(directorio_base,'dia')
-    directorio_eventos=os.path.join(directorio_base,'mseed','eventos')             
-    directorio_registros=os.path.join(directorio_base,'mseed','registros')   
-    directorio_reportes=directorio_base+"/reportes"           
-    directorio_fast=directorio_base+"/fastHypo"               
-    directorio_procesamiento=directorio_base+"/procesamiento" 
-    directorio_acelerogramas=directorio_base+"/acelerogramas" 
-    archivo_estaciones=directorio_base+'/'+archivo[-12:-6]+'_estaciones.csv'
-    archivo_comportamiento=directorio_base+'/'+archivo[-12:-6]+'_est.csv'
-    archivo_csv=directorio_base+'/'+archivo[-12:-6]+'000000.csv'
-    archivo_rep=directorio_base+'/'+archivo[-12:-6]+'000000_rep.csv'
-    archivo_cat=directorio_base+'/'+archivo[-12:-6]+'000000_cat.csv'
-    archivo_xml=directorio_base+'/'+archivo[-12:-6]+'000000.xml'
-    archivo_res=directorio_base+'/'+archivo[-12:-6]+'000000_res.csv'
-    archivo_reporte_dia=directorio_base+'/'+archivo[-12:-6]+'000000_rep.pdf'
-    archivo_resp=directorio_reportes+'/'+archivo[-12:-6]+'_resp.csv'
-    archivo_tiempos=directorio_reportes+'/'+archivo[-12:-6]+'_tiempos.csv'
-    archivo_marcas=directorio_base+'/'+archivo[-12:]+'_marcas.json'
-    archivo_auxiliar=directorio_base+'/'+archivo[-12:-6]+'_aux.csv'
-    archivo_procesamiento=directorio_procesamiento+'/'+archivo[-12:-6]+'_'+archivo[-6:]+'_proc.csv'
-    sufijo_mseed='_'+anio+archivo[-10:-6]+'_'+archivo[-6:]+'.mseed'
-    archivo_referencia=archivo[-12:]
-    return{'Directorio_base':directorio_base,                       #[0] Directorio base 
-           'Directorio_dia':directorio_dia,                         #[1] Directorio dia
-           'Directorio_eventos':directorio_eventos,                 #[2] Directorio eventos
-           'Directorio_registros':directorio_registros,             #[3] Directorio registros
-           'Directorio_reportes':directorio_reportes,               #[4] Directorio reportes
-           'Directorio_fastHypo':directorio_fast,                   #[5] Directorio fastHypo
-           'Directorio_procesamiento':directorio_procesamiento,     #[6] Directorio procesamiento
-           'Directorio_acelerogramas':directorio_acelerogramas,     #[7] Directorio acelerogramas
-           'archivo_estaciones':archivo_estaciones,
-           'archivo_csv':archivo_csv,
-           'archivo_reporte':archivo_rep,
-           'archivo_catalogo':archivo_cat,
-           'archivo_xml':archivo_xml,
-           'archivo_resumen':archivo_res,
-           'archivo_responsables':archivo_resp,
-           'archivo_tiempos':archivo_tiempos,
-           'archivo_marcas':archivo_marcas,
-           'archivo_auxiliar':archivo_auxiliar,
-           'sufijo_mseed':sufijo_mseed,
-           'archivo_referencia':archivo_referencia,
-           'archivo_procesamiento':archivo_procesamiento,
-           'archivo_comportamiento':archivo_comportamiento,
-           'archivo_reporte_dia':archivo_reporte_dia
-        }
+    if not (marca_tiempo.isdigit() and len(marca_tiempo) in (12, 14)):
+        raise ValueError(f"No reconozco la marca de tiempo en: {ruta_archivo}")
+
+    # ----------- hallar “DIA” y el posible directorio-año --------------- #
+    partes = ruta_original.parts
+    try:
+        idx_dia = next(i for i, p in enumerate(partes) if p.upper() == "DIA")
+    except StopIteration:
+        idx_dia = None  # por si acaso la ruta no contiene “DIA”
+
+    candidato_anio = (
+        partes[idx_dia + 1]                 # carpeta justo después de “DIA”
+        if idx_dia is not None and idx_dia + 1 < len(partes)
+        else None
+    )
+    es_anio_4d = candidato_anio and candidato_anio.isdigit() and len(candidato_anio) == 4
+
+    # --------------------------- caso 14 dígitos -------------------------- #
+    if len(marca_tiempo) == 14:            # AAAA MM DD hh mm ss
+        anio_largo  = marca_tiempo[:4]
+        fecha_larga = marca_tiempo[:8]     # YYYYMMDD
+        fecha_corta = anio_largo[2:] + marca_tiempo[4:8]  # AAMMDD
+        timestamp_largo  = marca_tiempo   # 14 dígitos
+        timestamp_corto  = marca_tiempo[2:]
+        usar_4digitos    = True
+
+    # --------------------------- caso 12 dígitos -------------------------- #
+    else:                                  # AA MM DD hh mm ss
+        aa = marca_tiempo[:2]
+
+        if es_anio_4d:                     # …/DIA/AAAA/…/ AAMMDDhhmmss*
+            anio_largo = candidato_anio
+        else:                              # …/DIA/ AAMMDDhhmmss*
+            anio_largo = "20" + aa
+
+        fecha_larga = anio_largo + marca_tiempo[2:6]      # YYYYMMDD
+        fecha_corta = marca_tiempo[:6]                    # AAMMDD
+        timestamp_corto = marca_tiempo
+        timestamp_largo = anio_largo + marca_tiempo[2:]
+        usar_4digitos   = False  # los nombres de archivo conservan el prefijo AAMMDD
+
+    # -------------- descomponer para directorios / sufijos --------------- #
+    anio, mes, dia = anio_largo, fecha_larga[4:6], fecha_larga[6:8]
+    hora, minuto, segundo = timestamp_corto[6:8], timestamp_corto[8:10], timestamp_corto[10:12]
+
+    # ----- ubicar carpeta “DIA” en la ruta para armar directorio_base ----- #
+    directorio_trabajo = (
+        Path(*partes[: idx_dia + 1])  # desde la raíz hasta “DIA”
+        if idx_dia is not None
+        else ruta_original.parent     # fallback
+    )
+
+    directorio_base = (
+        directorio_trabajo /
+        anio /
+        f"{anio}_{mes}" /
+        f"{anio}_{mes}_{dia}"
+    )
+
+    # ---------------- subcarpetas estándar -------------------------------- #
+    directorio_dia             = directorio_base / "dia"
+    directorio_eventos         = directorio_base / "mseed" / "eventos"
+    directorio_registros       = directorio_base / "mseed" / "registros"
+    directorio_reportes        = directorio_base / "reportes"
+    directorio_fast            = directorio_base / "fastHypo"
+    directorio_procesamiento   = directorio_base / "procesamiento"
+    directorio_acelerogramas   = directorio_base / "acelerogramas"
+
+    # -------------- nombres de archivo derivados -------------------------- #
+    prefijo_fecha = fecha_larga if usar_4digitos else fecha_corta
+    sufijo_mseed  = f"_{anio}{mes}{dia}_{hora}{minuto}{segundo}.mseed"
+
+    archivo_estaciones      = directorio_base / f"{prefijo_fecha}_estaciones.csv"
+    archivo_comportamiento  = directorio_base / f"{prefijo_fecha}_est.csv"
+    archivo_csv             = directorio_base / f"{prefijo_fecha}000000.csv"
+    archivo_rep             = directorio_base / f"{prefijo_fecha}000000_rep.csv"
+    archivo_cat             = directorio_base / f"{prefijo_fecha}000000_cat.csv"
+    archivo_xml             = directorio_base / f"{prefijo_fecha}000000.xml"
+    archivo_res             = directorio_base / f"{prefijo_fecha}000000_res.csv"
+    archivo_reporte_dia     = directorio_base / f"{prefijo_fecha}000000_rep.pdf"
+    archivo_resp            = directorio_reportes / f"{prefijo_fecha}_resp.csv"
+    archivo_tiempos         = directorio_reportes / f"{prefijo_fecha}_tiempos.csv"
+    archivo_marcas          = directorio_base / f"{prefijo_fecha}000000_marcas.json"
+    archivo_auxiliar        = directorio_base / f"{prefijo_fecha}_aux.csv"
+    archivo_proc            = directorio_procesamiento / f"{prefijo_fecha}_{hora}{minuto}{segundo}_proc.csv"
+    archivo_referencia      = timestamp_largo if usar_4digitos else timestamp_corto
+
+    # ---------------------------- salida ----------------------------------- #
+    return {
+        "Directorio_trabajo":           str(directorio_trabajo),
+        "Directorio_base":              str(directorio_base),
+        "Directorio_dia":               str(directorio_dia),
+        "Directorio_eventos":           str(directorio_eventos),
+        "Directorio_registros":         str(directorio_registros),
+        "Directorio_reportes":          str(directorio_reportes),
+        "Directorio_fastHypo":          str(directorio_fast),
+        "Directorio_procesamiento":     str(directorio_procesamiento),
+        "Directorio_acelerogramas":     str(directorio_acelerogramas),
+        "archivo_estaciones":           str(archivo_estaciones),
+        "archivo_csv":                  str(archivo_csv),
+        "archivo_reporte":              str(archivo_rep),
+        "archivo_catalogo":             str(archivo_cat),
+        "archivo_xml":                  str(archivo_xml),
+        "archivo_resumen":              str(archivo_res),
+        "archivo_responsables":         str(archivo_resp),
+        "archivo_tiempos":              str(archivo_tiempos),
+        "archivo_marcas":               str(archivo_marcas),
+        "archivo_auxiliar":             str(archivo_auxiliar),
+        "sufijo_mseed":                 sufijo_mseed,
+        "archivo_referencia":           archivo_referencia,
+        "archivo_procesamiento":        str(archivo_proc),
+        "archivo_comportamiento":       str(archivo_comportamiento),
+        "archivo_reporte_dia":          str(archivo_reporte_dia),
+        "anio":                         str(anio_largo)
+    }
+
 
 def cargar_parametros():
         # Asignar todos los parámetros de una sola llamada

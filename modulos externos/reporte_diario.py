@@ -181,7 +181,7 @@ class MyApp(QMainWindow):
         self.bandera_evento=1
         self.date=date
         self.fecha_ini=date
-        self.archivo=self.directorio_trabajo+date.toString('yyMMdd000000')
+        self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
         self.directorios=obtener_directorios(self.archivo)#return(directorio,directorio_dia,directorio_eventos,directorio_registros)
         self.dia_reporte='      del '+date.toString('d')+' de '+ date.toString('MMMM')+' de '+date.toString('yyyy')
         if os.path.exists(self.directorios['archivo_csv']):

@@ -280,14 +280,14 @@ class Marcar_evento(QMainWindow):
 
     def cambio_de_fecha(self):
         # Guardar las marcas del día actual antes de cambiar de fecha
-        archivo = self.directorio_trabajo + '/' + self.fecha_anterior.toString('yyMMdd') + '000000'
+        archivo = self.directorio_trabajo + '/' + self.fecha_anterior.toString('yyyyMMdd') + '000000'
         self.directorios = obtener_directorios(archivo)
         self.guardar_marcas()
 
         # Actualizar la fecha seleccionada
         self.fecha_seleccionada = self.date_edit.date().toPyDate()
         fecha = self.date_edit.date()
-        archivo = self.directorio_trabajo + '/' + fecha.toString('yyMMdd') + '000000'
+        archivo = self.directorio_trabajo + '/' + fecha.toString('yyyyMMdd') + '000000'
         # Actualizar los directorios basados en la nueva fecha
         self.directorios = obtener_directorios(archivo)
         # Filtrar y listar archivos MSEED en el directorio
