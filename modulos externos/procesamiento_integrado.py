@@ -67,7 +67,7 @@ def activar_hilo(self):
 def cargar_combo_eventos(self,text):
     self.sismos_procesar=[]
     self.cmbx_eventos.clear()
-
+    print("Eventos totales:",self.eventos)
     if self.eventos_reporte!=None:
         eventos_reporte=int(self.eventos_reporte[-1:][0][0])
     else:
@@ -77,7 +77,10 @@ def cargar_combo_eventos(self,text):
                     aux_sismo=(int(self.eventos[i][0]),self.eventos[i][1])#aux_sismo tiene el numero de evento del csv y todo el registro
                     self.sismos_procesar.append(aux_sismo)
                     self.cmbx_eventos.addItem(self.eventos[i][1])
+                    print(self.eventos[i][1])
+    print("Sismos a procesar:",self.sismos_procesar)
     self.preparar_evento('')
+    
 
 class FileMonitor:
     def __init__(self, file_path, update_callback, callback_params, procesamiento):
@@ -172,7 +175,7 @@ class MyApp(QMainWindow):
     
     def showDate(self, date):#Es como inicializar el dìa
         self.date=date
-        self.archivo=self.directorio_trabajo+date.toString('yyMMdd000000')
+        self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
         self.estaciones_eventos=[]
         self.bandera_marcas=1
         self.cmbx_eventos.clear()
@@ -200,7 +203,7 @@ class MyApp(QMainWindow):
         self.directorio=obtener_directorios(self.archivo)
         self.grupo_carga.setEnabled(True)
         #Cargar día
-
+        print(self.directorio['archivo_csv'])
         self.eventos_reporte,self.catalogo,self.eventos,\
         vector,self.evento_canales,\
         root,self.responsables,self.resumen=cargar_dia(self.directorio['archivo_csv'])

@@ -980,15 +980,17 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
 
     directorios=obtener_directorios(archivo)    
     archivo_=archivos_fast(archivo,directorio_trabajo,usuario)
+    print("Resultado archivos fast:",archivo_)
     archivo_fas=archivo_[1]
     archivo_rsa=archivo_[2]
     archivo_fase=archivo_[3]
     bandera_error=0
     archivo_estaciones = Path(directorios['archivo_estaciones']).name
+    print(archivo_estaciones)
     if usuario=='':
-        dir_dia = next(p for p in Path(archivo_rsa).parents if re.fullmatch(r"\d{4}_\d{2}_\d{2}", p.name))
-    else:
-        dir_dia = next(p for p in Path(archivo_fas[2]).parents if re.fullmatch(r"\d{4}_\d{2}_\d{2}", p.name))
+        dir_dia=extraer_hasta_directorio(archivo_rsa,'DIA')
+q    else:
+        dir_dia =extraer_hasta_directorio(archivo_rsa,'DIA')
         dir_dia=os.path.join(directorio_trabajo,dir_dia)
     archivo_estaciones=os.path.join(dir_dia,archivo_estaciones)
     lectura_estaciones=lectura_archivo(archivo_estaciones)
@@ -1577,7 +1579,7 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
             sismo_extraido.append(sis_extraido)
         # Crear archivo .sis si es evento sísmico
         if tipo_evento == "SISMO":
-            archivo_cabecera = os.path.join(directorios['directorio_trabajo'],"cabecera_sismo")
+            archivo_cabecera = os.path.join(directorios['Directorio_trabajo'],"cabecera_sismo")
             try:
                 with open(archivo_cabecera, 'rb') as archivo_leer:
                     cabecera = b''
@@ -1782,7 +1784,6 @@ def cargar_dia(archivo_csv):
     """
     directorio_trabajo=extraer_hasta_directorio(archivo_csv,'DIA')
     archivo=referencia_directorio_completa(archivo_csv)
-    print(archivo)
     directorios=obtener_directorios(archivo)
     if not(os.path.exists(directorios['Directorio_base'])):
         return [],[],[],[],[],[],[],[]

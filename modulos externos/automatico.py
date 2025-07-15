@@ -19,7 +19,7 @@ if ruta_librerias not in sys.path:
 if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
-
+import re
 import time
 import sys
 from PyQt5 import uic, QtWidgets
@@ -192,7 +192,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def showDate(self, date):#Es como inicializar el dìa
         self.date=date
-        self.dia=self.date.toString('yyMMdd')
+        self.dia=self.date.toString('yyyyMMdd')
         self.archivo=self.directorio_trabajo+self.dia+'000000'
 
 
@@ -208,18 +208,20 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def Abrir_archivo(self):
         lista_archivos=[]
-        directorio_origen='R:'# directorio_origen="C:/DIA/"
+        directorio_origen='R:'
         try:
             archivos_auxiliar = os.listdir(directorio_origen)
-            for archivo_copiar in archivos_auxiliar:
-                if len(archivo_copiar)==12 and archivo_copiar[0:6]==self.dia:        
-                    arch_aux=archivo_copiar
-                    archivo_origen='R:'+archivo_copiar#  archivo_origen="C:/DIA/"+archivo_copiar
-                    archivo_destino=self.directorio_trabajo+archivo_copiar
+            archivos_filtrados = [f for f in archivos_auxiliar if re.fullmatch(r'\d{6}(?:000000|235959)', Path(f).stem)]
+            for archivo_copiar in archivos_filtrados:
+                if archivo_copiar[0:6]==self.dia[2:]:        
+                    arch_aux='20'+archivo_copiar
+                    archivo_origen='R:/'+archivo_copiar#  archivo_origen="C:/DIA/"+archivo_copiar
+                    archivo_destino=self.directorio_trabajo+'20'+archivo_copiar
                     if archivo_copiar[6:12]=="235959":
-                        archivo_destino=self.directorio_trabajo+archivo_copiar[0:6]+"000000"#    archivo_destino="C:/DIA/"+archivo_copiar[0:6]+"000000"
-                        arch_aux=archivo_copiar[0:6]+"000000"
+                        archivo_destino=self.directorio_trabajo+'20'+archivo_copiar[0:6]+"000000"#    archivo_destino="C:/DIA/"+archivo_copiar[0:6]+"000000"
+                        arch_aux='20'+archivo_copiar[0:6]+"000000"
                     lista_archivos.append(arch_aux)
+                    print("Copiando archivos ",archivo_origen,archivo_destino)
                     shutil.copy(archivo_origen,archivo_destino)
                     self.Lbl_Mensajes.setText('Archivo copiado\n   '+archivo_copiar)
         except FileNotFoundError:
@@ -268,6 +270,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.canal = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]   # canal Variable  para la lectura desde el archivo binario
 
     def definir_dia(self):
+        print("Dia: ",self.archivo)
         self.directorios_=obtener_directorios(self.archivo)
         self.directorio=self.directorios_['Directorio_base']
         self.directorio_dia=self.directorios_['Directorio_dia']
@@ -447,7 +450,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
     def generar_plt(self):
-        hora_string=self.fecha_.strftime('%y%m%d_%H%M%S')
+        hora_string=self.fecha_.strftime('%Y%m%d_%H%M%S')
         print(self.trCanal)
         for i in range(0,16):
             if self.hab_plt[i]=='1':
@@ -465,7 +468,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 archivo_plt.close
 
     def imprimir_png(self):
-        hora_string=self.fecha_.strftime('%y%m%d_%H%M%S')
+        hora_string=self.fecha_.strftime('%Y%m%d_%H%M%S')
         for i in range(0,16):
             if self.hab_canal[i]=='1':
                 nombrepng = self.nombre_canal[i]+"_"+hora_string+".png"

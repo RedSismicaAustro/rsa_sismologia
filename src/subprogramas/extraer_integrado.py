@@ -143,7 +143,7 @@ class Extraer_evento(QMainWindow):
 
     def showDate(self, date):#Es como inicializar el dìa
         self.date=date
-        self.archivo=self.directorio_trabajo+date.toString('yyMMdd000000')
+        self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
         self.estaciones_eventos=[]
         self.filtros_estaciones=[]
         self.bandera_marcas=1
@@ -280,7 +280,7 @@ class Extraer_evento(QMainWindow):
         n_evento = self.cmbx_eventos.currentIndex() + 1
         tipo_evento = self.Cmb_bx_tipo_evento.currentText()
         fecha_real = self.tiempo + self.t_inicio  # Usado solo para generar nombre
-        nombre_sis = fecha_real.strftime('%y%m%d_%H%M%S.sis')
+        nombre_sis = fecha_real.strftime('%Y%m%d_%H%M%S.sis')
         ahora = datetime.now()
         estaciones=""
         for i,n_estacion in enumerate(self.estaciones_eventos_total):
@@ -576,17 +576,12 @@ class Extraer_evento(QMainWindow):
         )
         result = message_box.exec_()
         if result == QMessageBox.Yes:
-            directorio_=obtener_directorios(self.archivo)#(directorio,directorio_dia,directorio_eventos,directorio_registros)
-            directorio=directorio_['Directorio_base']
-            aux=len(directorio)
-            b=directorio[aux-8:aux-6]+directorio[aux-5:aux-3]+directorio[aux-2:aux]
-            nombre_archivo=directorio+"/"+b+"_aux.csv"
+            nombre_archivo=self.directorios["archivo_auxiliar"]
             if os.path.exists(nombre_archivo):
                 pass
             else:
-                nombre_archivo=directorio+"/"+b+"000000.csv"
-
-            archivo_guardar=directorio+"/reportes/"+b+"_tiempos.csv"
+                nombre_archivo=self.directorios["archivo_csv"]
+            archivo_guardar=self.directorios["archivo_tiempos"]
             if os.path.exists(archivo_guardar):
                 pass
             with open(nombre_archivo,newline='') as lista_csv:
@@ -600,7 +595,7 @@ class Extraer_evento(QMainWindow):
                 cont_tele=[0,0,0]
                 hora_=[12,18,24]
                 for evento_ in lista_eventos:
-                    h=int(evento_[1][7:9])
+                    h=int(evento_[1][9:11])
                     if h<12:
                         if evento_[2] == 'SISMO':
                             cont_sismo[0]=cont_sismo[0]+1
@@ -660,6 +655,7 @@ class Extraer_evento(QMainWindow):
             solo_eventos = [fila[1] for fila in eventos]
             for i,evento_auxiliar in enumerate(self.eventos_auxiliar):
                 ventana.actualizar(i + 1)
+                print(self.archivo)
                 evento=extraccion(evento_auxiliar,solo_eventos,self.archivo,False)
                 if evento!=None:
                     eventos.append(evento)
