@@ -961,13 +961,17 @@ def escritura_archivo(archivo, valores):
 
 
 def copiar_archivos(archivos_origen, archivos_destino):
+    print("copiando archivos:",archivos_origen, archivos_destino)
 
     lista=(17,17,12,11,10,10,10)
     for i in range(0,7):
+        print("Archivo destino:",archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:])
         try:
             archivo_dest=archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:]
             shutil.copyfile(archivos_origen[i],archivo_dest)
+            print("Copiando:",archivos_origen[i],archivo_dest)
         except FileNotFoundError:
+            print("Archivo no encontrado:",archivos_origen[i])
             pass
 
 
@@ -980,21 +984,16 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
 
     directorios=obtener_directorios(archivo)    
     archivo_=archivos_fast(archivo,directorio_trabajo,usuario)
-    print("Resultado archivos fast:",archivo_)
     archivo_fas=archivo_[1]
     archivo_rsa=archivo_[2]
     archivo_fase=archivo_[3]
     bandera_error=0
     archivo_estaciones = Path(directorios['archivo_estaciones']).name
-    print(archivo_estaciones)
     if usuario=='':
-        dir_dia=extraer_hasta_directorio(archivo_rsa,'DIA')
-q    else:
-        dir_dia =extraer_hasta_directorio(archivo_rsa,'DIA')
-        dir_dia=os.path.join(directorio_trabajo,dir_dia)
-    archivo_estaciones=os.path.join(dir_dia,archivo_estaciones)
+        archivo_estaciones= archivo_rsa[:-21]+ archivo_estaciones
+    else:
+        archivo_estaciones= directorio_trabajo+directorios['Directorio_base']+'/'+archivo_rsa[:-21]+ archivo_estaciones 
     lectura_estaciones=lectura_archivo(archivo_estaciones)
-
     aux=len(archivo)
     if archivo[-11:-10]=="_":
         sismo_aux=archivo[-17:-11]+archivo[-10:aux]
@@ -1154,7 +1153,6 @@ def archivos_fast(evento,dir_trabajo,usuario):
     if usuario == "":
         dir_dia_temp = os.path.join(dir_trabajo,directorios['Directorio_dia']) 
         dir_fastHypo_temp = os.path.join(dir_trabajo,directorios['Directorio_fastHypo'])
-
     numero=float(evento[-8:-6]+'.'+evento[-6:-4])
     redondeado = str(round(numero))
     if len(redondeado)==1:
@@ -1184,13 +1182,13 @@ def archivos_fast(evento,dir_trabajo,usuario):
         fecha_ = QDateTime(fecha.year, fecha.month,fecha.day,fecha.hour,fecha.minute,fecha.second)
         archivo_rsa=archivo_rsa[0:len(archivo_rsa)-12]+fecha_.toString('MMddhhmm')+'.rsa'
     archivos_procesammiento.append(archivo_rsa)
-    archivo_fase=dir_fastHypo_temp+'/'+'Phase'+archivo_rsa[-10:-7]+'.'+archivo_rsa[-7:-4]
+    archivo_fase= os.path.join(dir_fastHypo_temp,'Phase'+archivo_rsa[-10:-7]+'.'+archivo_rsa[-7:-4])
     archivos_procesammiento.append(archivo_fase)
-    archivo_L=dir_fastHypo_temp+'/'+evento[2:4]+archivo_rsa[-10:-6]+'.'+archivo_rsa[-6:-4]+'L'
+    archivo_L=os.path.join(dir_fastHypo_temp,evento[2:4]+archivo_rsa[-10:-6]+'.'+archivo_rsa[-6:-4]+'L')
     archivos_procesammiento.append(archivo_L)
-    archivo_P=dir_fastHypo_temp+'/'+evento[2:4]+archivo_rsa[-10:-6]+'.'+archivo_rsa[-6:-4]+'P'
+    archivo_P=os.path.join(dir_fastHypo_temp,evento[2:4]+archivo_rsa[-10:-6]+'.'+archivo_rsa[-6:-4]+'P')
     archivos_procesammiento.append(archivo_P)
-    archivo_S=dir_fastHypo_temp+'/'+evento[2:4]+archivo_rsa[-10:-6]+'.'+archivo_rsa[-6:-4]+'S'
+    archivo_S=os.path.join(dir_fastHypo_temp,evento[2:4]+archivo_rsa[-10:-6]+'.'+archivo_rsa[-6:-4]+'S')
     archivos_procesammiento.append(archivo_S)
     return(archivos_procesammiento)
 
@@ -1479,7 +1477,7 @@ def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaci
     #filtros_estaciones    Todos los filtros estacion por estación
     #estaciones_eventos_total  Todas las estaciones que tienen registros mseed del evento
     #bandera_todos    Bandera para filtrar todos los canales con los parametros generales o con los filtros estacion por estación.
-    print(estaciones_eventos_total,estaciones_eventos)
+
     num_canal=len(estaciones_eventos)
     for i in range(0, num_canal):
         indice=estaciones_eventos_total.index(estaciones_eventos[i])
