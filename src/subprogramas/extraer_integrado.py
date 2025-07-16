@@ -655,7 +655,6 @@ class Extraer_evento(QMainWindow):
             solo_eventos = [fila[1] for fila in eventos]
             for i,evento_auxiliar in enumerate(self.eventos_auxiliar):
                 ventana.actualizar(i + 1)
-                print(self.archivo)
                 evento=extraccion(evento_auxiliar,solo_eventos,self.archivo,False)
                 if evento!=None:
                     eventos.append(evento)

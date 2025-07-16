@@ -286,6 +286,8 @@ class MyApp(QMainWindow):
 
     def procesar_(self,text):
         archivo=self.evento_procesar[1]
+        self.archivo=os.path.join(self.directorio["Directorio_trabajo"],archivo[:8]+archivo[9:15])
+        self.directorio=obtener_directorios(self.archivo)
         if self.evento_procesar[2]=='SISMO':
             self.bandera_virtual=verificar_drives_virtuales(self.responsable_evento)
             if not(self.bandera_virtual):
@@ -302,7 +304,7 @@ class MyApp(QMainWindow):
             msg = QMessageBox(QMessageBox.Information, "¡AVISO IMPORTANTE!", "Modificacion de aportes de estaciones y filtros")
             msg.setWindowFlags(msg.windowFlags() | Qt.WindowStaysOnTopHint)
             msg.exec_()
-        self.archivo_procesar=self.directorio['Directorio_procesamiento']+'/'+archivo[:-4]+'_proc'+'.csv'
+        self.archivo_procesar=self.directorio['Directorio_procesamiento']+'/'+archivo[:-4]+'_proc.csv'
         if os.path.exists(self.archivo_procesar):
             self.procesamiento=lectura_archivo(self.archivo_procesar)
         else:

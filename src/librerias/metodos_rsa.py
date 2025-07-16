@@ -981,12 +981,13 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
 #  archivo_rsa es el archivo genrardo por el fasthypo con extencion .rsa generada a partir del archivo.
 #  usuario es para tomar información del sistema o de procesamiento, cuaNdo el valor es '', toma del sistema y si no toma de procesamiento asignando los valores 
 #   del drive adecuado en las computadoras de procesamiento.
-
+    print("Archivos procesamiento")
     directorios=obtener_directorios(archivo)    
-    archivo_=archivos_fast(archivo,directorio_trabajo,usuario)
-    archivo_fas=archivo_[1]
-    archivo_rsa=archivo_[2]
-    archivo_fase=archivo_[3]
+    archivo_procesamiento=archivos_fast(archivo,directorio_trabajo,usuario)
+    print(archivo_procesamiento)
+    archivo_fas=archivo_procesamiento[1]
+    archivo_rsa=archivo_procesamiento[2]
+    archivo_fase=archivo_procesamiento[3]
     bandera_error=0
     archivo_estaciones = Path(directorios['archivo_estaciones']).name
     if usuario=='':
@@ -1141,7 +1142,9 @@ def archivos_fast(evento,dir_trabajo,usuario):
 # evento es el archivo AAMMDD_hhmmss.sis
 # dir_trabajo es el 
 # Ususario es el responsable.
+    print(evento)    
     directorios=obtener_directorios(evento)
+    
     archivos_procesammiento=[]
     responsables=os.path.join(ruta_datos, "responsables.csv")
     datos=lectura_archivo(responsables)
@@ -1153,6 +1156,8 @@ def archivos_fast(evento,dir_trabajo,usuario):
     if usuario == "":
         dir_dia_temp = os.path.join(dir_trabajo,directorios['Directorio_dia']) 
         dir_fastHypo_temp = os.path.join(dir_trabajo,directorios['Directorio_fastHypo'])
+    else:
+        evento=evento[2:]
     numero=float(evento[-8:-6]+'.'+evento[-6:-4])
     redondeado = str(round(numero))
     if len(redondeado)==1:
@@ -1432,8 +1437,7 @@ def verificar_coincidencias(matriz, vector):
     """
     # Obtenemos el segundo elemento del vector y extraemos horas y minutos
     fecha_vector = vector[1]
-    horas_minutos_vector = fecha_vector[7:11]  # Extrae el componente hhmm de AAMMDD_hhmmss.sis
-
+    horas_minutos_vector = fecha_vector[9:13]  # Extrae el componente hhmm de AAMMDD_hhmmss.sis
     # Lista para almacenar los valores completos que coinciden
     coincidencias = []
 
@@ -1441,7 +1445,7 @@ def verificar_coincidencias(matriz, vector):
     for fila in matriz:
         # Obtenemos el segundo elemento de la fila y extraemos horas y minutos
         fecha_fila = fila[1]
-        horas_minutos_fila = fecha_fila[7:11]
+        horas_minutos_fila = fecha_fila[9:13]
 
         # Verificamos si las horas y minutos coinciden y no es la misma fila
         if horas_minutos_vector == horas_minutos_fila and fila != vector:
@@ -1510,11 +1514,13 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
     evento,tipo_evento,t_inicio, t_final = evento_auxiliar[1],evento_auxiliar[2], float(evento_auxiliar[4]), float(evento_auxiliar[5])
+    print("Trabajando evento ", evento,tipo_evento)
+    print(solo_eventos)
     fecha_ = obtencion_hora(archivo)
     t_ini = fecha_ + t_inicio
     t_fin = fecha_ + t_final
     numero_de_muestras=int((t_fin-t_ini)*64)
-    nombre_sis = os.path.join(directorios['Directorio_dia'] , t_ini.strftime('%y%m%d_%H%M%S.sis'))
+    nombre_sis = os.path.join(directorios['Directorio_dia'] , t_ini.strftime('%Y%m%d_%H%M%S.sis'))
     hora_formateada = t_ini.strftime(" %H: %M: %S")
     if t_inicio > t_final:
         QMessageBox.about(None, "Advertencia", "Hora incorrecta: Tiempo de inicio mayor a final")
@@ -1541,6 +1547,7 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
     else:
         return 
     if tipo_evento != "Ruido":
+        print("Extrayendo evento ",evento )
         sismo_extraido=[]
         for estacion_analogica in estaciones_analogicas:
             if estacion_analogica[0]=='ESTACION':
@@ -1577,6 +1584,7 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
             sismo_extraido.append(sis_extraido)
         # Crear archivo .sis si es evento sísmico
         if tipo_evento == "SISMO":
+            print("Convirtiendo a sis  ",evento )
             archivo_cabecera = os.path.join(directorios['Directorio_trabajo'],"cabecera_sismo")
             try:
                 with open(archivo_cabecera, 'rb') as archivo_leer:
