@@ -287,6 +287,7 @@ class MyApp(QMainWindow):
     def procesar_(self,text):
         archivo=self.evento_procesar[1]
         self.archivo=os.path.join(self.directorio["Directorio_trabajo"],archivo[:8]+archivo[9:15])
+        print("Archivo a rocesar: ",self.archivo)
         self.directorio=obtener_directorios(self.archivo)
         if self.evento_procesar[2]=='SISMO':
             self.bandera_virtual=verificar_drives_virtuales(self.responsable_evento)
@@ -345,10 +346,10 @@ class MyApp(QMainWindow):
         if result == QMessageBox.Yes:
             archivo=self.evento_procesar[1]
             archivos_origen=archivos_fast(archivo,self.directorio_trabajo,'')
-            hora=obtencion_hora(archivo[:6]+archivo[7:13])
+            hora=obtencion_hora(archivo[:8]+archivo[9:15])
             fecha_hora = hora
             fecha_hora_menos_un_minuto = fecha_hora - timedelta(minutes=1)
-            formato_fecha_hora = "%y%m%d_%H%M%S.sis"
+            formato_fecha_hora = "%Y%m%d_%H%M%S.sis"
             indice_catalogo="%Y%m%d%H%M%00"
             archivo_modificado = fecha_hora_menos_un_minuto.strftime(formato_fecha_hora)
             archivos_destino=archivos_fast(archivo_modificado,self.directorio_trabajo,'')

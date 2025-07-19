@@ -211,7 +211,9 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         directorio_origen='R:'
         try:
             archivos_auxiliar = os.listdir(directorio_origen)
-            archivos_filtrados = [f for f in archivos_auxiliar if re.fullmatch(r'\d{6}(?:000000|235959)', Path(f).stem)]
+            archivos_filtrados = [f for f in archivos_auxiliar
+                      if re.fullmatch(r'\d{6}(?:000000|235959)', Path(f).stem)
+                      and Path(f).suffix == '']
             for archivo_copiar in archivos_filtrados:
                 if archivo_copiar[0:6]==self.dia[2:]:        
                     arch_aux='20'+archivo_copiar

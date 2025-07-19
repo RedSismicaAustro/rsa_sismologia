@@ -990,11 +990,9 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
     archivo_fase=archivo_procesamiento[3]
     bandera_error=0
     archivo_estaciones = Path(directorios['archivo_estaciones']).name
-    if usuario=='':
-        archivo_estaciones= archivo_rsa[:-21]+ archivo_estaciones
-    else:
-        archivo_estaciones= directorio_trabajo+directorios['Directorio_base']+'/'+archivo_rsa[:-21]+ archivo_estaciones 
+    archivo_estaciones = os.path.join(os.path.dirname(archivo_rsa), archivo_estaciones)
     lectura_estaciones=lectura_archivo(archivo_estaciones)
+    print(archivo_estaciones,lectura_estaciones)
     aux=len(archivo)
     if archivo[-11:-10]=="_":
         sismo_aux=archivo[-17:-11]+archivo[-10:aux]
@@ -1137,65 +1135,84 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
         return 
 
 
-def archivos_fast(evento,dir_trabajo,usuario):
-# Programa para obtener los diferentes archivos de procesamiento de los archivos de eventos
-# evento es el archivo AAMMDD_hhmmss.sis
-# dir_trabajo es el 
-# Ususario es el responsable.
-    print(evento)    
-    directorios=obtener_directorios(evento)
-    
-    archivos_procesammiento=[]
-    responsables=os.path.join(ruta_datos, "responsables.csv")
-    datos=lectura_archivo(responsables)
-    for r in datos:
-        dir_dia_temp = r[1] 
-        dir_fastHypo_temp = r[2]
-        if r[0]==usuario:
-            break
-    if usuario == "":
-        dir_dia_temp = os.path.join(dir_trabajo,directorios['Directorio_dia']) 
-        dir_fastHypo_temp = os.path.join(dir_trabajo,directorios['Directorio_fastHypo'])
-    else:
-        evento=evento[2:]
-    numero=float(evento[-8:-6]+'.'+evento[-6:-4])
-    redondeado = str(round(numero))
-    if len(redondeado)==1:
-        redondeado='0'+redondeado
-    archivo_sis=os.path.join(dir_dia_temp,evento) 
-    archivos_procesammiento.append(archivo_sis)
-    archivo_fas=os.path.join(dir_dia_temp,evento[:-3]+'fas') 
-    archivos_procesammiento.append(archivo_fas)
-    if len(evento)==19:
-        evento=evento[2:]
-    archivo_rsa=os.path.join(dir_fastHypo_temp,evento[7:11]+'.rsa') 
-    if os.path.exists(archivo_rsa):
-        pass
-    else:
-        archivo_rsa=os.path.join(dir_fastHypo_temp,evento[2:6]+evento[7:9]+redondeado+'.rsa') 
+def archivos_fast(evento, dir_trabajo, usuario):
+    """
+    Devuelve las rutas:
+        [ .sis, .fas, .rsa, Phase, .L, .P, .S ]
 
-    aux=len(evento)
-    if evento[-11:-10]=="_":
-        sismo_aux=evento[-17:-11]+evento[-10:aux]
-    else:
-        sismo_aux=evento[-10:aux]
-    if os.path.exists(archivo_rsa):  #Toma lectura del archivo rsa si existe
-        pass
-    else: #Incrementa al siguiente minuto para la lectura
-        fecha=datetime(int(sismo_aux[0:2]),int(sismo_aux[2:4]),int(sismo_aux[4:6]),int(sismo_aux[6:8]),int(sismo_aux[8:10]),0)
-        fecha = fecha + timedelta(0,60)
-        fecha_ = QDateTime(fecha.year, fecha.month,fecha.day,fecha.hour,fecha.minute,fecha.second)
-        archivo_rsa=archivo_rsa[0:len(archivo_rsa)-12]+fecha_.toString('MMddhhmm')+'.rsa'
-    archivos_procesammiento.append(archivo_rsa)
-    archivo_fase= os.path.join(dir_fastHypo_temp,'Phase'+archivo_rsa[-10:-7]+'.'+archivo_rsa[-7:-4])
-    archivos_procesammiento.append(archivo_fase)
-    archivo_L=os.path.join(dir_fastHypo_temp,evento[2:4]+archivo_rsa[-10:-6]+'.'+archivo_rsa[-6:-4]+'L')
-    archivos_procesammiento.append(archivo_L)
-    archivo_P=os.path.join(dir_fastHypo_temp,evento[2:4]+archivo_rsa[-10:-6]+'.'+archivo_rsa[-6:-4]+'P')
-    archivos_procesammiento.append(archivo_P)
-    archivo_S=os.path.join(dir_fastHypo_temp,evento[2:4]+archivo_rsa[-10:-6]+'.'+archivo_rsa[-6:-4]+'S')
-    archivos_procesammiento.append(archivo_S)
-    return(archivos_procesammiento)
+    ─ Host    (usuario == '') → .sis/.fas con AAAA
+    ─ Virtual (usuario != '') → .sis/.fas con AA  (se recortan los dos primeros dígitos)
+
+    Formatos FASTHYPO (todos con año AA):
+        · MMDDhhmm.rsa
+        · PhaseDDh.hmm
+        · MMDDhh.mm[L|P|S]
+
+    Si el .rsa exacto no existe se suma 1 minuto y ese minuto “ajustado” se
+    reutiliza en Phase y L/P/S.
+    """
+
+    # ------------------------------------------------------------------ #
+    # 1 · Carpetas base
+    # ------------------------------------------------------------------ #
+    info = obtener_directorios(evento)
+    dir_dia  = os.path.join(dir_trabajo, info['Directorio_dia'])
+    dir_fast = os.path.join(dir_trabajo, info['Directorio_fastHypo'])
+
+    if usuario:
+        csv_path = os.path.join(ruta_datos, "responsables.csv")
+        for fila in lectura_archivo(csv_path):
+            if fila[0].strip() == usuario.strip():
+                dir_dia, dir_fast = fila[1], fila[2]
+                break
+
+    # ------------------------------------------------------------------ #
+    # 2 · Despiece de nombre base
+    # ------------------------------------------------------------------ #
+    base = evento[:-4]                             # quita '.sis'
+    if len(base) == 13:                            # AAMMDD_hhmmss
+        yy, mm, dd = 20 + int(base[:2]), base[2:4], base[4:6]
+        hh, minu, ss = base[7:9], base[9:11], base[11:13]
+        sisfas_base  = base                        # ya en AA
+    else:                                          # AAAAMMDD_hhmmss
+        yy, mm, dd = int(base[:4]), base[4:6], base[6:8]
+        hh, minu, ss = base[9:11], base[11:13], base[13:15]
+        sisfas_base  = base if usuario == '' else base[2:]  # recorta '20' sólo para virtual
+    # ------------------------------------------------------------------ #
+    # 3 · .sis / .fas
+    # ------------------------------------------------------------------ #
+    archivo_sis = os.path.join(dir_dia, f"{sisfas_base}.sis")
+    archivo_fas = os.path.join(dir_dia, f"{sisfas_base}.fas")
+
+    # ------------------------------------------------------------------ #
+    # 4 · .rsa  (intento minuto real)
+    # ------------------------------------------------------------------ #
+    rsa_nom = f"{mm}{dd}{hh}{minu}.rsa"
+    archivo_rsa = os.path.join(dir_fast, rsa_nom)
+
+    # ------------------------------------------------------------------ #
+    # 5 · Redondeo (+1 min) si falta el .rsa
+    # ------------------------------------------------------------------ #
+    if not os.path.exists(archivo_rsa):
+        dt = datetime(yy, int(mm), int(dd), int(hh), int(minu), int(ss)) + timedelta(minutes=1)
+        mm, dd, hh, minu = dt.strftime("%m %d %H %M").split()
+        rsa_nom = f"{mm}{dd}{hh}{minu}.rsa"
+        archivo_rsa = os.path.join(dir_fast, rsa_nom)
+
+    # ------------------------------------------------------------------ #
+    # 6 · Phase  y  L / P / S (mismo minuto usado en .rsa)
+    # ------------------------------------------------------------------ #
+    phase_nom = f"Phase{dd}{hh[0]}.{hh[1]}{minu}"
+    archivo_phase = os.path.join(dir_fast, phase_nom)
+
+    base_lp = f"{mm}{dd}{hh}.{minu}"
+    archivo_L = os.path.join(dir_fast, base_lp + 'L')
+    archivo_P = os.path.join(dir_fast, base_lp + 'P')
+    archivo_S = os.path.join(dir_fast, base_lp + 'S')
+
+    # ------------------------------------------------------------------ #
+    return [archivo_sis, archivo_fas, archivo_rsa,
+            archivo_phase, archivo_L, archivo_P, archivo_S]
 
 
 def guardar_informacion_diaria(archivo,directorio_trabajo,catalogo_anterior,eventos):
