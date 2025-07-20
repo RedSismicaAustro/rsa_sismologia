@@ -981,23 +981,21 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
 #  archivo_rsa es el archivo genrardo por el fasthypo con extencion .rsa generada a partir del archivo.
 #  usuario es para tomar información del sistema o de procesamiento, cuaNdo el valor es '', toma del sistema y si no toma de procesamiento asignando los valores 
 #   del drive adecuado en las computadoras de procesamiento.
-    print("Archivos procesamiento")
+    print("Lectura RSA","\narchivo:",archivo)
     directorios=obtener_directorios(archivo)    
     archivo_procesamiento=archivos_fast(archivo,directorio_trabajo,usuario)
-    print(archivo_procesamiento)
     archivo_fas=archivo_procesamiento[1]
     archivo_rsa=archivo_procesamiento[2]
     archivo_fase=archivo_procesamiento[3]
     bandera_error=0
-    archivo_estaciones = Path(directorios['archivo_estaciones']).name
-    archivo_estaciones = os.path.join(os.path.dirname(archivo_rsa), archivo_estaciones)
+    archivo_estaciones = os.path.join(directorio_trabajo, directorios["archivo_estaciones"])
     lectura_estaciones=lectura_archivo(archivo_estaciones)
-    print(archivo_estaciones,lectura_estaciones)
     aux=len(archivo)
     if archivo[-11:-10]=="_":
         sismo_aux=archivo[-17:-11]+archivo[-10:aux]
     else:
         sismo_aux=archivo[-10:aux]
+    print("Variable simso_aux: ",sismo_aux)
     lectura_fase=[]
     auxiliar=["Disp.","t_pr.","t_sec.","marc.s","t_cod."]
     lectura_fase.append(auxiliar)
@@ -1114,7 +1112,7 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
                 return 1
             else:                
                 ubicacion_sismo=ubicacion(latitud,longitud)
-                ruta=archivo[len(archivo)-17:len(archivo)]
+                ruta=archivo
                 if segundo_sismo<0:#hay que transformar en archivo datetime y hacer la operaciòn para que sea exacto
                     segundo_sismo=60+segundo_sismo
                     minuto_sismo = minuto_sismo-1

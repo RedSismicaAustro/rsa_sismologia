@@ -4,7 +4,9 @@ from pathlib import Path
 def extraer_hasta_directorio(ruta_completa, nombre_directorio):
     partes = Path(ruta_completa).parts
     if nombre_directorio in partes:
+# %%
         indice = partes.index(nombre_directorio)
+
         ruta_recortada = Path(*partes[:indice + 1])
         return str(ruta_recortada) + '/'
     else:
