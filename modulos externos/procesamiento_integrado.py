@@ -36,6 +36,8 @@ import time
 import threading
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from PyQt5.QtCore import QTimer
+
 
 def activar_hilo(self):
         #archivo_monitoreo=self.parent.archivos_procesamiento_virtual[2]
@@ -567,6 +569,13 @@ class estaciones_(QDialog):
         self.Btn_ubicacion.setEnabled(True)
         self.Btn_ubicacion.clicked.connect(self.Ubicacion_)
         self.Btn_ubicacion.clearFocus()
+
+        self.Btn_salir_procesamiento = QPushButton("Salir", self)
+        self.Btn_salir_procesamiento.setGeometry(500, 470, 60, 24)
+        self.Btn_salir_procesamiento.clicked.connect(self.Salir_)
+        self.Btn_salir_procesamiento.setVisible(True)
+
+
         self.bandera_procesamiento=0
 
     def showEvent(self, event):
@@ -645,9 +654,16 @@ class estaciones_(QDialog):
         escritura_archivo(self.parent.directorio['archivo_catalogo'],self.parent.catalogo)
         print("Saliendo de estaciones en close")
 
-    def Salir_(self):
+    def Salir___(self):
         print("Saliendo de estaciones en salir")
         self.destroy()
+
+
+
+    def Salir_(self):
+        print("Saliendo sin procesamiento")
+        self.close()
+
 
     def Graficar_(self):
         print("Entró a graficar")
