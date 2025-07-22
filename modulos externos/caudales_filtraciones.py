@@ -90,7 +90,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
     def cargar_componentes_fecha(self):
         fecha = self.selector_fecha_grafico.date()
         self.archivo_mseed = f"CHA2_{fecha.toString('yyyyMMdd')}_000000.mseed"
-        self.archivo = os.path.join(self.directorio_trabajo, fecha.toString("yyMMdd") + "000000")
+        self.archivo = os.path.join(self.directorio_trabajo, fecha.toString("yyyyMMdd") + "000000")
         self.directorios = obtener_directorios(self.archivo)
         ruta_archivo = os.path.join(self.directorios['Directorio_registros'], self.archivo_mseed)
         if os.path.isfile(ruta_archivo):
@@ -121,13 +121,16 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             eventos_ordenados = sorted(self.caudales, key=lambda fila: fila[0])
             nuevos_caudales = []
             for i, fila in enumerate(eventos_ordenados):
+                print(len(fila[0]))
+                if len(fila[0])==17:
+                    fila[1]='20'+fila[1]
                 evento = fila[0]
                 bandera = fila[2] if len(fila) > 2 else "0"
                 try:
-                    dt_evento = datetime.strptime(evento.replace(".sis", ""), "%y%m%d_%H%M%S")
+                    dt_evento = datetime.strptime(evento.replace(".sis", ""), "%Y%m%d_%H%M%S")
                     if i > 0:
                         evento_anterior = eventos_ordenados[i - 1][0]
-                        dt_anterior = datetime.strptime(evento_anterior.replace(".sis", ""), "%y%m%d_%H%M%S")
+                        dt_anterior = datetime.strptime(evento_anterior.replace(".sis", ""), "%Y%m%d_%H%M%S")
                         segundos = int((dt_evento - dt_anterior).total_seconds())
                         caudal = int(3500000 / segundos) if segundos > 0 else 0
                     else:
