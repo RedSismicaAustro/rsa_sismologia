@@ -13,6 +13,7 @@ from librerias.metodos_rsa import parametros_estaciones
 from librerias.metodos_gestion import obtener_directorios
 from librerias.metodos_sismicos import diezmar_senal
 import json
+from PyQt5.QtCore import pyqtSignal
 
 class CustomScrollArea(QScrollArea):
     def __init__(self, parent=None):
@@ -30,6 +31,7 @@ class CustomScrollArea(QScrollArea):
 
 
 class Marcar_evento(QMainWindow):
+    cerrado = pyqtSignal()  # señal que se emitire al cerrar
     def __init__(self, directorio_trabajo, usuario, parent=None):
         super().__init__(parent)
         self.directorio_trabajo = directorio_trabajo
@@ -395,7 +397,8 @@ class Marcar_evento(QMainWindow):
         self.close()
 
     def closeEvent(self, event):
-        print('Saliendo por ventana:')
-        self.guardar_marcas()
-        event.accept()
-
+        """
+        Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
+        """
+        self.cerrado.emit()
+        super().closeEvent(event)

@@ -30,12 +30,16 @@ from PyQt5 import QtWidgets
 from subprogramas.fases import VentanaPrincipal as FasesVentana  # Usando la clase para integrar
 from subprogramas.extraer_integrado import Extraer_evento
 from subprogramas.marcar_eventos import Marcar_evento
+from subprogramas.procesamiento_integrado import Procesar_evento,verificar_drives_virtuales,FileMonitor,cargar_combo_eventos,activar_hilo
+
 from subprogramas.inicio import Inicio_proceso
 from datetime import datetime, timedelta
 from metodos_rsa import lectura_archivo
 from metodos_gestion import obtener_directorios
 import subprocess
 import csv
+
+
 
 class VentanaPrincipal(QMainWindow):
     def __init__(self):
@@ -56,6 +60,20 @@ class VentanaPrincipal(QMainWindow):
         ruta_csv =  os.path.join(self.RAIZ_PROYECTO, "datos", "responsables.csv")
         ruta_csv = os.path.abspath(ruta_csv)
         
+
+    def cargar_widget_central(self, widget, titulo):
+        anterior = self.centralWidget()
+        if anterior:
+            anterior.deleteLater()
+        self.setCentralWidget(widget)
+        self.actualizar_titulo(titulo)
+        widget.showMaximized()
+
+        if hasattr(widget, 'cerrado'):
+            widget.cerrado.connect(self.restaurar_estado_sismico)
+
+
+
     def limpiar_variables_temporales(self):
         """Elimina atributos temporales, conservando los esenciales para la UI."""
         atributos_permitidos = {
@@ -330,35 +348,21 @@ class VentanaPrincipal(QMainWindow):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         # Integrar la funcionalidad de Marcar Eventos en la ventana principal
-        self.marcar_evento = Marcar_evento(self.directorio_trabajo,self.usuario)
-        self.setCentralWidget(self.marcar_evento)
-        self.marcar_evento.showMaximized()
-        # Actualizar el título después de haber cambiado el widget central
-        self.actualizar_titulo('PROCESAMIENTO INTEGRADO  -  MARCAR EVENTOS EN REGISTRO CONTINUO')
-        # Conectar el evento de cierre de la ventana de fases para restaurar el título y habilitar los menús
-        self.marcar_evento.closeEvent =  self.restaurar_estado_sismico
+        widget = Marcar_evento(self.directorio_trabajo,self.usuario)
+        self.cargar_widget_central(widget, 'PROCESAMIENTO INTEGRADO  -  MARCAR EVENTOS EN REGISTRO CONTINUO')
 
     def procesamiento(self):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
-        QMessageBox.information(self, 'Procesamiento', 'Procesamiento')
-        self.habilitar_menus()
+        widget = Procesar_evento()
+        self.cargar_widget_central(widget, 'PROCESAMIENTO INTEGRADO  -  PROCESAMIENTO DE EVENTOS')
 
     def extraer_eventos(self):
         self.limpiar_variables_temporales()
-        # Deshabilitar menús al ejecutar esta acción
         self.deshabilitar_menus()
-        
-        # Integrar la funcionalidad de Extraer Eventos en la ventana principal
-        self.extraer_eventos = Extraer_evento(self.directorio_trabajo,self.usuario)
-        self.setCentralWidget(self.extraer_eventos)
-        self.extraer_eventos.showMaximized()
+        widget = Extraer_evento(self.directorio_trabajo, self.usuario)
+        self.cargar_widget_central(widget, 'PROCESAMIENTO INTEGRADO  -  EXTRACCIÓN DE EVENTOS')
 
-        # Actualizar el título después de haber cambiado el widget central
-        self.actualizar_titulo('PROCESAMIENTO INTEGRADO  -  EXTRACCIÓN DE EVENTOS')
-
-        # Conectar el evento de cierre de la ventana de fases para restaurar el título y habilitar los menús
-        self.extraer_eventos.closeEvent = self.restaurar_estado_sismico
 
     def reextracion(self):
         self.limpiar_variables_temporales()
@@ -424,11 +428,11 @@ class VentanaPrincipal(QMainWindow):
         self.etiqueta_titulo.setText(texto)
         self.update()
 
-    def restaurar_estado_sismico(self, event):
+    def restaurar_estado_sismico(self):
         self.limpiar_variables_temporales()  # <- limpieza al cerrar submenú
         self.actualizar_titulo('PROCESAMIENTO INTEGRADO')
         self.habilitar_menus()
-        event.accept()
+
 
     def habilitar_menus(self):
         self.menu_configuracion.setEnabled(True)

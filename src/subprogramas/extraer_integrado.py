@@ -45,9 +45,10 @@ import os
 import gc
 #from obspy import read, UTCDateTime
 from obspy import Stream
-
+from PyQt5.QtCore import pyqtSignal
 
 class Extraer_evento(QMainWindow):
+    cerrado = pyqtSignal()  # señal que se emitire al cerrar
     def __init__(self, directorio_trabajo, usuario, parent=None):
         super().__init__(parent)
         self.directorio_trabajo = directorio_trabajo
@@ -666,7 +667,16 @@ class Extraer_evento(QMainWindow):
         self.close()
 
 
+    def closeEvent(self, event):
+        """
+        Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
+        """
+        self.cerrado.emit()
+        super().closeEvent(event)
+
+
 class estaciones_(QDialog):
+
     def __init__(self, hab_grafico,estaciones_eventos,filtros,parent=None):
         super(estaciones_,self).__init__()
         super().__init__(parent)
@@ -818,6 +828,7 @@ class estaciones_(QDialog):
                 self.parent.hab_grafico[canal_]='1'
             else:
                 self.parent.hab_grafico[canal_]='0'
+
     def Salir_(self):
         self.destroy()
 
