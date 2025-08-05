@@ -981,7 +981,6 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
 #  archivo_rsa es el archivo genrardo por el fasthypo con extencion .rsa generada a partir del archivo.
 #  usuario es para tomar información del sistema o de procesamiento, cuaNdo el valor es '', toma del sistema y si no toma de procesamiento asignando los valores 
 #   del drive adecuado en las computadoras de procesamiento.
-    print("Lectura RSA","\narchivo:",archivo)
     directorios=obtener_directorios(archivo)    
     archivo_procesamiento=archivos_fast(archivo,directorio_trabajo,usuario)
     archivo_fas=archivo_procesamiento[1]
@@ -995,7 +994,6 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
         sismo_aux=archivo[-17:-11]+archivo[-10:aux]
     else:
         sismo_aux=archivo[-10:aux]
-    print("Variable simso_aux: ",sismo_aux)
     lectura_fase=[]
     auxiliar=["Disp.","t_pr.","t_sec.","marc.s","t_cod."]
     lectura_fase.append(auxiliar)
@@ -1917,7 +1915,6 @@ def cargar_dia(archivo_csv):
         else:
             cont_ruido[indice_hora]=cont_ruido[indice_hora]+1
     responsables=lectura_archivo(directorios['archivo_tiempos'])
-    print(directorios['archivo_tiempos'],responsables)
     aux=['','','']
     if responsables==None:
         aux[0]=['RSA','']
@@ -1976,7 +1973,6 @@ def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,ma
             QMessageBox.information(None, "Error", '¡Falta información del sismo!')
             return  
     lectura=extraccion_dato(texto,"\n")
-    print(lectura)
     if(red_==1):#Cuando la red es IGEPN
         try:
             indice_utc = lectura.index('Tiempo UTC:')
@@ -2476,6 +2472,7 @@ def referencia_directorio_completa(archivo) -> str:
     · Para cualquier archivo bajo …\DIA\AAAA\AAAA_MM\AAAA_MM_DD\… →
       se construye y devuelve …\DIA\AAAAMMDD000000.
     """
+    print(archivo)
     ruta = Path(archivo).expanduser().resolve()
     partes = ruta.parts
 

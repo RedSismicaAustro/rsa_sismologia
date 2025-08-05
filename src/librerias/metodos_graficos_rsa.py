@@ -557,7 +557,6 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
     # resumen_responsables----
     # eventos_dia    Todos los eventos generados en el día.
     #print("Reporte resumen:\n")
-    print('Resumen:',resumen)
     bandera_dia=banderas[0]
     bandera_reporte=banderas[1]
     bandera_firma=banderas[2]
@@ -724,7 +723,10 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
                 indice_hora=int(hora_evento/60000)
                 if indice_hora==0:
                     indice_hora=1
-                archivo=referencia_directorio_completa(evento_sismico)
+
+                archivo=os.path.join(directorio,evento_sismico[:8]+evento_sismico[9:])
+                print(archivo)
+                #archivo=referencia_directorio_completa(evento_sismico)
                 directorios=obtener_directorios(archivo)
                 archivo_responsable=directorios['archivo_responsables']
                 responsables_dia=lectura_archivo(archivo_responsable)
