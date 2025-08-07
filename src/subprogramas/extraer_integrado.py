@@ -49,9 +49,11 @@ from PyQt5.QtCore import pyqtSignal
 
 class Extraer_evento(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    def __init__(self, directorio_trabajo, usuario, parent=None):
+    def __init__(self, archivo, directorio_trabajo, responsable, parent=None):
         super().__init__(parent)
         self.directorio_trabajo = directorio_trabajo
+        self.usuario=responsable
+        self.archivo=archivo
         self.setWindowTitle('Extraer Eventos')
         # Configurar el layout principal
         layout_principal = QHBoxLayout()
@@ -131,7 +133,7 @@ class Extraer_evento(QMainWindow):
         d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
         self.dateEdit.setDate(d)    #Conficuración de los datos de fecha en el DataEdit
         self.dateEdit.dateChanged.connect(self.showDate)
-        self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
+        #self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
         self.Lbl_directorio.setText(self.directorio_trabajo)
         self.showDate(d)
 
@@ -666,11 +668,29 @@ class Extraer_evento(QMainWindow):
             ventana.cerrar()
         self.close()
 
+    def limpiar_estado(self):
+        """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""
+        try:
+            if hasattr(self, 'canvas'):
+                self.canvas.deleteLater()
+                self.canvas = None
+            if hasattr(self, 'visor'):
+                self.visor.clf()
+                self.visor = None
+            # Limpieza de listas, buffers o datos
+            if hasattr(self, 'stLeido'):
+                del self.stLeido
+            if hasattr(self, 'lista_eventos'):
+                self.lista_eventos.clear()
+        except Exception as e:
+            print(f"Error en limpieza de Extraer_evento: {e}")
+
 
     def closeEvent(self, event):
         """
         Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
         """
+        self.limpiar_estado()
         self.cerrado.emit()
         super().closeEvent(event)
 

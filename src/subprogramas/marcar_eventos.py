@@ -32,11 +32,13 @@ class CustomScrollArea(QScrollArea):
 
 class Marcar_evento(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    def __init__(self, directorio_trabajo, usuario, parent=None):
+    def __init__(self, archivo, directorio_trabajo, responsable, parent=None):
         super().__init__(parent)
         self.directorio_trabajo = directorio_trabajo
+        self.archivo=archivo
+        self.usuario=responsable
         self.setWindowTitle("Marcado de eventos")
-        print(self.directorio_trabajo)
+
         #self.directorio_trabajo = "G:\\Mi unidad\\DIA"
         
         self.archivos_mseed = []
@@ -396,9 +398,28 @@ class Marcar_evento(QMainWindow):
         self.guardar_marcas()
         self.close()
 
+    def limpiar_estado(self):
+        """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""
+        try:
+            if hasattr(self, 'canvas'):
+                self.canvas.deleteLater()
+                self.canvas = None
+            if hasattr(self, 'visor'):
+                self.visor.clf()
+                self.visor = None
+            # Limpieza de listas, buffers o datos
+            if hasattr(self, 'stLeido'):
+                del self.stLeido
+            if hasattr(self, 'lista_eventos'):
+                self.lista_eventos.clear()
+        except Exception as e:
+            print(f"Error en limpieza de Extraer_evento: {e}")
+
+
     def closeEvent(self, event):
         """
         Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
         """
+        self.limpiar_estado()
         self.cerrado.emit()
         super().closeEvent(event)

@@ -125,13 +125,15 @@ def verificar_drives_virtuales(responsable_evento):
         
 class Procesar_evento(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    def __init__(self,parent=None):#Constructor de la clase
+    def __init__(self, archivo, directorio_trabajo, responsable, parent=None):#Constructor de la clase
         super().__init__(parent)
         #Carga la configuración del archivo .ui en el objeto
         ruta_ui = os.path.abspath(os.path.join(ruta_proyecto, 'src','ui',"Proceso.ui"))
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui,self)
-
+        self.directorio_trabajo = directorio_trabajo
+        self.archivo=archivo
+        self.usuario=responsable
         self.visor = Figure(figsize=(8, 4), dpi=100)
         self.canvas = FigureCanvas(self.visor)
 
@@ -155,7 +157,7 @@ class Procesar_evento(QMainWindow):
         d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
         self.dateEdit.setDate(d)    #Conficuración de los datos de fecha en el DataEdit
         self.dateEdit.dateChanged.connect(self.showDate)
-        self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
+        #self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
         self.Lbl_directorio.setText(self.directorio_trabajo)
         self.showDate(d)
         self.canales_habilitados=[]
@@ -164,6 +166,28 @@ class Procesar_evento(QMainWindow):
                 self.canales_habilitados.append(i)
         self.numero_estaciones=len(self.canales_habilitados)
         self.lbl_directorio_trabajo=self.directorio_trabajo
+
+
+
+    def limpiar_estado(self):
+        """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""
+        try:
+            if hasattr(self, 'canvas'):
+                self.canvas.deleteLater()
+                self.canvas = None
+            if hasattr(self, 'visor'):
+                self.visor.clf()
+                self.visor = None
+            # Limpieza de listas, buffers o datos
+            if hasattr(self, 'stLeido'):
+                del self.stLeido
+            if hasattr(self, 'lista_eventos'):
+                self.lista_eventos.clear()
+        except Exception as e:
+            print(f"Error en limpieza de Extraer_evento: {e}")
+
+
+
 
     
     def closeEvent(self, event):
@@ -396,6 +420,7 @@ class Procesar_evento(QMainWindow):
         """
         Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
         """
+        self.limpiar_estado()
         self.cerrado.emit()
         super().closeEvent(event)
 
@@ -676,7 +701,7 @@ class estaciones_(QDialog):
         print("Entró a graficar")
         plt.close()
         archivo=self.parent.evento_procesar[1]
-        archivo=self.parent.directorio_trabajo+'/'+archivo[:6]+archivo[7:13]
+        archivo=os.path.join(self.parent.directorio_trabajo,archivo[:8]+archivo[9:15])
         self.trCanal=leer_mseed(archivo,1)
         t_inicio=self.trCanal[self.estaciones_eventos[0]][0].stats.starttime
         t_final=self.trCanal[self.estaciones_eventos[0]][0].stats.endtime

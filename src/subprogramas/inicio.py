@@ -44,8 +44,11 @@ import copy
 import gc
 import psutil
 from obspy.core.trace import Trace
+from PyQt5.QtCore import pyqtSignal
     
 class Inicio_proceso(QMainWindow):
+    cerrado = pyqtSignal()  # señal que se emitire al cerrar
+    inicializado = pyqtSignal(str, str, str)  # archivo, directorio_trabajo, responsable
     def __init__(self, directorio_trabajo, usuario, parent=None):
         super().__init__()
         self.setWindowTitle('Inizializacion de día')
@@ -53,7 +56,6 @@ class Inicio_proceso(QMainWindow):
         layout_principal = QHBoxLayout()
         # Panel izquierdo
         panel_izquierdo = QVBoxLayout()
-
 
         # Cargar la interfaz desde el archivo .ui directamente en esta instancia
         ruta_ui =  os.path.join(ruta_proyecto,"src",  "ui", 'inicio.ui')
@@ -104,13 +106,24 @@ class Inicio_proceso(QMainWindow):
             self.canvas.draw_idle()
             diagnostico_memoria("Después de limpiar visor")
 
-    def Iniciar(self):
-        print("Entro inciar")
 
+    def Iniciar(self):
+        # Actualizar fecha y archivo
+        self.date = self.dia.date()
+        self.archivo = os.path.join(self.directorio_trabajo, self.date.toString('yyyyMMdd000000'))
+
+        # Obtener responsable
+        self.responsable = self.cmbx_resposables.currentText()
+
+        # Emitir señal con la información
+        self.inicializado.emit(self.archivo, self.directorio_trabajo, self.responsable)
+
+        # Opcional: cerrar ventana luego de iniciar
+        self.close()
 
     def showDate(self, date):#Es como inicializar el dìa
         self.date=date
-        self.archivo=self.directorio_trabajo+date.toString('yyMMdd000000')
+        self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
 
     def seleccionar_drive(self):
         folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Select Folder')
@@ -121,18 +134,43 @@ class Inicio_proceso(QMainWindow):
         self.directorio_trabajo=folderpath
         self.showDate(self.date)
 
-      
+
+
     def Salir_(self):
-        message_box = QMessageBox(
-            QMessageBox.Question,
-            "¡Importante!",
-            "  ¿Guardar informe?\nSolo guardar definitivo\n  de 12H, 18H o 24H",
-            QMessageBox.Yes | QMessageBox.No ,
-            self.window()
-        )
-        result = message_box.exec_()
-        if result == QMessageBox.Yes:
-            pass
- 
+        self.close()
+
+    def limpiar_estado(self):
+        """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""
+        try:
+            if hasattr(self, 'canvas') and self.canvas is not None:
+                self.canvas.deleteLater()
+                self.canvas = None
+
+            if hasattr(self, 'visor') and self.visor is not None:
+                self.visor.clf()
+                self.visor = None
+
+            if hasattr(self, 'stLeido'):
+                del self.stLeido
+            if hasattr(self, 'lista_eventos'):
+                self.lista_eventos.clear()
+
+        except Exception as e:
+            print(f"Error en limpieza de Inicio: {e}")
+
+
+    def closeEvent(self, event):
+        """
+        Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
+        """
+        self.limpiar_estado()
+        print("Emitiendo señal:inicializado")
+        print("Archivo:", self.archivo)
+        print("Directorio:", self.directorio_trabajo)
+        print("Responsable:", getattr(self, 'responsable', 'No definido'))
+
+        self.inicializado.emit(self.archivo, self.directorio_trabajo, self.responsable)
+        self.cerrado.emit()
+        super().closeEvent(event)
 
 
