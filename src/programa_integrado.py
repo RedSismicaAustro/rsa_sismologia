@@ -46,26 +46,28 @@ class VentanaPrincipal(QMainWindow):
         super().__init__()
 
         # Configuración de la ventana principal
+        print("Ingresando a programa.")
         self.setWindowTitle('PROCESAMIENTO INTEGRADO')
         self.setWindowIcon(QIcon('logo rsa.png'))  # Establecer ícono de la ventana
         self.showMaximized()  # Mostrar la ventana maximizada inicialmente
-        self.init_ui()
         self.directorio_trabajo='G:/Mi unidad/DIA/'
         self.usuario='RSA'
         self.periodo='00H-12H'
         self.archivo=os.path.join(self.directorio_trabajo,datetime.today().strftime("%Y%m%d") + "000000")
+        self.construccion_menu()
         # Ruta del archivo CSV
         self.RAIZ_PROYECTO = os.path.dirname(os.path.abspath(__file__))
         self.RAIZ_PROYECTO=os.path.join(self.RAIZ_PROYECTO, "..")
         ruta_csv =  os.path.join(self.RAIZ_PROYECTO, "datos", "responsables.csv")
         ruta_csv = os.path.abspath(ruta_csv)
+        self.variables_permitidas=self.__dict__.keys()
+
         
     def recibir_datos_inicio(self, archivo, directorio_trabajo, usuario):
         print("Resibiendo datos:")
         self.archivo = archivo
         self.directorio_trabajo = directorio_trabajo
         self.usuario = usuario
-        print(self.archivo)
 
 
     def cargar_widget_central(self, widget, titulo):
@@ -86,38 +88,28 @@ class VentanaPrincipal(QMainWindow):
         print("Limpiando variables temporales:")
         if self.centralWidget() is not None:
             widget_actual = self.centralWidget()
-        
             # Si tiene método para limpieza interna (como gráficos), lo llamamos
             if hasattr(widget_actual, 'limpiar_estado'):
                 try:
                     widget_actual.limpiar_estado()
                 except Exception as e:
                     print(f"Error al limpiar el estado interno del widget: {e}")
-
             # Eliminar del layout y de memoria
             widget_actual.setParent(None)
             widget_actual.deleteLater()
-
         # Lista de atributos temporales que pueden haberse creado
-        atributos_permitidos = {
-            'directorio_trabajo', 'usuario', 'archivo'
-            'menu_inicio', 'menu_configuracion', 'menu_procesamiento',
-            'menu_informes', 'menu_ayuda', 'barra_menu',
-            'barra_herramientas', 'etiqueta_logo', 'etiqueta_titulo',
-            'widget_central', 'layout_principal', 'RAIZ_PROYECTO'
-        }
-
+        print(self.__dict__.keys())
         for atributo in list(self.__dict__.keys()):
-            if atributo not in atributos_permitidos:
+            if atributo not in self.variables_permitidas:
                 try:
                     delattr(self, atributo)
                 except Exception as e:
                     print(f"No se pudo eliminar el atributo {atributo}: {e}")
 
-        for
+        print("Saliendo de limpiar variables")
 
         
-    def init_ui(self):
+    def construccion_menu(self):
         # Crear barra de menú
         self.barra_menu = self.menuBar()
  
@@ -293,22 +285,18 @@ class VentanaPrincipal(QMainWindow):
 
 
     def inicializar_dia(self):
+        print("Menu inicializando dia.")
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
-
         # Crear e inicializar la ventana
         self.inicio_proceso = Inicio_proceso(self.directorio_trabajo, self.usuario)
-
-
-
         # Conectar señales
-        self.inicio_proceso.cerrado.connect(self.restaurar_estado_sismico)
         self.inicio_proceso.inicializado.connect(self.recibir_datos_inicio)
-        
+        self.inicio_proceso.cerrado.connect(self.restaurar_estado_sismico)        
         # Cargar el widget en el centro
         self.cargar_widget_central(self.inicio_proceso, 'PROCESAMIENTO INTEGRADO  -  INICIO DE PROCESAMIENTO')
         #self.limpiar_variables_temporales()
-        print("Saliendo de inicializar dia",self.archivo)
+        print("Saliendo de inicializar dia")
 
     def salir(self):
         self.close()

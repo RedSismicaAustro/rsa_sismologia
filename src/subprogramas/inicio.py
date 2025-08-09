@@ -50,6 +50,7 @@ class Inicio_proceso(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
     inicializado = pyqtSignal(str, str, str)  # archivo, directorio_trabajo, responsable
     def __init__(self, directorio_trabajo, usuario, parent=None):
+        print("Print Inicio.")
         super().__init__()
         self.setWindowTitle('Inizializacion de día')
         # Configurar el layout principal
@@ -80,7 +81,7 @@ class Inicio_proceso(QMainWindow):
 
         self.Btn_Iniciar.clicked.connect(self.Iniciar)
         self.Btn_drive.clicked.connect(self.seleccionar_drive)
-        self.Btn_Salir.clicked.connect(self.Salir_)
+
 
 
         ruta_csv =  os.path.join(ruta_proyecto, "datos", "responsables.csv")
@@ -93,7 +94,9 @@ class Inicio_proceso(QMainWindow):
         d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
         self.dia.setDate(d)    #Conficuración de los datos de fecha en el DataEdit
         self.dia.dateChanged.connect(self.showDate)
-        self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
+        #self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
+        self.directorio_trabajo=directorio_trabajo
+        self.usuario=usuario
         self.showDate(d)
 
     def limpiar_visor(self):
@@ -134,10 +137,6 @@ class Inicio_proceso(QMainWindow):
         self.directorio_trabajo=folderpath
         self.showDate(self.date)
 
-
-
-    def Salir_(self):
-        self.close()
 
     def limpiar_estado(self):
         """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""

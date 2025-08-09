@@ -77,21 +77,8 @@
        <x>10</x>
        <y>176</y>
        <width>301</width>
-       <height>131</height>
+       <height>181</height>
       </rect>
-     </property>
-    </widget>
-    <widget class="QProgressBar" name="progressBar">
-     <property name="geometry">
-      <rect>
-       <x>12</x>
-       <y>310</y>
-       <width>301</width>
-       <height>23</height>
-      </rect>
-     </property>
-     <property name="value">
-      <number>24</number>
      </property>
     </widget>
     <widget class="QComboBox" name="cmbx_resposables">
@@ -143,19 +130,6 @@
       <string>RESPONSABLE</string>
      </property>
     </widget>
-   </widget>
-   <widget class="QPushButton" name="Btn_Salir">
-    <property name="geometry">
-     <rect>
-      <x>70</x>
-      <y>410</y>
-      <width>211</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Salir</string>
-    </property>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
