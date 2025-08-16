@@ -52,7 +52,7 @@ import xml.etree.ElementTree as ET
 # calidad: Indicador de calidad de datos, 'D', 'R' o 'Q', D es calidad indeterminada
 # Tiempo de inicio en el orden: anio, mes, dia, horas, minuto210618000000210618000000s, segundos, microsegundos
 
-def filtro_evento(stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaciones_eventos,hab_grafico,bandera_marcas,pagina):
+def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaciones_eventos,hab_grafico,bandera_marcas,pagina):
     #parametros=(nombre_canal_total_,nombre_canal,tipo_canal_,n_canales_,hab_canal)
     #stLeido es l atraza donde se encuetra el Mseed de la estaciòn
     #tiempo_s es la referencia de tiempo, +7m -7m para el despliegue
@@ -66,7 +66,7 @@ def filtro_evento(stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaciones_e
         stLeido[canal_].filter("bandpass",freqmin=freqmin_,freqmax=freqmax_,corners=grado_)
     aux=t_final-t_inicio
     plt.close()
-    grafico_evento_int(stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
+    grafico_evento_int(visor,stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
 
 class MyApp(QMainWindow):
     def __init__(self,parent=None):#Constructor de la clase
@@ -356,8 +356,8 @@ class MyApp(QMainWindow):
         plt.close()
         t_inicio=self.trCanal[self.estaciones_eventos[0]][0].stats.starttime
         t_final=self.trCanal[self.estaciones_eventos[0]][0].stats.endtime
-        grafico_evento_int(self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,0) #El ultimo parametro es la página, hay que gestionarla para que se despleigue
-        
+        grafico_evento_int(self.visor,self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,0) #El ultimo parametro es la página, hay que gestionarla para que se despleigue
+        #                  (visor, stLeido, t_inicio, t_final, estaciones_evento, hab_grafico, bandera_marcas, pagina)
     def cambio_pagina(self):
         plt.close()
         self.pagina=self.pagina+1
@@ -366,7 +366,7 @@ class MyApp(QMainWindow):
             self.pagina=0
         t_inicio=self.trCanal[self.estaciones_eventos[0]][0].stats.starttime
         t_final=self.trCanal[self.estaciones_eventos[0]][0].stats.endtime
-        grafico_evento_int(self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,self.pagina)
+        grafico_evento_int(self.visor,self.trCanal,t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,self.pagina)
 
     def Modificar_(self):
         self.eventos_reporte[self.indice][2]=self.cmbx_evento.currentText()
@@ -385,7 +385,7 @@ class MyApp(QMainWindow):
                     t_inicio=self.trCanal[i][0].stats.starttime
                     t_final=self.trCanal[i][0].stats.endtime
                     break
-            filtro_evento(self.trCanal,self.sp_Box_finf.value(),self.sp_Box_fsup.value(),self.sp_Box_orden.value(),t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,self.pagina)
+            filtro_evento(self.visor,self.trCanal,self.sp_Box_finf.value(),self.sp_Box_fsup.value(),self.sp_Box_orden.value(),t_inicio,t_final,self.estaciones_eventos,self.parametros['HAB_GRAFICO'],0,self.pagina)
 
     def Salir_(self):
         print("Saliendo completamente del programa.")

@@ -109,6 +109,7 @@ def leer_mseed(archivo, tipo, t_inicio=None, t_final=None):
     return trCanal
 
 def grafico_evento_int(visor, stLeido, t_inicio, t_final, estaciones_evento, hab_grafico, bandera_marcas, pagina):
+    #visor   es la ventana donde se grafica
     #stLeido es la traza donde se encuetra el Mseed de la estaciòn
     #t_inicio----- incio del perido del grafico
     #t_final------ fin del perido del grafico
@@ -2108,7 +2109,7 @@ def guardar_seniales_csv(archivo_csv, seniales_ascii, stats):
     
 def incrementar_catalogo_eventos(directorio_trabajo,eventos,eventos_catalogo):
     """
-    eventos:   Eventos tomados de AAMMDD_000000.csv
+    eventos:   Eventos tomados de AAAAMMDD_000000.csv
     eventos_catalogo:  Eventos tomados del catálogo 
     """
     for evento in eventos:
@@ -2123,11 +2124,11 @@ def incrementar_catalogo_eventos(directorio_trabajo,eventos,eventos_catalogo):
             else:
                 for k in range(len(lectura),1,-1):
                     pass
-        evento_buscado=int(evento[1][:6]+evento[1][7:-4])
+        evento_buscado =int(evento[1].replace('_', '')[:-4])
         tamanio_catalogo=len(eventos_catalogo)
         indice=1
         for i in range(indice,tamanio_catalogo):
-            evento_analizado=int(eventos_catalogo[i][IDX_EVENTO][:6]+eventos_catalogo[i][IDX_EVENTO][7:-4])
+            evento_analizado=int(eventos_catalogo[i][IDX_EVENTO].replace('_', '')[:-4])
             if evento_buscado==evento_analizado:
                 break
             if evento_analizado>evento_buscado:
@@ -2520,13 +2521,13 @@ def referencia_directorio_completa__(archivo):
     archivo_base = Path(archivo).name      # Esto aísla el nombre del archivo
     extension = Path(archivo).suffix  # Esto obtiene la extensión (incluye el punto .)
     if extension=='.sis':
-        archivo_base=archivo_base[:6]+'000000'
+        archivo_base=archivo_base[:8]+'000000'
     elif extension=='.csv':
-        archivo_base=archivo_base[:6]+'000000'
+        archivo_base=archivo_base[:8]+'000000'
     elif extension=='.mseed':
-        archivo_base=archivo_base[6:12]+'000000'        
+        archivo_base=archivo_base[4:12]+'000000'        
     elif extension=='.pdf':
-        archivo_base=archivo_base[:6]+'000000'
+        archivo_base=archivo_base[:8]+'000000'
     else:
         pass
     directorio_trabajo=extraer_hasta_directorio(archivo, 'DIA')

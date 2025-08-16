@@ -298,7 +298,7 @@ def dibujo_sismos_(lienzo,vector,coordenadas,tamanio,mapa_,bandera_dia,bandera_r
                     r=1*(magnitud)-2.5
                 else:
                     r=2*(magnitud)-5
-                char_=str(magnitud)+'/'+vector[i][5][7:9]+':'+vector[i][5][9:11]+':'+vector[i][5][11:13]
+                char_=str(magnitud)+'/'+vector[i][5][9:11]+':'+vector[i][5][11:13]
                 if mapa_==3:# Es el mapa para fuentes.
                     if color!=colors.blue:
                         for k in range(1,10):
@@ -555,7 +555,7 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
     # directorio---- direcorio base donde se tomará la información de los días del reporte, usado en periodo.
     # arbol--------- base de datos en xml del periodo de reporte
     # resumen_responsables----
-    # eventos_dia    Todos los eventos generados en el día.
+    # eventos        Todos los eventos generados en el día.
     #print("Reporte resumen:\n")
     bandera_dia=banderas[0]
     bandera_reporte=banderas[1]
@@ -650,12 +650,12 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
                         if len(lectura)==1:
                             #os.remove(archivo_procesamiento)
                             continue
-                        evento_buscado=int(evento_dia[1][:6]+evento_dia[1][7:-4])
+                        evento_buscado =int(evento_dia[1].replace('_', '')[:-4])
                         aux=['00000000000000', '2025', '1', '1', '0', '0', '0', '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z', '0', ' ', 'No procesado', evento_dia[1],' , , ']
                         tamanio_catalogo=len(catalogo)
                         indice=1
                         for i in range(indice,tamanio_catalogo):
-                            evento_analizado=int(catalogo[i][IDX_EVENTO][:6]+catalogo[i][IDX_EVENTO][7:-4])
+                            evento_analizado=int(catalogo[i][IDX_EVENTO].replace('_', '')[:-4])
                             if evento_buscado==evento_analizado:
                                 break
                             if evento_analizado>evento_buscado:
@@ -723,10 +723,7 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
                 indice_hora=int(hora_evento/60000)
                 if indice_hora==0:
                     indice_hora=1
-
-                archivo=os.path.join(directorio,evento_sismico[:8]+evento_sismico[9:])
-                print(archivo)
-                #archivo=referencia_directorio_completa(evento_sismico)
+                archivo=os.path.join(directorio,evento_sismico.replace('_', '')[:-4])
                 directorios=obtener_directorios(archivo)
                 archivo_responsable=directorios['archivo_responsables']
                 responsables_dia=lectura_archivo(archivo_responsable)
@@ -1478,7 +1475,6 @@ def imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_c
     # mapa_              -   Mapa al cual se va a imprimri
     # raiz               -   base de datos XML
     # detalle            -   Averiguar que no me acuerdo
-    #print("Impreimir_catalogo")
     maximos_reporte=[]
     indice=1
     
@@ -1582,7 +1578,7 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
     # En evento _generar se tiene los datos a desplegarse en el reporte, sean de la RSA como de otras redes.
     directorios=obtener_directorios(archivo)
     responsables=lectura_archivo(directorio_trabajo+directorios['archivo_responsables'])
-    hora_evento=int(archivo[7:13])
+    hora_evento = int(archivo.split('_')[1].split('.')[0])
     if hora_evento<120000:
         indice_responsable=1
     elif hora_evento<180000:
