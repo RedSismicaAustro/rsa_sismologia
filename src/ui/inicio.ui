@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>351</width>
-    <height>531</height>
+    <width>558</width>
+    <height>542</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,10 +17,10 @@
    <widget class="QGroupBox" name="cmbx_resposables_2">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>20</y>
-      <width>321</width>
-      <height>371</height>
+      <x>5</x>
+      <y>10</y>
+      <width>250</width>
+      <height>461</height>
      </rect>
     </property>
     <property name="title">
@@ -29,8 +29,8 @@
     <widget class="QPushButton" name="Btn_Iniciar">
      <property name="geometry">
       <rect>
-       <x>110</x>
-       <y>140</y>
+       <x>80</x>
+       <y>190</y>
        <width>101</width>
        <height>23</height>
       </rect>
@@ -40,11 +40,14 @@
      </property>
     </widget>
     <widget class="QPushButton" name="Btn_drive">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="geometry">
       <rect>
-       <x>210</x>
-       <y>20</y>
-       <width>101</width>
+       <x>70</x>
+       <y>40</y>
+       <width>81</width>
        <height>23</height>
       </rect>
      </property>
@@ -53,11 +56,14 @@
      </property>
     </widget>
     <widget class="QDateEdit" name="dia">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="geometry">
       <rect>
-       <x>170</x>
-       <y>60</y>
-       <width>141</width>
+       <x>140</x>
+       <y>90</y>
+       <width>91</width>
        <height>22</height>
       </rect>
      </property>
@@ -75,18 +81,21 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>176</y>
-       <width>301</width>
-       <height>181</height>
+       <y>220</y>
+       <width>231</width>
+       <height>221</height>
       </rect>
      </property>
     </widget>
     <widget class="QComboBox" name="cmbx_resposables">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="geometry">
       <rect>
-       <x>128</x>
-       <y>100</y>
-       <width>181</width>
+       <x>90</x>
+       <y>130</y>
+       <width>141</width>
        <height>22</height>
       </rect>
      </property>
@@ -94,9 +103,9 @@
     <widget class="QLabel" name="label">
      <property name="geometry">
       <rect>
-       <x>20</x>
+       <x>50</x>
        <y>20</y>
-       <width>141</width>
+       <width>131</width>
        <height>20</height>
       </rect>
      </property>
@@ -107,9 +116,9 @@
     <widget class="QLabel" name="label_2">
      <property name="geometry">
       <rect>
-       <x>20</x>
-       <y>60</y>
-       <width>141</width>
+       <x>10</x>
+       <y>90</y>
+       <width>51</width>
        <height>20</height>
       </rect>
      </property>
@@ -120,14 +129,40 @@
     <widget class="QLabel" name="label_3">
      <property name="geometry">
       <rect>
-       <x>20</x>
-       <y>100</y>
-       <width>141</width>
+       <x>10</x>
+       <y>130</y>
+       <width>81</width>
        <height>20</height>
       </rect>
      </property>
      <property name="text">
       <string>RESPONSABLE</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="cmbx_periodo">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>160</y>
+       <width>141</width>
+       <height>22</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_4">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>160</y>
+       <width>81</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>PERIODO</string>
      </property>
     </widget>
    </widget>
@@ -137,7 +172,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>351</width>
+     <width>558</width>
      <height>21</height>
     </rect>
    </property>

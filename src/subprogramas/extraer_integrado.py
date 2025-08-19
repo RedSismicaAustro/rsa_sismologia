@@ -718,8 +718,6 @@ class estaciones_(QDialog):
         nombre_canal_total_=self.parametros['NOMBRE']
         nombre_canal=self.parametros['CODIGO']
         componente_canal=self.parametros['COMPONENTE']
-
-
         self.lbl_grafico_0=QLabel("ESTACIONL",self)
         self.lbl_grafico_0.setGeometry(40, 20, 61, 16)  #setGeometry(x, y, width, height)
         self.lbl_grafico_1=QLabel("CÓDIGO",self)

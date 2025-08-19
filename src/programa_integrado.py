@@ -98,7 +98,6 @@ class VentanaPrincipal(QMainWindow):
             widget_actual.setParent(None)
             widget_actual.deleteLater()
         # Lista de atributos temporales que pueden haberse creado
-        print(self.__dict__.keys())
         for atributo in list(self.__dict__.keys()):
             if atributo not in self.variables_permitidas:
                 try:

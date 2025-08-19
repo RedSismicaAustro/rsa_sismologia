@@ -1528,8 +1528,7 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
     evento,tipo_evento,t_inicio, t_final = evento_auxiliar[1],evento_auxiliar[2], float(evento_auxiliar[4]), float(evento_auxiliar[5])
-    print("Trabajando evento ", evento,tipo_evento)
-    print(solo_eventos)
+    print('Extrayendo ',evento)
     fecha_ = obtencion_hora(archivo)
     t_ini = fecha_ + t_inicio
     t_fin = fecha_ + t_final
@@ -1542,27 +1541,57 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
     if evento not in solo_eventos:
         if len(evento_auxiliar)>6:
             estaciones=evento_auxiliar[7]
-            lista_estaciones =estaciones.split()
+            lista_estaciones_aportantes =estaciones.split()
         else:
             eventos=lectura_archivo(directorios['archivo_csv'])
-            lista_estaciones=[]
+            lista_estaciones_aportantes=[]
             for evento in eventos:
                 if evento[1]==evento_auxiliar[1]:
                     break
             for estacion_aportante in evento[3:]:
                 if estacion_aportante!='-':
-                    lista_estaciones.append(estacion_aportante)
+                    lista_estaciones_aportantes.append(estacion_aportante)
             
         estaciones_eventos_total=[]
-        for estaciones_aportantes in lista_estaciones:
+        for estaciones_aportantes in lista_estaciones_aportantes:
             codigo_estacion=estaciones_aportantes[:4]
             indice=parametros['CODIGO'].index(codigo_estacion)
             estaciones_eventos_total.append(indice)
     else:
         return 
     if tipo_evento != "Ruido":
-        print("Extrayendo evento ",evento )
         sismo_extraido=[]
+        estaciones_con_senial=[]
+        for numero_estacion,estacion_habilitada in enumerate(parametros['HAB_CANAL']):
+            if  estacion_habilitada=='1':
+                archivo_mseed_dia=os.path.join(directorios['Directorio_registros'],parametros['CODIGO'][numero_estacion]+directorios['sufijo_mseed'])
+                if os.path.exists(archivo_mseed_dia):
+                    auxiliar=(numero_estacion,parametros['NOMBRE'][numero_estacion],parametros['CODIGO'][numero_estacion])
+                    estaciones_con_senial.append(auxiliar)
+
+        ####################################################
+        ####Estraccion de eventos en mseed por estación.
+        ####################################################
+        for estacion_con_senial in estaciones_con_senial:
+            numero_estacion=int(estacion_con_senial[0])
+            componente=int(parametros['COMPONENTE'][numero_estacion])-1
+            archivo_mseed_dia=os.path.join(directorios['Directorio_registros'],parametros['CODIGO'][numero_estacion]+directorios['sufijo_mseed'])
+            stcanal = read(archivo_mseed_dia, format="MSEED", starttime=t_ini, endtime=t_fin, nearest_sample=False)
+            if len(stcanal)==0:
+                    continue
+            # Aplica corrección de polaridad si es necesario
+            if parametros['POLARIDAD'][numero_estacion] == 'N':
+                stcanal[componente].data *= -1
+            # Guardar archivo .mseed
+            nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
+            stcanal.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
+
+  
+
+        ####################################################
+        ####Converesión de las estaciones configuradas en estaciones analógicas
+        ####para el proceso V2.
+        ####################################################
         for estacion_analogica in estaciones_analogicas:
             if estacion_analogica[0]=='ESTACION':
                 continue
@@ -1570,24 +1599,19 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
             componente=int(parametros['COMPONENTE'][numero_estacion])-1
             if numero_estacion not in estaciones_eventos_total:
                 stcanal=[]
-                sis_extraido=np.array([])
+                sis_extraido = np.array([], dtype=np.int32)
             else:
-                archivo_mseed_dia=os.path.join(directorios['Directorio_registros'],parametros['CODIGO'][numero_estacion]+directorios['sufijo_mseed'])
-                stcanal = read(archivo_mseed_dia, format="MSEED", starttime=t_ini, endtime=t_fin, nearest_sample=False)
+                nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
+                stcanal = read(nombre_mseed)
+                stcanal.detrend("demean")
                 if len(stcanal)==0:
                     continue
-                # Aplica corrección de polaridad si es necesario
-                if parametros['POLARIDAD'][numero_estacion] == 'N':
-                    #print('Canal con polaridad negativa: ', parametros['CODIGO'][numero_estacion])
-                    stcanal[componente].data *= -1
-                # Guardar archivo .mseed
-                nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
-                stcanal.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
                 stcanal[componente].data = stcanal[componente].data.astype('int32')
                 sis_extraido = stcanal[componente].data
                 muestras = stcanal[componente].stats.sampling_rate
                 if muestras!=64:
                     sis_extraido = signal.resample(sis_extraido, numero_de_muestras)
+                    sis_extraido = np.rint(sis_extraido).astype(np.int32)
                 # Forzar tamaño correcto
                 if sis_extraido.size != numero_de_muestras:
                     if sis_extraido.size > numero_de_muestras:
@@ -1598,7 +1622,6 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
             sismo_extraido.append(sis_extraido)
         # Crear archivo .sis si es evento sísmico
         if tipo_evento == "SISMO":
-            print("Convirtiendo a sis  ",evento )
             archivo_cabecera = os.path.join(directorios['Directorio_trabajo'],"cabecera_sismo")
             try:
                 with open(archivo_cabecera, 'rb') as archivo_leer:
@@ -1637,21 +1660,22 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
                                 valor = int(sismo_extraido[m][n])
                             else:
                                 valor=0
-                            if parametros['BITS'][estacion]=='20':
-                                valor= valor>>4
+                            #if parametros['BITS'][estacion]=='20':
+                                #valor= int(valor/16)
                             archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
             except FileNotFoundError:
                 print("Cabecera binaria no encontrada:", archivo_cabecera)
     if evento not in solo_eventos:
         estaciones_eventos_total=[]
         lista_guiones = ['-'] * 101
-        if lista_estaciones != []:#if tipo_evento != "Ruido":
-            for estacion_aportante in lista_estaciones or bandera_forzar:
+        if lista_estaciones_aportantes != []:#if tipo_evento != "Ruido":
+            for estacion_aportante in lista_estaciones_aportantes or bandera_forzar:
                 codigo_estacion=estacion_aportante[:4]
                 indice=parametros['CODIGO'].index(codigo_estacion)
                 nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][indice] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
                 lista_guiones[indice]=estacion_aportante
         evento=list(evento_auxiliar[:3])+lista_guiones
+    #input("Enter:")
     return evento
 
 def espectro_respuesta(acelerograma, dt,factor,directorio):
@@ -2473,7 +2497,6 @@ def referencia_directorio_completa(archivo) -> str:
     · Para cualquier archivo bajo …\DIA\AAAA\AAAA_MM\AAAA_MM_DD\… →
       se construye y devuelve …\DIA\AAAAMMDD000000.
     """
-    print(archivo)
     ruta = Path(archivo).expanduser().resolve()
     partes = ruta.parts
 
