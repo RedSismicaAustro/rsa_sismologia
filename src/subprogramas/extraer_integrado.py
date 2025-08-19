@@ -662,8 +662,6 @@ class Extraer_evento(QMainWindow):
                 if evento!=None:
                     eventos.append(evento)
             eventos=ordenar_y_eliminar_duplicados(eventos,1,False)
-            for i,evento in enumerate(eventos):
-                evento[0]=i+1
             escritura_archivo(self.directorios['archivo_csv'],eventos)
             ventana.cerrar()
         self.close()

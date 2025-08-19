@@ -96,8 +96,9 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         if os.path.isfile(ruta_archivo):
             self.stream = read(ruta_archivo)
             self.cargar_componentes(self.stream)
-            print(ruta_archivo,"  no existe")
+            
         else:
+            print(ruta_archivo,"  no existe")
             self.stream=None
         
         archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
@@ -121,7 +122,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             eventos_ordenados = sorted(self.caudales, key=lambda fila: fila[0])
             nuevos_caudales = []
             for i, fila in enumerate(eventos_ordenados):
-                print(len(fila[0]))
+                
                 if len(fila[0])==17:
                     fila[1]='20'+fila[1]
                 evento = fila[0]
@@ -190,7 +191,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                     color_linea='red'
                 else:
                     color_linea='green'
-                dt_evento = datetime.strptime(evento.replace(".sis", ""), "%y%m%d_%H%M%S")
+                dt_evento = datetime.strptime(evento.replace(".sis", ""), "%Y%m%d_%H%M%S")
                 tiempo_relativo = mdates.date2num(dt_evento)
                 ax.axvline(x=tiempo_relativo, color='green', linestyle=':', linewidth=1)
                 ax.text(tiempo_relativo, max(datos) * 0.95, evento, rotation=90,
@@ -246,7 +247,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         n_evento = 0
         tipo_evento = 'CONTROL'
         fecha_real = tiempo +tiempo_inicio  # Usado solo para generar nombre
-        nombre_sis = fecha_real.strftime('%y%m%d_%H%M%S.sis')
+        nombre_sis = fecha_real.strftime('%Y%m%d_%H%M%S.sis')
         ahora = datetime.now()
         estaciones="CHA231000000"
         evento_auxiliar=(n_evento,nombre_sis,tipo_evento,ahora, tiempo_inicio, tiempo_fin,'RSA',estaciones,'Caudales')
@@ -262,8 +263,6 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             if evento!=None:
                 self.eventos.append(evento)
         self.eventos=ordenar_y_eliminar_duplicados(self.eventos,1,False)
-        for i,evento in enumerate(self.eventos):
-            evento[0]=i+1
         escritura_archivo(self.directorios['archivo_csv'],self.eventos)
         self.marcas_usuario.clear()
         self.cargar_componentes_fecha()
@@ -286,7 +285,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                 if fila[2] != "1":
                     continue  # Ignora eventos con bandera diferente de 1
 
-                fecha_evento = datetime.strptime(fila[0].replace(".sis", ""), "%y%m%d_%H%M%S")
+                fecha_evento = datetime.strptime(fila[0].replace(".sis", ""), "%Y%m%d_%H%M%S")
 
                 # ✅ Nuevo filtro por rango de fechas
                 if not (fecha_inicio <= fecha_evento.date() <= fecha_fin):
@@ -337,7 +336,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # Paso 2: buscar eventos CONTROL nuevos
         while fecha_actual <= fecha_fin:
-            nombre_archivo = fecha_actual.strftime("%y%m%d") + "000000"
+            nombre_archivo = fecha_actual.strftime("%Y%m%d") + "000000"
             try:
                 directorios_dia = obtener_directorios(os.path.join(self.directorio_trabajo, nombre_archivo))
                 archivo_csv_eventos = os.path.join(self.directorio_trabajo, directorios_dia['archivo_csv'])
@@ -358,9 +357,9 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                 continue  # Ya está en el archivo
 
             try:
-                dt_actual = datetime.strptime(evento.replace(".sis", ""), "%y%m%d_%H%M%S")
+                dt_actual = datetime.strptime(evento.replace(".sis", ""), "%Y%m%d_%H%M%S")
                 if evento_inicio:
-                    dt_inicio = datetime.strptime(evento_inicio.replace(".sis", ""), "%y%m%d_%H%M%S")
+                    dt_inicio = datetime.strptime(evento_inicio.replace(".sis", ""), "%Y%m%d_%H%M%S")
                     segundos = int((dt_actual - dt_inicio).total_seconds())
                 else:
                     segundos = 0  # Este valor será recalculado luego

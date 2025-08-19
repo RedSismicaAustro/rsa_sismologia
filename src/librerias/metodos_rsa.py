@@ -1370,11 +1370,11 @@ def ordenar_y_eliminar_duplicados(catalogo, indice, bandera=True):
     Args:
         catalogo: Lista de listas o tuplas donde la primera sublista contiene los encabezados.
         indice: Índice de la columna por la que se ordenará.
-
+        bandera:   True es catalogo, False es cualquier archivo
     Returns:
         Lista ordenada y sin duplicados.
     """    
-
+    print("Entrando a ordenar y eliminar duplicados.")
     if bandera:
         print("catalogo")
         if not catalogo or not isinstance(catalogo, list):
@@ -1402,10 +1402,13 @@ def ordenar_y_eliminar_duplicados(catalogo, indice, bandera=True):
 
     # Ordenar por el índice especificado, convirtiendo el elemento a str temporalmente
     sin_duplicados.sort(key=lambda x: x[indice])
-
     if bandera:    
         # Agregar el encabezado
         sin_duplicados.insert(0, encabezado)
+    else:
+        for i,evento in enumerate(sin_duplicados):
+            evento[0]=i+1
+
     return sin_duplicados
 
 
