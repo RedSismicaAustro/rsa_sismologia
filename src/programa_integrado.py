@@ -51,7 +51,7 @@ class VentanaPrincipal(QMainWindow):
         self.setWindowIcon(QIcon('logo rsa.png'))  # Establecer ícono de la ventana
         self.showMaximized()  # Mostrar la ventana maximizada inicialmente
         self.directorio_trabajo='G:/Mi unidad/DIA/'
-        self.usuario='RSA'
+        self.responsable='RSA'
         self.periodo='00H-12H'
         self.archivo=os.path.join(self.directorio_trabajo,datetime.today().strftime("%Y%m%d") + "000000")
         self.construccion_menu()
@@ -67,7 +67,8 @@ class VentanaPrincipal(QMainWindow):
         print("Resibiendo datos:")
         self.archivo = archivo
         self.directorio_trabajo = directorio_trabajo
-        self.usuario = usuario
+        self.responsable = usuario
+
 
 
     def cargar_widget_central(self, widget, titulo):
@@ -288,7 +289,7 @@ class VentanaPrincipal(QMainWindow):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         # Crear e inicializar la ventana
-        self.inicio_proceso = Inicio_proceso(self.directorio_trabajo, self.usuario)
+        self.inicio_proceso = Inicio_proceso(self.directorio_trabajo, self.responsable)
         # Conectar señales
         self.inicio_proceso.inicializado.connect(self.recibir_datos_inicio)
         self.inicio_proceso.cerrado.connect(self.restaurar_estado_sismico)        
@@ -363,19 +364,19 @@ class VentanaPrincipal(QMainWindow):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         # Integrar la funcionalidad de Marcar Eventos en la ventana principal
-        self.marcar_eventos = Marcar_evento(self.archivo, self.directorio_trabajo, self.usuario)
+        self.marcar_eventos = Marcar_evento(self.archivo, self.directorio_trabajo, self.responsable)
         self.cargar_widget_central(self.marcar_eventos, 'PROCESAMIENTO INTEGRADO  -  MARCAR EVENTOS EN REGISTRO CONTINUO')
 
     def procesamiento(self):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
-        self.procesar_eventos = Procesar_evento(self.archivo, self.directorio_trabajo, self.usuario)
+        self.procesar_eventos = Procesar_evento(self.archivo, self.directorio_trabajo, self.responsable)
         self.cargar_widget_central(self.procesar_eventos, 'PROCESAMIENTO INTEGRADO  -  PROCESAMIENTO DE EVENTOS')
 
     def extraer_eventos(self):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
-        self.extraer_eventos=Extraer_evento(self.archivo, self.directorio_trabajo, self.usuario)
+        self.extraer_eventos=Extraer_evento(self.archivo, self.directorio_trabajo, self.responsable)
         self.cargar_widget_central(self.extraer_eventos, 'PROCESAMIENTO INTEGRADO  -  EXTRACCIÓN DE EVENTOS')
 
 
@@ -440,7 +441,7 @@ class VentanaPrincipal(QMainWindow):
 
     def actualizar_titulo(self, texto):
         self.setWindowTitle(texto)
-        texto=texto+'   Directorio por defecto: '+self.directorio_trabajo+'   Usuario: '+self.usuario#+'   DIA: '+self.archivo
+        texto=texto+'   Directorio por defecto: '+self.directorio_trabajo+'   Usuario: '+self.responsable#+'   DIA: '+self.archivo
         self.etiqueta_titulo.setText(texto)
         # Obtener el nombre del archivo si ya se definió
 

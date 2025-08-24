@@ -850,9 +850,18 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
             mensaje_1="Reporte IGEPN: Mag: "+str(evento_generar[1][IDX_MAGNITUD])+evento_generar[1][IDX_UNIDAD_MAG]+"  Prof: "+str(evento_generar[1][IDX_PROFUNDIDAD])+"  Lat: "+str(evento_generar[1][IDX_LATITUD])+"  Long: "+str(evento_generar[1][IDX_LONGITUD])
         if numero_redes>2:
             mensaje_2="Reporte USGS: Mag: "+str(evento_generar[2][IDX_MAGNITUD])+evento_generar[2][IDX_UNIDAD_MAG]+"  Prof: "+str(evento_generar[2][IDX_PROFUNDIDAD])+"  Lat: "+str(evento_generar[2][IDX_LATITUD])+"  Long: "+str(evento_generar[2][IDX_LONGITUD])
+
+
+
+
     id_evento=evento_generar[reporte][IDX_INDICE]
     fuente=evento_generar[reporte][IDX_FUENTE]
     evento=evento_generar[reporte][IDX_EVENTO]
+    directorios=obtener_directorios(evento)
+    archivo_procesamiento=directorio_trabajo+directorios['archivo_procesamiento']
+    if not os.path.exists(archivo_procesamiento):
+        return lienzo_archivo
+
     anio=int(evento_generar[reporte][IDX_ANIO])
     mes=int(evento_generar[reporte][IDX_MES])
     dia=int(evento_generar[reporte][IDX_DIA])
@@ -896,6 +905,9 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
     fecha_ev_local=date_local.toString('dd')+' de '+date_local.toString('MMMM')+' de '+date_local.toString('yyyy')+' (tiempo local) '
     hora_ev_local=date_local.toString('hh:mm:ss')+' (Local) '
 
+
+
+
 # Mapa principal donde aparece la ubicación del sismo.
     for mapa_ in range(3,-1,-1):#0 Region 1 Ecuador, 2 Austro   3 Elecaustro
         detalle=0   #0 sin detalle, 1 basico    2 Detalle
@@ -923,10 +935,9 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
 
     lienzo.setFillColor('Black')
     lienzo.setStrokeColor(colors.black)    
-    
 
     if id_evento=='00000000000000':
-        if fuente=='No procesado':
+        if fuente=='No':
             lienzo.setFont('Helvetica', 30)
             lienzo.drawString(200,630,'¡Sin convergencia!')
     else:
@@ -1545,8 +1556,6 @@ def imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_c
                 bandera_primera_hoja=1
             else:
                 bandera_primera_hoja=0
-            
-            
             lienzo=hoja_seniales_(directorio,lienzo,evento_catalogo,evento_generar,evento,pagina,trCanal,raiz,mapa_,detalle,bandera_primera_hoja)
         ####################################################################
         #### ACELEROGRAMAS
@@ -1608,7 +1617,10 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
 #######################################################################
 #Impresion del reporte primera hoja
 #######################################################################
-    if bandera_primera_hoja and evento_catalogo[IDX_INDICE]!='Id':
+    print(evento[2],bandera_primera_hoja ,evento_catalogo[IDX_INDICE])
+
+
+    if bandera_primera_hoja:#and evento_catalogo[IDX_INDICE]!='00000000000000'
         impresion_reporte_sismo(lienzo,evento_generar, pagina,trCanal,1,directorio_trabajo,mapa_)
         lienzo.showPage()
     ### INFORMACION SOBRE LAS SEÑALES

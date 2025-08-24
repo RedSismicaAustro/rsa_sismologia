@@ -24,7 +24,7 @@ from matplotlib.figure import Figure
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, 
                              QLabel, QMessageBox, QCheckBox)
 from PyQt5 import uic
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets,QtCore
 from metodos_rsa import (lectura_archivo, diagnostico_memoria)
 
 from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
@@ -49,7 +49,7 @@ from PyQt5.QtCore import pyqtSignal
 class Inicio_proceso(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
     inicializado = pyqtSignal(str, str, str)  # archivo, directorio_trabajo, responsable
-    def __init__(self, directorio_trabajo, usuario, parent=None):
+    def __init__(self, directorio_trabajo, responsable, parent=None):
         print("Print Inicio.")
         super().__init__()
         self.setWindowTitle('Inizializacion de día')
@@ -89,14 +89,18 @@ class Inicio_proceso(QMainWindow):
         datos=lectura_archivo(ruta_csv)
         lista_resp = [sublista[0] for sublista in datos]
         self.cmbx_resposables.addItems(lista_resp)
+
+        horario=["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
+        self.cmbx_periodo.addItems(horario)
+
         self.parametros=parametros_estaciones()#(nombre_canal_total_,nombre_canal,tipo_canal_,n_canales_,hab_canal)
         d=datetime.today()              #obtención de la fecha y hora actual
         d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
-        self.dia.setDate(d)    #Conficuración de los datos de fecha en el DataEdit
-        self.dia.dateChanged.connect(self.showDate)
+        self.dia.clicked[QtCore.QDate].connect(self.showDate)
         #self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
         self.directorio_trabajo=directorio_trabajo
-        self.usuario=usuario
+        self.responsable=responsable
+        self.periodo="00:00 - 12:00"
         self.showDate(d)
 
     def limpiar_visor(self):
@@ -112,7 +116,7 @@ class Inicio_proceso(QMainWindow):
 
     def Iniciar(self):
         # Actualizar fecha y archivo
-        self.date = self.dia.date()
+        self.date = self.dia.selectedDate()
         self.archivo = os.path.join(self.directorio_trabajo, self.date.toString('yyyyMMdd000000'))
 
         # Obtener responsable
@@ -124,9 +128,6 @@ class Inicio_proceso(QMainWindow):
         # Opcional: cerrar ventana luego de iniciar
         self.close()
 
-    def showDate(self, date):#Es como inicializar el dìa
-        self.date=date
-        self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
 
     def seleccionar_drive(self):
         folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Select Folder')
@@ -172,4 +173,21 @@ class Inicio_proceso(QMainWindow):
         self.cerrado.emit()
         super().closeEvent(event)
 
+    def showDate(self, date):#Es como inicializar el dìa
+        self.date=date
+        self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
+        self.desplegar_mensaje()
+
+
+    def desplegar_mensaje(self):
+        mensaje = (
+            "<b>DIA:</b><br>" + self.date.toString("yyyy\\MM\\dd") +
+            "<br><b>DIRECTORIO DE TRABAJO:</b><br>" + str(self.directorio_trabajo)+
+            "<br><b>RESPONSABLE:</b><br>" + str(self.responsable)+
+            "<br><b>PERIODO:</b><br>" + str(self.periodo)
+            )
+
+        self.mensajes.setHtml(mensaje)        
+        
+        
 

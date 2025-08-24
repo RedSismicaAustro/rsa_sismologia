@@ -209,26 +209,43 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
     def Abrir_archivo(self):
         lista_archivos=[]
         directorio_origen='R:'
+
         try:
+            # Listar archivos en R:\ (directorio_origen debe ser "R:/")
             archivos_auxiliar = os.listdir(directorio_origen)
-            archivos_filtrados = [f for f in archivos_auxiliar
-                      if re.fullmatch(r'\d{6}(?:000000|235959)', Path(f).stem)
-                      and Path(f).suffix == '']
+
+            # Filtrar: exactamente 12 dígitos (AAMMDDhhmmss), sin extensión
+            archivos_filtrados = [
+                f for f in archivos_auxiliar
+                if re.fullmatch(r'\d{12}', Path(f).stem) and Path(f).suffix == ''
+                ]
+            print("Candidatos:", archivos_filtrados)
+
             for archivo_copiar in archivos_filtrados:
-                if archivo_copiar[0:6]==self.dia[2:]:        
-                    arch_aux='20'+archivo_copiar
-                    archivo_origen='R:/'+archivo_copiar#  archivo_origen="C:/DIA/"+archivo_copiar
-                    archivo_destino=self.directorio_trabajo+'20'+archivo_copiar
-                    if archivo_copiar[6:12]=="235959":
-                        archivo_destino=self.directorio_trabajo+'20'+archivo_copiar[0:6]+"000000"#    archivo_destino="C:/DIA/"+archivo_copiar[0:6]+"000000"
-                        arch_aux='20'+archivo_copiar[0:6]+"000000"
+                # Coincidencia con el día AAMMDD esperado (self.dia = AAAAMMDD)
+                if archivo_copiar[:6] == self.dia[2:]:
+                    archivo_origen = os.path.join('R:/', archivo_copiar)
+
+                    # Transformación a AAAAMMDDhhmmss
+                    if archivo_copiar[6:12] == "235959":
+                        arch_aux = "20" + archivo_copiar[:6] + "000000"
+                        archivo_destino = os.path.join(self.directorio_trabajo, arch_aux)
+                    else:
+                        arch_aux = "20" + archivo_copiar
+                        archivo_destino = os.path.join(self.directorio_trabajo, arch_aux)
+
+                    # Agregar a la lista con AAAAMMDDhhmmss
                     lista_archivos.append(arch_aux)
-                    print("Copiando archivos ",archivo_origen,archivo_destino)
-                    shutil.copy(archivo_origen,archivo_destino)
-                    self.Lbl_Mensajes.setText('Archivo copiado\n   '+archivo_copiar)
+
+                    print("Copiando archivo", archivo_origen, "->", archivo_destino)
+                    shutil.copy(archivo_origen, archivo_destino)
+                    self.Lbl_Mensajes.setText('Archivo copiado\n   ' + archivo_copiar)
+
         except FileNotFoundError:
-            auxiliar=self.dia+'000000'
+            # Si no existe el directorio origen o similar, registra un auxiliar del día a las 00:00:00
+            auxiliar = self.dia + '000000'   # AAAAMMDD000000
             lista_archivos.append(auxiliar)
+
 # Loop para cada parte binaria
         lista_archivos.sort()
         print(lista_archivos)
