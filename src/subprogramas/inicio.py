@@ -48,8 +48,8 @@ from PyQt5.QtCore import pyqtSignal
     
 class Inicio_proceso(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    inicializado = pyqtSignal(str, str, str)  # archivo, directorio_trabajo, responsable
-    def __init__(self, directorio_trabajo, responsable, parent=None):
+    inicializado = pyqtSignal(str, str, str,str)  # archivo, directorio_trabajo, responsable
+    def __init__(self, directorio_trabajo, responsable, periodo,parent=None):
         print("Print Inicio.")
         super().__init__()
         self.setWindowTitle('Inizializacion de día')
@@ -97,10 +97,12 @@ class Inicio_proceso(QMainWindow):
         d=datetime.today()              #obtención de la fecha y hora actual
         d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
         self.dia.clicked[QtCore.QDate].connect(self.showDate)
+        self.cmbx_periodo.currentTextChanged.connect(self.cambio_periodo)
+        self.cmbx_resposables.currentTextChanged.connect(self.cambio_responsable)
         #self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
         self.directorio_trabajo=directorio_trabajo
         self.responsable=responsable
-        self.periodo="00:00 - 12:00"
+        self.periodo=periodo
         self.showDate(d)
 
     def limpiar_visor(self):
@@ -123,7 +125,7 @@ class Inicio_proceso(QMainWindow):
         self.responsable = self.cmbx_resposables.currentText()
 
         # Emitir señal con la información
-        self.inicializado.emit(self.archivo, self.directorio_trabajo, self.responsable)
+        self.inicializado.emit(self.archivo, self.directorio_trabajo, self.responsable,self.periodo)
 
         # Opcional: cerrar ventana luego de iniciar
         self.close()
@@ -169,7 +171,7 @@ class Inicio_proceso(QMainWindow):
         print("Directorio:", self.directorio_trabajo)
         print("Responsable:", getattr(self, 'responsable', 'No definido'))
 
-        self.inicializado.emit(self.archivo, self.directorio_trabajo, self.responsable)
+        self.inicializado.emit(self.archivo, self.directorio_trabajo, self.responsable,self.periodo)
         self.cerrado.emit()
         super().closeEvent(event)
 
@@ -178,8 +180,18 @@ class Inicio_proceso(QMainWindow):
         self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
         self.desplegar_mensaje()
 
+    def cambio_periodo(self, texto):
+        # asignar el valor del combobox a self.periodo
+        self.periodo = texto
+        self.desplegar_mensaje()
 
+    def cambio_responsable(self, texto):
+        # asignar el valor del combobox a self.periodo
+        self.responsable = texto
+        self.desplegar_mensaje()        
+            
     def desplegar_mensaje(self):
+        
         mensaje = (
             "<b>DIA:</b><br>" + self.date.toString("yyyy\\MM\\dd") +
             "<br><b>DIRECTORIO DE TRABAJO:</b><br>" + str(self.directorio_trabajo)+
@@ -187,7 +199,7 @@ class Inicio_proceso(QMainWindow):
             "<br><b>PERIODO:</b><br>" + str(self.periodo)
             )
 
-        self.mensajes.setHtml(mensaje)        
+        self.mensajes.setHtml(mensaje)
         
         
 

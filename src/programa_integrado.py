@@ -34,7 +34,7 @@ from subprogramas.procesamiento_integrado import Procesar_evento,verificar_drive
 
 from subprogramas.inicio import Inicio_proceso
 from datetime import datetime, timedelta
-from metodos_rsa import lectura_archivo
+from metodos_rsa import lectura_archivo,extraer_dia
 from metodos_gestion import obtener_directorios
 import subprocess
 import csv
@@ -63,30 +63,111 @@ class VentanaPrincipal(QMainWindow):
         self.variables_permitidas=self.__dict__.keys()
 
         
-    def recibir_datos_inicio(self, archivo, directorio_trabajo, usuario):
-        print("Resibiendo datos:")
+    def recibir_datos_inicio(self, archivo, directorio_trabajo, responsable,periodo):
+        #print("Resibiendo datos:",archivo, directorio_trabajo, responsable,periodo)
         self.archivo = archivo
         self.directorio_trabajo = directorio_trabajo
-        self.responsable = usuario
+        self.responsable = responsable
+        self.periodo = periodo
 
 
-
-    def cargar_widget_central(self, widget, titulo):
+    def cargar_widget_central(self, widget, titulo,bandera_titulo):
         anterior = self.centralWidget()
         if anterior:
             anterior.deleteLater()
         self.setCentralWidget(widget)
-        self.actualizar_titulo(titulo)
+        self.actualizar_titulo(titulo,bandera_titulo)
         widget.showMaximized()
 
         if hasattr(widget, 'cerrado'):
             widget.cerrado.connect(self.restaurar_estado_sismico)
 
-
     def limpiar_variables_temporales(self):
+        """
+        Elimina atributos temporales y limpia el widget central y su contenido gráfico
+        de forma segura. Usa takeCentralWidget() para desacoplar el widget central.
+        """
+        from PyQt5.QtWidgets import QWidget
+        try:
+            print("Limpiando variables temporales:")
+            # 1) Desacoplar el widget central de forma segura
+            widget_central = self.takeCentralWidget()  # devuelve el widget y deja el central en None
+
+            if widget_central is not None and isinstance(widget_central, QWidget):
+                # 2) Verificar que el objeto no esté ya destruido (opcional pero útil en PyQt5)
+                try:
+                    # sip.isdeleted solo existe en PyQt5; si usas PySide2, usa shiboken2.isValid
+                    import sip
+                    if sip.isdeleted(widget_central):
+                        widget_central = None
+                except Exception:
+                    # si sip no está disponible, seguimos sin esa comprobación
+                    pass
+
+                if widget_central is not None:
+                    # 3) Si el widget tiene limpieza interna (gráficos, timers, señales), invócala
+                    if hasattr(widget_central, 'limpiar_estado'):
+                        try:
+                            widget_central.limpiar_estado()
+                        except Exception as e:
+                            print(f"Error al limpiar el estado interno del widget central: {e}")
+
+                    # 4) Asegurar desconexión de señales propias del widget si procede
+                    # (ejemplo) if hasattr(widget_central, 'desconectar_senales'): widget_central.desconectar_senales()
+
+                    # 5) Programar destrucción segura
+                    try:
+                        widget_central.deleteLater()
+                    except Exception as e:
+                        print(f"Error al programar borrado del widget central: {e}")
+
+           # 6) Limpieza de atributos temporales controlada
+           #    Define un conjunto de atributos que NUNCA se deben borrar.
+           #    Asegúrate de incluir variables_permitidas y todo lo que sea esencial para tu ventana.
+            esenciales = {
+                'self.archivo','self.directorio_trabajo','self.responsables','self.periodo',
+                'variables_permitidas', 'menuBar', 'statusBar',  # ejemplos
+                # agrega aquí tus atributos críticos del QMainWindow
+            }
+
+            # Si ya manejas una lista blanca en self.variables_permitidas, unifícala:
+            if hasattr(self, 'variables_permitidas') and isinstance(self.variables_permitidas, (set, list, tuple)):
+                esenciales.update(self.variables_permitidas)
+
+            # Opcional: define un prefijo para identificar temporales (más seguro).
+            prefijo_temporal = 'tmp_'  # ajusta si usas otra convención
+
+            for nombre_atributo in list(self.__dict__.keys()):
+                if nombre_atributo in esenciales:
+                    continue
+                # Evita borrar métodos enlazados u objetos críticos
+                valor = getattr(self, nombre_atributo)
+                # Regla: borra solo si tú mismo creaste el atributo como temporal (por prefijo)
+                # o si lo incluiste explícitamente en una lista de temporales.
+                es_temporal_por_prefijo = isinstance(nombre_atributo, str) and nombre_atributo.startswith(prefijo_temporal)
+                es_temporal_por_lista = hasattr(self, 'lista_temporales') and isinstance(getattr(self, 'lista_temporales'), (set, list, tuple)) and nombre_atributo in self.lista_temporales
+
+                if es_temporal_por_prefijo or es_temporal_por_lista:
+                    try:
+                        # Si son objetos Qt, intenta desconectar señales/timers antes
+                        # (agrega aquí tu propia lógica si corresponde)
+                        delattr(self, nombre_atributo)
+                    except Exception as e:
+                        print(f"No se pudo eliminar el atributo {nombre_atributo}: {e}")
+
+            print("Saliendo de limpiar variables")
+
+        except Exception as e:
+            # Este except te permitirá ver si el crash proviene de otro punto
+            print(f"Error en limpieza de Extraer_evento: {e}")
+
+
+
+
+    def limpiar_variables_temporales_(self):
         """Elimina atributos temporales y limpia el widget central y su contenido gráfico."""
         # Limpia el widget central si hay alguno cargado
-        print("Limpiando variables temporales:")
+        #print("Limpiando variables temporales:")
         if self.centralWidget() is not None:
             widget_actual = self.centralWidget()
             # Si tiene método para limpieza interna (como gráficos), lo llamamos
@@ -106,7 +187,7 @@ class VentanaPrincipal(QMainWindow):
                 except Exception as e:
                     print(f"No se pudo eliminar el atributo {atributo}: {e}")
 
-        print("Saliendo de limpiar variables")
+        #print("Saliendo de limpiar variables")
 
         
     def construccion_menu(self):
@@ -254,7 +335,7 @@ class VentanaPrincipal(QMainWindow):
 
         # Agregar un título a la barra de herramientas
         self.etiqueta_titulo = QLabel('PROCESAMIENTO INTEGRADO')
-        self.etiqueta_titulo.setFont(QFont('Arial', 16))
+        self.etiqueta_titulo.setFont(QFont('Arial', 12))
         self.barra_herramientas.addWidget(self.etiqueta_titulo)
 
         # Ajustar el tamaño de la barra de herramientas
@@ -285,18 +366,18 @@ class VentanaPrincipal(QMainWindow):
 
 
     def inicializar_dia(self):
-        print("Menu inicializando dia.")
+        #print("Menu inicializando dia.")
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         # Crear e inicializar la ventana
-        self.inicio_proceso = Inicio_proceso(self.directorio_trabajo, self.responsable)
+        self.inicio_proceso = Inicio_proceso(self.directorio_trabajo, self.responsable,self.periodo)
         # Conectar señales
         self.inicio_proceso.inicializado.connect(self.recibir_datos_inicio)
         self.inicio_proceso.cerrado.connect(self.restaurar_estado_sismico)        
         # Cargar el widget en el centro
-        self.cargar_widget_central(self.inicio_proceso, 'PROCESAMIENTO INTEGRADO  -  INICIO DE PROCESAMIENTO')
+        self.cargar_widget_central(self.inicio_proceso, 'PROCESAMIENTO INTEGRADO  -  INICIO DE PROCESAMIENTO',False)
         #self.limpiar_variables_temporales()
-        print("Saliendo de inicializar dia")
+        #print("Saliendo de inicializar dia")
 
     def salir(self):
         self.close()
@@ -354,7 +435,7 @@ class VentanaPrincipal(QMainWindow):
         self.fases_ventana.showMaximized()
 
         # Actualizar el título después de haber cambiado el widget central
-        self.actualizar_titulo('PROCESAMIENTO INTEGRADO  -  MARCAR FASES SISMICAS')
+        self.actualizar_titulo('PROCESAMIENTO INTEGRADO  -  MARCAR FASES SISMICAS',True)
 
         # Conectar el evento de cierre de la ventana de fases para restaurar el título y habilitar los menús
         self.fases_ventana.closeEvent = self.restaurar_estado_sismico
@@ -364,26 +445,27 @@ class VentanaPrincipal(QMainWindow):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         # Integrar la funcionalidad de Marcar Eventos en la ventana principal
-        self.marcar_eventos = Marcar_evento(self.archivo, self.directorio_trabajo, self.responsable)
-        self.cargar_widget_central(self.marcar_eventos, 'PROCESAMIENTO INTEGRADO  -  MARCAR EVENTOS EN REGISTRO CONTINUO')
+        self.marcar_eventos = Marcar_evento(self.archivo, self.directorio_trabajo, self.responsable, self.periodo)
+        self.cargar_widget_central(self.marcar_eventos, 'PROCESAMIENTO INTEGRADO  -  MARCAR EVENTOS EN REGISTRO CONTINUO',True)
 
     def procesamiento(self):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
-        self.procesar_eventos = Procesar_evento(self.archivo, self.directorio_trabajo, self.responsable)
-        self.cargar_widget_central(self.procesar_eventos, 'PROCESAMIENTO INTEGRADO  -  PROCESAMIENTO DE EVENTOS')
+        self.procesar_eventos = Procesar_evento(self.archivo, self.directorio_trabajo, self.responsable, self.periodo)
+        self.cargar_widget_central(self.procesar_eventos, 'PROCESAMIENTO INTEGRADO  -  PROCESAMIENTO DE EVENTOS',True)
 
     def extraer_eventos(self):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
-        self.extraer_eventos=Extraer_evento(self.archivo, self.directorio_trabajo, self.responsable)
-        self.cargar_widget_central(self.extraer_eventos, 'PROCESAMIENTO INTEGRADO  -  EXTRACCIÓN DE EVENTOS')
+        self.extraer_eventos=Extraer_evento(self.archivo, self.directorio_trabajo, self.responsable, self.periodo)
+        self.cargar_widget_central(self.extraer_eventos, 'PROCESAMIENTO INTEGRADO  -  EXTRACCIÓN DE EVENTOS',True)
 
 
     def reextracion(self):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
-        QMessageBox.information(self, 'Procesamiento', 'Reextraccion')
+        
+        extraer_dia(self.archivo,self.responsable,True)
         self.habilitar_menus()
 
         ##########################################################################################
@@ -439,15 +521,16 @@ class VentanaPrincipal(QMainWindow):
         ##########################################################################################
 
 
-    def actualizar_titulo(self, texto):
+    def actualizar_titulo(self, texto,bandera_titulo):
         self.setWindowTitle(texto)
-        texto=texto+'   Directorio por defecto: '+self.directorio_trabajo+'   Usuario: '+self.responsable#+'   DIA: '+self.archivo
-        self.etiqueta_titulo.setText(texto)
+        if bandera_titulo:
+            texto='Directorio: '+self.directorio_trabajo+'\nDia: '+self.archivo+'\nPeriodo: '+self.periodo+'\nUsuario: '+self.responsable
+            self.etiqueta_titulo.setText(texto)
         # Obtener el nombre del archivo si ya se definió
 
     def restaurar_estado_sismico(self):
         self.limpiar_variables_temporales()  # <- limpieza al cerrar submenú
-        self.actualizar_titulo('PROCESAMIENTO INTEGRADO')
+        self.actualizar_titulo('PROCESAMIENTO INTEGRADO',False)
         self.habilitar_menus()
 
     def habilitar_menus(self):

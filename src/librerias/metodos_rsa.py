@@ -63,7 +63,7 @@ import calendar
 from obspy import read
 import tkinter as tk
 import shutil
-from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,denegar_escritura,habilitar_escritura,revisar_csv
+from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,denegar_escritura,habilitar_escritura,revisar_csv,VentanaProgreso
 import pandas as pd
 
 
@@ -1519,6 +1519,95 @@ def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaci
     grafico_evento_int(visor,stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
 
 
+def extraer_dia(archivo,responsable,bandera_todo):
+            directorios=obtener_directorios(archivo)
+            nombre_archivo=directorios["archivo_auxiliar"]
+            eventos_auxiliar=lectura_archivo(nombre_archivo)
+            if os.path.exists(nombre_archivo):
+                pass
+            else:
+                nombre_archivo=directorios["archivo_csv"]
+            archivo_guardar=directorios["archivo_tiempos"]
+            if os.path.exists(archivo_guardar):
+                pass
+            with open(nombre_archivo,newline='') as lista_csv:
+                lista_eventos=csv.reader(lista_csv,delimiter=';',quotechar=';')
+                cont_sismo=[0,0,0]
+                cont_indefinido=[0,0,0]
+                cont_FC=[0,0,0]
+                cont_FF=[0,0,0]
+                cont_ruido=[0,0,0]
+                cont_local=[0,0,0]
+                cont_tele=[0,0,0]
+                hora_=[12,18,24]
+                for evento_ in lista_eventos:
+                    h=int(evento_[1][9:11])
+                    if h<12:
+                        if evento_[2] == 'SISMO':
+                            cont_sismo[0]=cont_sismo[0]+1
+                        elif evento_[2] == 'FF':
+                            cont_FF[0]=cont_FF[0]+1
+                        elif evento_[2] == 'FC':
+                            cont_FC[0]=cont_FC[0]+1
+                        elif evento_[2] == 'INDEFINIDO':
+                            cont_indefinido[0]=cont_indefinido[0]+1
+                        elif evento_[2] == 'TELESISMO':
+                            cont_tele[0]=cont_tele[0]+1
+                        elif evento_[2] == 'Evento_local' or evento_[2] == 'CONTROL':
+                            cont_local[0]=cont_local[0]+1
+                        else:
+                            cont_ruido[0]=cont_ruido[0]+1
+                    elif h<18 and h>11:
+                        if evento_[2] == 'SISMO':
+                            cont_sismo[1]=cont_sismo[1]+1
+                        elif evento_[2] == 'FF':
+                            cont_FF[1]=cont_FF[1]+1
+                        elif evento_[2] == 'FC':
+                            cont_FC[1]=cont_FC[1]+1
+                        elif evento_[2] == 'INDEFINIDO':
+                            cont_indefinido[1]=cont_indefinido[1]+1
+                        elif evento_[2] == 'TELESISMO':
+                            cont_tele[1]=cont_tele[1]+1
+                        elif evento_[2] == 'Evento_local'or evento_[2] == 'CONTROL':
+                            cont_local[1]=cont_local[1]+1
+                        else:
+                            cont_ruido[1]=cont_ruido[1]+1
+                    else:
+                        if evento_[2] == 'SISMO':
+                            cont_sismo[2]=cont_sismo[2]+1
+                        elif evento_[2] == 'FF':
+                            cont_FF[2]=cont_FF[2]+1
+                        elif evento_[2] == 'FC':
+                            cont_FC[2]=cont_FC[2]+1
+                        elif evento_[2] == 'INDEFINIDO':
+                            cont_indefinido[2]=cont_indefinido[2]+1
+                        elif evento_[2] == 'TELESISMO':
+                            cont_tele[2]=cont_tele[2]+1
+                        elif evento_[2] == 'Evento_local'or evento_[2] == 'CONTROL':
+                            cont_local[2]=cont_local[2]+1
+                        else:
+                            cont_ruido[2]=cont_ruido[2]+1
+            archivo_dato=open(archivo_guardar,'a')            
+            for i in (0,1,2):
+                total=cont_sismo[i]+cont_FF[i]+cont_FC[i]+cont_indefinido[i]+cont_tele[i]+cont_local[i]+cont_ruido[i]
+                if(total!=0):
+                    archivo_dato.write(responsable+";"+str(hora_[i])+"H;"+str(total)+";"+str(cont_sismo[i])+";"+str(cont_FF[i])+";"+str(cont_FC[i])+";"+str(cont_indefinido[i])+";"+str(cont_tele[i])+";"+str(cont_local[i])+";"+str(cont_ruido[i])+'\n')
+            archivo_dato.close        
+            eventos=lectura_archivo(directorios['archivo_csv'])
+            maximo=len(eventos)
+            ventana = VentanaProgreso("Extrayendo eventos...", maximo)
+            if bandera_todo:
+                eventos=[]
+            solo_eventos = [fila[1] for fila in eventos]
+            for i,evento_auxiliar in enumerate(eventos_auxiliar):
+                ventana.actualizar(i + 1)
+                evento=extraccion(evento_auxiliar,solo_eventos,archivo,False)
+                if evento!=None:
+                    eventos.append(evento)
+            eventos=ordenar_y_eliminar_duplicados(eventos,1,False)
+            escritura_archivo(directorios['archivo_csv'],eventos)
+            ventana.cerrar()
+
 def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
     """
     evento_auxiliar              linea de lectura del archivo AAMMDD_aux.csv 
@@ -1588,7 +1677,7 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
             # Guardar archivo .mseed
             nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
             stcanal.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
-
+            print('Grabando:',nombre_mseed)
   
 
         ####################################################

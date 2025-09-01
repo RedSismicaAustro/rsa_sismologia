@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>278</width>
+    <width>365</width>
     <height>714</height>
    </rect>
   </property>
@@ -37,53 +37,17 @@
      <string>Estaciones disponibles</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="boton_directorio">
-    <property name="geometry">
-     <rect>
-      <x>40</x>
-      <y>430</y>
-      <width>75</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>..dia\</string>
-    </property>
-   </widget>
    <widget class="QPushButton" name="boton_salir">
     <property name="geometry">
      <rect>
-      <x>130</x>
+      <x>30</x>
       <y>430</y>
-      <width>75</width>
+      <width>181</width>
       <height>23</height>
      </rect>
     </property>
     <property name="text">
      <string>Salir</string>
-    </property>
-   </widget>
-   <widget class="QDateEdit" name="date_edit">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>40</y>
-      <width>211</width>
-      <height>22</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_2">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>20</y>
-      <width>111</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Seleccionar Fecha:</string>
     </property>
    </widget>
    <widget class="QScrollBar" name="barra_horas">
@@ -204,7 +168,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>278</width>
+     <width>365</width>
      <height>21</height>
     </rect>
    </property>

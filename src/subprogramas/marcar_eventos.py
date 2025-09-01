@@ -32,11 +32,12 @@ class CustomScrollArea(QScrollArea):
 
 class Marcar_evento(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    def __init__(self, archivo, directorio_trabajo, responsable, parent=None):
+    def __init__(self, archivo, directorio_trabajo, responsable, periodo, parent=None):
         super().__init__(parent)
         self.directorio_trabajo = directorio_trabajo
         self.archivo=archivo
-        self.usuario=responsable
+        self.responsable=responsable
+        self.periodo=periodo
         self.setWindowTitle("Marcado de eventos")
 
         #self.directorio_trabajo = "G:\\Mi unidad\\DIA"
@@ -82,10 +83,6 @@ class Marcar_evento(QMainWindow):
         self.btn_increase_amp.clicked.connect(lambda: self.ajustar_amplitud(2.0))
         self.btn_decrease_amp.clicked.connect(lambda: self.ajustar_amplitud(0.5))
         self.boton_salir.clicked.connect(self.salir)
-        self.boton_directorio.clicked.connect(self.seleccionar_drive)
-        self.date_edit.setCalendarPopup(True)  # Mostrar el calendario emergente al hacer clic en la fecha
-        self.date_edit.setDate(QDate.currentDate())
-        self.date_edit.dateChanged.connect(self.cambio_de_fecha)
         self.lista_mseed.itemClicked.connect(self.seleccionar_grafico_mseed)
         self.scroll_area.horizontalScrollBar().valueChanged.connect(self.actualizar_hora)
         # Conectar la barra de desplazamiento al cambio de período
@@ -99,7 +96,6 @@ class Marcar_evento(QMainWindow):
         # Conectar el evento de clic del ratón
         self.canvas.mpl_connect('button_press_event', self.marcar_o_borrar_cruz)
         # Inicializar la interfaz
-        self.fecha_anterior= self.date_edit.date()
         self.cambio_de_fecha()
         self.showMaximized()        
         # Lanzar la ventana en modo pantalla completa
@@ -284,16 +280,9 @@ class Marcar_evento(QMainWindow):
 
     def cambio_de_fecha(self):
         # Guardar las marcas del día actual antes de cambiar de fecha
-        archivo = self.directorio_trabajo + '/' + self.fecha_anterior.toString('yyyyMMdd') + '000000'
-        self.directorios = obtener_directorios(archivo)
-        self.guardar_marcas()
 
         # Actualizar la fecha seleccionada
-        self.fecha_seleccionada = self.date_edit.date().toPyDate()
-        fecha = self.date_edit.date()
-        archivo = self.directorio_trabajo + '/' + fecha.toString('yyyyMMdd') + '000000'
-        # Actualizar los directorios basados en la nueva fecha
-        self.directorios = obtener_directorios(archivo)
+        self.directorios = obtener_directorios(self.archivo)
         # Filtrar y listar archivos MSEED en el directorio
         if os.path.exists(self.directorios['Directorio_registros']):
             self.archivos_mseed = [f for f in os.listdir(self.directorios['Directorio_registros']) if f.endswith('mseed')]
@@ -321,7 +310,6 @@ class Marcar_evento(QMainWindow):
             self.lista_mseed.setCurrentRow(0)
             self.seleccionar_grafico_mseed(self.lista_mseed.item(0))
         # Cargar marcas del nuevo día
-        self.fecha_anterior=fecha
         self.cargar_marcas()
 
  
@@ -382,16 +370,6 @@ class Marcar_evento(QMainWindow):
         with open(archivo_marcas, 'w') as f:
             json.dump([marca.isoformat() for marca in self.marcas], f)
         print('\n\n Marcas Guardadas en archivo ',archivo_marcas,'\n',self.marcas)
-
-    def seleccionar_drive(self):
-        folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Select Folder')
-        if folderpath[-1]=='/':
-            folderpath=folderpath
-        else:
-            folderpath=folderpath+'/'
-        self.directorio_trabajo=folderpath
-        self.Lbl_directorio.setText(self.directorio_trabajo)
-        self.showDate(self.date)
 
     def salir(self):
         print('Saliendo desde boton:')

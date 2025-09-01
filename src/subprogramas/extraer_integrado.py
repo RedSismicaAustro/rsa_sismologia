@@ -26,7 +26,8 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
 from PyQt5 import uic
 from PyQt5 import QtWidgets
 from metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,lectura_archivo,
-                         escritura_archivo,revisar_csv,filtro_evento,extraccion,ordenar_y_eliminar_duplicados)
+                         escritura_archivo,revisar_csv,filtro_evento,extraccion,
+                         ordenar_y_eliminar_duplicados,extraer_dia)
 
 from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios,VentanaProgreso
 import struct
@@ -49,11 +50,12 @@ from PyQt5.QtCore import pyqtSignal
 
 class Extraer_evento(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    def __init__(self, archivo, directorio_trabajo, responsable, parent=None):
+    def __init__(self, archivo, directorio_trabajo, responsable, periodo,parent=None):
         super().__init__(parent)
         self.directorio_trabajo = directorio_trabajo
-        self.usuario=responsable
+        self.responsable=responsable
         self.archivo=archivo
+        self.periodo=periodo
         self.setWindowTitle('Extraer Eventos')
         # Configurar el layout principal
         layout_principal = QHBoxLayout()
@@ -77,8 +79,6 @@ class Extraer_evento(QMainWindow):
         widget_central.setLayout(layout_principal)
         self.setCentralWidget(widget_central)
         self.setWindowTitle("EXTRACCION DE EVENTOS")
-        self.btn_abrir.clicked.connect(self.Abrir_archivo)
-        self.Btn_drive.clicked.connect(self.seleccionar_drive)
         self.Btn_eventos.clicked.connect(self.cargar_eventos)
         self.Btn_filtrar.clicked.connect(self.filtrar_evento)
         #self.Btn_guardar.clicked.connect(self.testeo_botones)
@@ -106,7 +106,6 @@ class Extraer_evento(QMainWindow):
         self.btn_p_0_5.clicked.connect(self.mas_0_5_minutos)
         self.btn_p_0_2.clicked.connect(self.mas_0_2_minutos)
         self.cmbx_eventos.activated[str].connect(self.lista_eventos) 
-        self.cmbx_resp_1.activated[str].connect(self.habilitacion_) 
         self.sp_Box_finf.valueChanged.connect(self.lista_filtros)
         self.sp_Box_fsup.valueChanged.connect(self.lista_filtros)
         self.sp_Box_orden.valueChanged.connect(self.lista_filtros)
@@ -117,60 +116,22 @@ class Extraer_evento(QMainWindow):
                 self.comboBox_hora.addItem(str(i))
         lista_filtros = ["Ruido", "FF", "FC","TELESISMO","SISMO","INDEFINIDO","Evento_local","CONTROL"]
         self.Cmb_bx_tipo_evento.addItems(lista_filtros)
-        horario=["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
-        self.cmbx_horario.addItems(horario)
-        lista_resp=[]
-        reponsables=os.path.join(ruta_datos,"responsables.csv")
-        with open(reponsables,newline='') as f:
-            datos=csv.reader(f,delimiter=';',quotechar=';')
-            for r in datos:
-                lista_resp.append(r[0])
-        self.cmbx_resp_1.addItems(lista_resp)
         self.parametros=parametros_estaciones()#(nombre_canal_total_,nombre_canal,tipo_canal_,n_canales_,hab_canal)
         self.hab_grafico=self.parametros['HAB_GRAFICO']
         self.pagina=0
-        d=datetime.today()              #obtención de la fecha y hora actual
-        d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
-        self.dateEdit.setDate(d)    #Conficuración de los datos de fecha en el DataEdit
-        self.dateEdit.dateChanged.connect(self.showDate)
-        #self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
         self.Lbl_directorio.setText(self.directorio_trabajo)
-        self.showDate(d)
-
-    def habilitacion_(self, event):
-        indice=self.cmbx_resp_1.currentIndex()
-        if indice!=0:
-            self.btn_abrir.setEnabled(True)
-        else:
-            self.btn_abrir.setEnabled(False)
-
-    def showDate(self, date):#Es como inicializar el dìa
-        self.date=date
-        self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
+        self.Abrir_archivo()
         self.estaciones_eventos=[]
         self.filtros_estaciones=[]
         self.bandera_marcas=1
-        self.cmbx_eventos.clear()
-        self.grupo_evento.setEnabled(False)
-        self.grupo_hora_especifica.setEnabled(False)
-        self.grupo_carga.setEnabled(False)
 
-    def seleccionar_drive(self):
-        folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Select Folder')
-        if folderpath[-1]=='/':
-            folderpath=folderpath
-        else:
-            folderpath=folderpath+'/'
-        self.directorio_trabajo=folderpath
-        self.Lbl_directorio.setText(self.directorio_trabajo)
-        self.showDate(self.date)
 
 ############################################################
 # Médtodo que carga la lista de eventos generados en el archivo puntos.csv
 # en el directorio del día procesado.
 # EL método lectura_eventos(archivo) da como resultado la lista
     def Abrir_archivo(self):  #Depurado
-        self.responsable=self.cmbx_resp_1.currentText()
+        
         self.directorios=obtener_directorios(self.archivo)
         self.directorio=self.directorios['Directorio_base']
         self.directorio_dia=self.directorios['Directorio_dia']
@@ -181,7 +142,6 @@ class Extraer_evento(QMainWindow):
         resultado=lectura_eventos(self.archivo)
         mensaje=resultado[0]
         self.hora_sismos=resultado[1]
-        print(self.hora_sismos)
         if self.hora_sismos!=0:
             self.cargar_lista_eventos()
             self.grupo_carga.setEnabled(True)
@@ -378,11 +338,16 @@ class Extraer_evento(QMainWindow):
     
     def lista_eventos(self, text):
         periodo=[(0,120000),(120000,180000),(180000,240000)]
+        diccionaio_periodo= {
+            "00:00 - 12:00": 0,
+            "12:00 - 18:00": 1,
+            "18:00 - 24:00": 2
+            }
         self.grupo_evento.setEnabled(False)
         #self.grupo_desplazar.setEnabled(False)
         hora_str=self.cmbx_eventos.currentText()[-8:]
         var_tiempo=int(hora_str[:2]+hora_str[3:5]+hora_str[6:8])
-        index_periodo=self.cmbx_horario.currentIndex()
+        index_periodo=diccionaio_periodo[self.periodo]
         minimo=periodo[index_periodo][0]
         maximo=periodo[index_periodo][1]
         if var_tiempo>minimo and var_tiempo<maximo:
@@ -579,91 +544,7 @@ class Extraer_evento(QMainWindow):
         )
         result = message_box.exec_()
         if result == QMessageBox.Yes:
-            nombre_archivo=self.directorios["archivo_auxiliar"]
-            if os.path.exists(nombre_archivo):
-                pass
-            else:
-                nombre_archivo=self.directorios["archivo_csv"]
-            archivo_guardar=self.directorios["archivo_tiempos"]
-            if os.path.exists(archivo_guardar):
-                pass
-            with open(nombre_archivo,newline='') as lista_csv:
-                lista_eventos=csv.reader(lista_csv,delimiter=';',quotechar=';')
-                cont_sismo=[0,0,0]
-                cont_indefinido=[0,0,0]
-                cont_FC=[0,0,0]
-                cont_FF=[0,0,0]
-                cont_ruido=[0,0,0]
-                cont_local=[0,0,0]
-                cont_tele=[0,0,0]
-                hora_=[12,18,24]
-                for evento_ in lista_eventos:
-                    h=int(evento_[1][9:11])
-                    if h<12:
-                        if evento_[2] == 'SISMO':
-                            cont_sismo[0]=cont_sismo[0]+1
-                        elif evento_[2] == 'FF':
-                            cont_FF[0]=cont_FF[0]+1
-                        elif evento_[2] == 'FC':
-                            cont_FC[0]=cont_FC[0]+1
-                        elif evento_[2] == 'INDEFINIDO':
-                            cont_indefinido[0]=cont_indefinido[0]+1
-                        elif evento_[2] == 'TELESISMO':
-                            cont_tele[0]=cont_tele[0]+1
-                        elif evento_[2] == 'Evento_local' or evento_[2] == 'CONTROL':
-                            cont_local[0]=cont_local[0]+1
-                        else:
-                            cont_ruido[0]=cont_ruido[0]+1
-                    elif h<18 and h>11:
-                        if evento_[2] == 'SISMO':
-                            cont_sismo[1]=cont_sismo[1]+1
-                        elif evento_[2] == 'FF':
-                            cont_FF[1]=cont_FF[1]+1
-                        elif evento_[2] == 'FC':
-                            cont_FC[1]=cont_FC[1]+1
-                        elif evento_[2] == 'INDEFINIDO':
-                            cont_indefinido[1]=cont_indefinido[1]+1
-                        elif evento_[2] == 'TELESISMO':
-                            cont_tele[1]=cont_tele[1]+1
-                        elif evento_[2] == 'Evento_local'or evento_[2] == 'CONTROL':
-                            cont_local[1]=cont_local[1]+1
-                        else:
-                            cont_ruido[1]=cont_ruido[1]+1
-                    else:
-                        if evento_[2] == 'SISMO':
-                            cont_sismo[2]=cont_sismo[2]+1
-                        elif evento_[2] == 'FF':
-                            cont_FF[2]=cont_FF[2]+1
-                        elif evento_[2] == 'FC':
-                            cont_FC[2]=cont_FC[2]+1
-                        elif evento_[2] == 'INDEFINIDO':
-                            cont_indefinido[2]=cont_indefinido[2]+1
-                        elif evento_[2] == 'TELESISMO':
-                            cont_tele[2]=cont_tele[2]+1
-                        elif evento_[2] == 'Evento_local'or evento_[2] == 'CONTROL':
-                            cont_local[2]=cont_local[2]+1
-                        else:
-                            cont_ruido[2]=cont_ruido[2]+1
-            archivo_dato=open(archivo_guardar,'a')            
-            for i in (0,1,2):
-                total=cont_sismo[i]+cont_FF[i]+cont_FC[i]+cont_indefinido[i]+cont_tele[i]+cont_local[i]+cont_ruido[i]
-                if(total!=0):
-                    archivo_dato.write(self.cmbx_resp_1.currentText()+";"+str(hora_[i])+"H;"+str(total)+";"+str(cont_sismo[i])+";"+str(cont_FF[i])+";"+str(cont_FC[i])+";"+str(cont_indefinido[i])+";"+str(cont_tele[i])+";"+str(cont_local[i])+";"+str(cont_ruido[i])+'\n')
-            archivo_dato.close        
-            eventos=lectura_archivo(self.directorios['archivo_csv'])
-            maximo=len(eventos)
-            ventana = VentanaProgreso("Extrayendo eventos...", maximo)
-            if self.chkBx_forzar.isChecked():
-                eventos=[]
-            solo_eventos = [fila[1] for fila in eventos]
-            for i,evento_auxiliar in enumerate(self.eventos_auxiliar):
-                ventana.actualizar(i + 1)
-                evento=extraccion(evento_auxiliar,solo_eventos,self.archivo,False)
-                if evento!=None:
-                    eventos.append(evento)
-            eventos=ordenar_y_eliminar_duplicados(eventos,1,False)
-            escritura_archivo(self.directorios['archivo_csv'],eventos)
-            ventana.cerrar()
+            extraer_dia(self.archivo,self.responsable,False)
         self.close()
 
     def limpiar_estado(self):

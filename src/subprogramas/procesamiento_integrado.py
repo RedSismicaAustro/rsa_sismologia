@@ -69,17 +69,14 @@ def activar_hilo(self):
         self.parent.Lbl_Mensajes.setText(mensaje)
     
 def cargar_combo_eventos(self,text):
+    print("cargando eventos")
     self.sismos_procesar=[]
     self.cmbx_eventos.clear()
-    if self.eventos_reporte!=None:
-        eventos_reporte=int(self.eventos_reporte[-1:][0][0])
-    else:
-        eventos_reporte=0
     for i in range(0,len(self.eventos)):
-                if self.eventos[i][2]==text:
-                    aux_sismo=(int(self.eventos[i][0]),self.eventos[i][1])#aux_sismo tiene el numero de evento del csv y todo el registro
-                    self.sismos_procesar.append(aux_sismo)
-                    self.cmbx_eventos.addItem(self.eventos[i][1])
+        if self.eventos[i][2]==text:
+            aux_sismo=(int(self.eventos[i][0]),self.eventos[i][1])#aux_sismo tiene el numero de evento del csv y todo el registro
+            self.sismos_procesar.append(aux_sismo)
+            self.cmbx_eventos.addItem(self.eventos[i][1])
     self.preparar_evento('')
     
 
@@ -111,6 +108,7 @@ class FileMonitor:
             time.sleep(1)
 
 def verificar_drives_virtuales(responsable_evento):
+    print("entrando a verificar drives virtuales", responsable_evento)
     responsables = os.path.abspath(os.path.join(ruta_proyecto,'datos','responsables.csv'))
     responsables=lectura_archivo(responsables)
     for responsable in responsables:
@@ -125,7 +123,7 @@ def verificar_drives_virtuales(responsable_evento):
         
 class Procesar_evento(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    def __init__(self, archivo, directorio_trabajo, responsable, parent=None):#Constructor de la clase
+    def __init__(self, archivo, directorio_trabajo, responsable, horario, parent=None):#Constructor de la clase
         super().__init__(parent)
         #Carga la configuración del archivo .ui en el objeto
         ruta_ui = os.path.abspath(os.path.join(ruta_proyecto, 'src','ui',"Proceso.ui"))
@@ -133,40 +131,34 @@ class Procesar_evento(QMainWindow):
         uic.loadUi(ruta_ui,self)
         self.directorio_trabajo = directorio_trabajo
         self.archivo=archivo
-        self.usuario=responsable
+        self.responsable=responsable
+        self.horario=horario
         self.visor = Figure(figsize=(8, 4), dpi=100)
         self.canvas = FigureCanvas(self.visor)
-
         self.setWindowTitle("PROCESAMIENTO")
-        self.btn_abrir.clicked.connect(self.Abrir_archivo)
-        self.Btn_drive.clicked.connect(self.seleccionar_drive)
         self.Btn_eventos.clicked.connect(self.guardar_evento)
         self.Btn_Salir.clicked.connect(self.Salir_)
         self.Btn_procesar.clicked.connect(self.procesar_)
         self.Btn_reportar.clicked.connect(self.reportar_)
         self.Btn_insertar.clicked.connect(self.insertar_)
         self.Btn_renombrar.clicked.connect(self.renombrar_)
-        self.Btn_coeficientes.clicked.connect(self.cambiar_coeficientes_)
-        self.cmbx_eventos.activated[str].connect(self.preparar_evento) 
         self.Cmb_bx_tipo_evento.activated[str].connect(self.cambio_evento)
         self.cmbx_t_evento.activated[str].connect(self.cargar_tipo_evento)
+        self.cmbx_eventos.activated[str].connect(self.preparar_evento)
         self.parametros=parametros_estaciones()
         self.pagina=0
         self.registro_tiempo=0
-        d=datetime.today()              #obtención de la fecha y hora actual
-        d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
-        self.dateEdit.setDate(d)    #Conficuración de los datos de fecha en el DataEdit
-        self.dateEdit.dateChanged.connect(self.showDate)
-        #self.directorio_trabajo='G:\Mi unidad\DIA\\' #self.directorio_trabajo=dir_trabajo[0:aux-9]
         self.Lbl_directorio.setText(self.directorio_trabajo)
-        self.showDate(d)
         self.canales_habilitados=[]
         for i in range(0,101):
             if self.parametros['HAB_CANAL'][i]=='1':
                 self.canales_habilitados.append(i)
         self.numero_estaciones=len(self.canales_habilitados)
         self.lbl_directorio_trabajo=self.directorio_trabajo
-
+        self.estaciones_eventos=[]
+        self.bandera_marcas=1
+        self.grupo_carga.setEnabled(False)
+        self.Abrir_archivo()
 
 
     def limpiar_estado(self):
@@ -196,30 +188,9 @@ class Procesar_evento(QMainWindow):
     def cambiar_coeficientes_(self):
         self.cambio_coeficientes_filtro = Cambio_Coeficientes_Filtro(self.canales_habilitados)
         
-            
-    
-    def showDate(self, date):#Es como inicializar el dìa
-        self.date=date
-        self.archivo=self.directorio_trabajo+date.toString('yyyyMMdd000000')
-        self.estaciones_eventos=[]
-        self.bandera_marcas=1
-        self.cmbx_eventos.clear()
-        self.grupo_carga.setEnabled(False)
-
-    def seleccionar_drive(self):
-        folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Select Folder')
-        if folderpath[-1]=='/':
-            folderpath=folderpath
-        else:
-            folderpath=folderpath+'/'
-        self.directorio_trabajo=folderpath
-        self.Lbl_directorio.setText(self.directorio_trabajo)
-
-        self.showDate(self.date)
-
+  
     def Abrir_archivo(self):  #Depurado
         print("Abrir_archivo")
-        self.cmbx_eventos.clear()
         self.Cmb_bx_tipo_evento.clear()
         lista_filtros = ["Ruido", "FF", "FC","TELESISMO","SISMO","INDEFINIDO","Evento_local",'CONTROL','REVISION','TODOS']
         self.Cmb_bx_tipo_evento.addItems(lista_filtros)
@@ -248,14 +219,16 @@ class Procesar_evento(QMainWindow):
         escritura_archivo(self.directorio['archivo_catalogo'],self.catalogo)
 
     def preparar_evento(self, text):
-        print("Preparar evento:")
+        print("Preparar evento:",self.cmbx_eventos.currentText())
+        self.evento_procesar=''
         for i,evento in enumerate(self.eventos):
             if evento[1]==self.cmbx_eventos.currentText():
                 self.indice_evento_procesar=i
                 self.evento_procesar=evento
                 self.parametro=evento[0]+"  "+evento[1]+"  "+evento[2]
                 break
-        verificar_coincidencias(self.eventos, self.evento_procesar)
+        if self.evento_procesar!='':
+            verificar_coincidencias(self.eventos, self.evento_procesar)
         aux=int(self.evento_procesar[1][-10:-4])
         if aux<120000:
             indice_hora=1
@@ -264,6 +237,7 @@ class Procesar_evento(QMainWindow):
         elif aux<240000:
             indice_hora=3
         horario=['',"00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
+        print(self.responsables,indice_hora,self.responsables[indice_hora][0])
         self.responsable_evento=self.responsables[indice_hora][0]
         self.Cmb_bx_tipo_evento.setCurrentText(self.evento_procesar[2])
         self.txt_responsables.setText(self.responsable_evento)
@@ -315,9 +289,10 @@ class Procesar_evento(QMainWindow):
     def procesar_(self,text):
         archivo=self.evento_procesar[1]
         self.archivo=os.path.join(self.directorio["Directorio_trabajo"],archivo[:8]+archivo[9:15])
-        print("Archivo a rocesar: ",self.archivo)
+        print("Archivo a rocesar: ",self.archivo,self.responsable_evento)
         self.directorio=obtener_directorios(self.archivo)
         if self.evento_procesar[2]=='SISMO':
+            
             self.bandera_virtual=verificar_drives_virtuales(self.responsable_evento)
             if not(self.bandera_virtual):
                 msg = QMessageBox(QMessageBox.Information, "¡AVISO IMPORTANTE!", "Debe estar conectado el Virtual\n para ejecutar ProcesoV2")
@@ -686,14 +661,11 @@ class estaciones_(QDialog):
         escritura_archivo(self.parent.directorio['archivo_catalogo'],self.parent.catalogo)
         print("Saliendo de estaciones en close")
 
-    def Salir___(self):
-        print("Saliendo de estaciones en salir")
-        self.destroy()
-
-
-
     def Salir_(self):
+        
         print("Saliendo sin procesamiento")
+        archivo_reporte_teporal=os.path.join(self.directorio['directorio_base'],Path(self.archivo).name+self.horario+self.responsable+'.pdf')
+        print(archivo_reporte_teporal)
         self.close()
 
 
