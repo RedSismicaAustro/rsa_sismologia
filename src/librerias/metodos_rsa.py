@@ -119,7 +119,6 @@ def grafico_evento_int(visor, stLeido, t_inicio, t_final, estaciones_evento, hab
     #pagina-------- Variable que genera paginas para el despliegue, son de 6 en 6.
     # Limpiar la figura existente
     visor.clear()
-    
     # Crear subplots dentro de la figura existente
     ax = [visor.add_subplot(6, 1, i+1) for i in range(6)]
     minorLocator = MultipleLocator(320)
@@ -139,6 +138,8 @@ def grafico_evento_int(visor, stLeido, t_inicio, t_final, estaciones_evento, hab
         if i < len(estaciones_evento):
             canal_ = int(estaciones_evento[i])
             comp_ = int(parametros['COMPONENTE'][canal_]) - 1
+            print("Canal:",canal_,"Componente:",comp_ )
+            print(stLeido[canal_])
             estaciones_graficar.append(canal_)
             st_graficar.append(stLeido[canal_][comp_])
 

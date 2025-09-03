@@ -32,7 +32,7 @@ import shutil
 import struct
 import numpy as np
 from pathlib import Path
-from metodos_rsa import loc_cabecera,imprimir_plt,conversion_mseed,leer_mseed
+from metodos_rsa import loc_cabecera,imprimir_plt,conversion_mseed,leer_mseed,lectura_archivo
 from metodos_gestion import parametros_estaciones,obtencion_hora,obtener_directorios
 from datetime import datetime
 import os 
@@ -349,67 +349,15 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.Lbl_Mensajes.setText(mensaje)
         print(mensaje)
 
-    def Leer_binario(self):#Depurado
-        archivo_abrir = open(self.archivo_binario,'rb')
-        numero_segundo=loc_cabecera(archivo_abrir)  #return(numero_segundo,configuracion,puntero-20)
-        with open(self.estaciones, 'a', newline='') as archivo_estaciones:
-            escritor_csv_ = csv.writer(archivo_estaciones,delimiter=';')
-            for datos_estaciones in numero_segundo[1]:
-                escritor_csv_.writerow(datos_estaciones)                       
-        puntero=numero_segundo[2]-5
-        archivo_abrir.close()
-        archivo_abrir = open(self.archivo_binario,'rb')
-        cabecera=archivo_abrir.read(puntero)
-        archivo_abrir.close()
-        archivo_grabar=self.directorio_trabajo+"cabecera_sismo"
-        print(archivo_grabar)
-        with open(archivo_grabar, "wb") as archivo:
-            archivo.write(cabecera)
-        archivo_abrir = open(self.archivo_binario,'rb')
-        bandera=1
-        self.Lbl_Mensajes.setText("Lectura de registro continuo\n\n en ejecución")
-        print("Lectura de registro continuo\n\n en ejecución")
-        contador=0      #Número de segundos
-        contador_m=0      #Número de minutos
-        bandera_linea = 0 #bandera que permite que sea restado el promedio del primer segundo a todo el registro
-        while bandera:
-            cabecera_0=archivo_abrir.read(4)
-            if len(cabecera_0) == 0:
-                bandera=0
-            if cabecera_0 == b'\x08\x00\x05\x00':
-                numero_segundo=archivo_abrir.read(5)
-                cabecera_1=archivo_abrir.read(20)
-                if cabecera_1 == b'\x02\x20\x02\x00\x40\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00':
-                    puntero_a=archivo_abrir.tell()
-                    #print(puntero_a)
-                    cuerpo_=archivo_abrir.read(2048)
-                    if len(cuerpo_)<2048:
-                        bandera=0
-                        break
-                    archivo_abrir.seek(puntero_a)
-                    contador=contador+1# Va sumando todos los segundos, en un dìa son 86400
-                    contador_m=contador_m+1
-                    if contador_m==3600:
-                        contador_m=0
-                    for k in range(0, 64):
-                        for m in range(0,16):
-                            dato=struct.unpack("<h", archivo_abrir.read(2))
-                            self.canal[m].append(dato[0]-self.linea[m])
-                            if bandera_linea:
-                                self.suma[m]=self.suma[m]+dato[0]
-                    if bandera_linea:
-                        bandera_linea = 0
-                        for m in range(0,16):
-                            self.linea[m]=int(self.suma[m]/64)
-        archivo_abrir.close()
-        huecos=86400-contador
-        self.Lbl_Mensajes.setText("Lectura terminada, \n Segundos faltantes "+str(huecos))
-        print("Lectura terminada, \n Segundos faltantes "+str(huecos))
-
     def Btn_Mseed(self):#Depurado  Aquì se genera las trazas de los mseed.
         self.canal_np = np.asarray(self.canal)
         self.Lbl_Mensajes.setText("Grabando Mseed... ")
         print("Grabando Mseed... ")
+        print(self.canal_np)
+        estaciones_completo=lectura_archivo(self.estaciones)
+        for i in range(0, 16):
+            self.hab_canal[i]=estaciones_completo[i+1][1]
+            self.nombre_canal[i]=estaciones_completo[i+1][2]
         self.trCanal=conversion_mseed(self.canal_np,self.hab_canal,self.nombre_canal,self.fecha_,self.directorio_registros)
         self.Lbl_Mensajes.setText("Grabación Mseed Terminada ")
         print("Grabación Mseed Terminada ")
