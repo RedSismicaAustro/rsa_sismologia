@@ -77,6 +77,7 @@ def cargar_combo_eventos(self,text):
             aux_sismo=(int(self.eventos[i][0]),self.eventos[i][1])#aux_sismo tiene el numero de evento del csv y todo el registro
             self.sismos_procesar.append(aux_sismo)
             self.cmbx_eventos.addItem(self.eventos[i][1])
+            print(self.eventos[i][1])
     self.preparar_evento('')
     
 
