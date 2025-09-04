@@ -29,6 +29,18 @@ import xml.etree.ElementTree as ET
 import shutil
 from datetime import timedelta
 
+def ajuste_tiempo(tiempo,marca):
+        marca_ent=int(marca)
+        marca_fracc=int(((marca %1)-marca_ent)*1000)
+        if marca > 60:
+            tiempo=tiempo+timedelta(minutes=1)
+            tiempo=tiempo.replace(second=marca_ent-60)
+            tiempo=tiempo.replace(milliseconds=marca_fracc)
+        else:
+            tiempo=tiempo.replace(second=marca_ent)
+            tiempo=tiempo.replace(milliseconds=marca_fracc)
+        return tiempo
+
 class VentanaPrincipal(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -223,6 +235,8 @@ class VentanaPrincipal(QMainWindow):
         self.directorio_destino = Path(ruta_dir)
         self._actualizar_encabezado_salida()
 
+
+        
     def procesar(self):
         """
         Aquí irá la lógica de procesamiento. Por ahora solo valida que
@@ -284,26 +298,19 @@ class VentanaPrincipal(QMainWindow):
                             filename=f"event_{contador_fases:04d}_P.mseed"
                             contador_fases=contador_fases+1
                             tiempo_p=float(est['p-sec'])
-
-                            if tiempo_p > 60:
-                                dt_evento_p=dt_evento+timedelta(minutes=1)
-                                dt_evento_p=dt_evento.replace(second=tiempo_p-60)
-                            else:
-                                dt_evento_p=dt_evento.replace(second=tiempo_p)
+                            dt_evento_p=ajuste_tiempo(dt_evento,tiempo_p)
                             aux=(filename,sismo_objetivo,'P',estacion_objetivo,dt_evento,dt_evento,dt_evento_p,'Frec','codigo_canal', est['p-sec'])
                             print(aux)
                             if est['marc.s'] != '':
                                 filename=f"event_{contador_fases:04d}_S.mseed"
                                 tiempo_s=float(est['marc.s'])
-                                if tiempo_p > 60:
-                                    dt_evento_s=dt_evento+timedelta(minutes=1)
-                                    dt_evento_s=dt_evento.replace(second=tiempo_p-60)
-                                else:
-                                    dt_evento_s=dt_evento.replace(second=tiempo_s)
+                                dt_evento_s=ajuste_tiempo(dt_evento,tiempo_s)
                                 aux=(filename,sismo_objetivo,'S',estacion_objetivo,dt_evento,dt_evento,dt_evento_s,'Frec','codigo_canal', est['p-sec'])
                                 print(aux)
                             if est['t_cod.']!='':
-                                   tiempo_c=int(est['t_cod.'])
+                                tiempo_c=float(est['t_cod.'])
+                                dt_evento_c=ajuste_tiempo(dt_evento,tiempo_c)
+                                print(dt_evento_c)   
                             
                             bandera=1
                     if not bandera:
