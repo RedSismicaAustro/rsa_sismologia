@@ -55,8 +55,8 @@ def catalogo_gis(catalogo):
     colores = {'RSA': 'yellow', 'IGEPN': 'blue', 'USGS': 'black'}
     bordes = {'RSA': 'red', 'IGEPN': 'green', 'USGS': 'white'}
     for evento in catalogo:
-        longitud = float(evento[8])
-        latitud = float(evento[7])
+        longitud = float(evento[7])
+        latitud = float(evento[8])
         profundidad = evento[9]
         magnitud = evento[15]
         epicentro = evento[19]

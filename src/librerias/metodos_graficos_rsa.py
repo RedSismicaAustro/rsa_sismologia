@@ -821,7 +821,8 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
     # trCanal------- Datos mseed del evento
     # bandera_periodo------- 1 es reporte de periodo , 0 es reporte diario.
     # directorio_trabajo------- Directorio de trabajo.
-    #print("Impresion reporte sismo")
+    print("Impresion reporte sismo:",lienzo_archivo)
+    
     ancho=450#Hay que sacar la proporción adecuada para la ubicación de los eventos. original 350, 3.5 grados
     alto=450#Hay que sacar la proporción adecuada para la ubicación de los eventos. original 350, 3.5 grados
     xpos=(A4[0]-ancho)/2

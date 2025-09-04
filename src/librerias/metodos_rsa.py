@@ -2091,6 +2091,7 @@ def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,ma
             QMessageBox.information(None, "Error", '¡Falta información del sismo!')
             return  
     lectura=extraccion_dato(texto,"\n")
+    print(lectura)
     if(red_==1):#Cuando la red es IGEPN
         try:
             indice_utc = lectura.index('Tiempo UTC:')
@@ -2108,8 +2109,10 @@ def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,ma
             indice_localizacion = lectura.index('Localización:')
             localizacion=lectura[indice_localizacion + 1]
             partes = localizacion.split()
+            print(partes)
             latitud = float(partes[0].replace('°', '')) * (-1 if partes[1] == 'S' else 1)
             longitud = float(partes[2].replace('°', '')) * (-1 if partes[3] == 'W' else 1)
+            print(latitud, longitud)
             catalogo_temp[7]=str(longitud)#Longitud
             catalogo_temp[8]=str(latitud)#Latitud
             indice_profundidad = lectura.index('Profundidad:')
