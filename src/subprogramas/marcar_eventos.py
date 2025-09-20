@@ -14,7 +14,7 @@ from librerias.metodos_gestion import obtener_directorios
 from librerias.metodos_sismicos import diezmar_senal
 import json
 from PyQt5.QtCore import pyqtSignal
-
+from PyQt5.QtCore import QTimer
 class CustomScrollArea(QScrollArea):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -30,10 +30,11 @@ class CustomScrollArea(QScrollArea):
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - event.angleDelta().y())
 
 
-class Marcar_evento(QMainWindow):
+class Marcar_evento(QWidget):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
     def __init__(self, archivo, directorio_trabajo, responsable, periodo, parent=None):
         super().__init__(parent)
+        print("ENtrando a subprograma marcar eventos")
         self.directorio_trabajo = directorio_trabajo
         self.archivo=archivo
         self.responsable=responsable
@@ -133,14 +134,12 @@ class Marcar_evento(QMainWindow):
         self.ax.set_xticks([])  # Eliminar marcas de tiempo en el eje x
         self.ax.set_yticklabels([])  # Eliminar etiquetas del eje y
         for t in self.marcas:
-            #print(t)
             if t>self.inicio_segmento and t<fin_segmento:
                 tiempo_relativo = (t - self.inicio_segmento)  # Convertir a minutos
                 num_linea = int(tiempo_relativo / 360)
                 x = (tiempo_relativo - (num_linea) * 360)/60
                 y = -2000 * num_linea
                 self.ax.plot(x, y, 'r+', markersize=30, mew=3, alpha=0.8)
-                #print(f"Redibujado en: {t.isoformat()} (segundos: {tiempo_relativo}), Línea: {num_linea+1},x:{x},y:{y}")
         # Ajustar para ocupar todo el espacio
         self.figura.tight_layout(pad=0)
         # Calcular el ancho total de la figura en píxeles
@@ -352,14 +351,12 @@ class Marcar_evento(QMainWindow):
 
 
     def cargar_marcas(self):
-        print('\n\nCargando marcas:',self.directorios['archivo_marcas'])
         archivo_marcas = self.directorios['archivo_marcas']
         self.marcas = []
         if os.path.exists(archivo_marcas):
             with open(archivo_marcas, 'r') as f:
                 self.marcas = [obspy.UTCDateTime(marca) for marca in json.load(f)]
             self.marcas.sort()
-        print(self.marcas)
 
     def guardar_marcas(self):
         archivo_marcas = self.directorios['archivo_marcas']
@@ -398,6 +395,7 @@ class Marcar_evento(QMainWindow):
         """
         Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
         """
+        print("Saliendo de Marcar eventos")
         self.limpiar_estado()
         self.cerrado.emit()
-        super().closeEvent(event)
+        QTimer.singleShot(0, self.cerrado.emit)

@@ -45,12 +45,11 @@ import gc
 import psutil
 from obspy.core.trace import Trace
 from PyQt5.QtCore import pyqtSignal
-    
+ 
 class Inicio_proceso(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
     inicializado = pyqtSignal(str, str, str,str)  # archivo, directorio_trabajo, responsable
     def __init__(self, directorio_trabajo, responsable, periodo,parent=None):
-        print("Print Inicio.")
         super().__init__()
         self.setWindowTitle('Inizializacion de día')
         # Configurar el layout principal
@@ -105,17 +104,6 @@ class Inicio_proceso(QMainWindow):
         self.periodo=periodo
         self.showDate(d)
 
-    def limpiar_visor(self):
-        """Limpieza profunda del visor para evitar saturación de memoria."""
-        if hasattr(self, 'visor'):
-            for ax in list(self.visor.axes):
-                self.visor.delaxes(ax)
-            self.visor.clf()
-            gc.collect()
-            self.canvas.draw_idle()
-            diagnostico_memoria("Después de limpiar visor")
-
-
     def Iniciar(self):
         # Actualizar fecha y archivo
         self.date = self.dia.selectedDate()
@@ -140,6 +128,12 @@ class Inicio_proceso(QMainWindow):
         self.directorio_trabajo=folderpath
         self.showDate(self.date)
 
+    def visor_limpiar_completo(self):
+        """Antes de cada gráfico nuevo"""
+        self.visor.clear()
+        self.visor.clf()
+        # AGREGAAR ESTO:
+        plt.close(self.visor)  # Liberar figura de matplotlib completamente
 
     def limpiar_estado(self):
         """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""
@@ -152,11 +146,7 @@ class Inicio_proceso(QMainWindow):
                 self.visor.clf()
                 self.visor = None
 
-            if hasattr(self, 'stLeido'):
-                del self.stLeido
-            if hasattr(self, 'lista_eventos'):
-                self.lista_eventos.clear()
-
+ 
         except Exception as e:
             print(f"Error en limpieza de Inicio: {e}")
 
@@ -165,12 +155,9 @@ class Inicio_proceso(QMainWindow):
         """
         Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
         """
+        print("Cerrando inicio")
+        self.visor_limpiar_completo()
         self.limpiar_estado()
-        print("Emitiendo señal:inicializado")
-        print("Archivo:", self.archivo)
-        print("Directorio:", self.directorio_trabajo)
-        print("Responsable:", getattr(self, 'responsable', 'No definido'))
-
         self.inicializado.emit(self.archivo, self.directorio_trabajo, self.responsable,self.periodo)
         self.cerrado.emit()
         super().closeEvent(event)

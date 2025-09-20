@@ -963,11 +963,8 @@ def escritura_archivo(archivo, valores):
 
 
 def copiar_archivos(archivos_origen, archivos_destino):
-    print("copiando archivos:",archivos_origen, archivos_destino)
-
     lista=(17,17,12,11,10,10,10)
     for i in range(0,7):
-        print("Archivo destino:",archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:])
         try:
             archivo_dest=archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:]
             shutil.copyfile(archivos_origen[i],archivo_dest)
@@ -1753,9 +1750,18 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
                                 valor = int(sismo_extraido[m][n])
                             else:
                                 valor=0
+
+
+
+
                             #if parametros['BITS'][estacion]=='20':
                                 #valor= int(valor/16)
-                            archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
+                            try:
+                                archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
+                            except OverflowError:
+                                print(valor)
+                                valor=0
+                                archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
             except FileNotFoundError:
                 print("Cabecera binaria no encontrada:", archivo_cabecera)
     if evento not in solo_eventos:

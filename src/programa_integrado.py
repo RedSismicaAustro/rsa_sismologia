@@ -46,7 +46,6 @@ class VentanaPrincipal(QMainWindow):
         super().__init__()
 
         # Configuración de la ventana principal
-        print("Ingresando a programa.")
         self.setWindowTitle('PROCESAMIENTO INTEGRADO')
         self.setWindowIcon(QIcon('logo rsa.png'))  # Establecer ícono de la ventana
         self.showMaximized()  # Mostrar la ventana maximizada inicialmente
@@ -62,9 +61,15 @@ class VentanaPrincipal(QMainWindow):
         ruta_csv = os.path.abspath(ruta_csv)
         self.variables_permitidas=self.__dict__.keys()
 
+
+    def _al_destruir_central(self, *args):
+        # Asegura un central limpio y re-habilita menús
+        self.setCentralWidget(QWidget(self))  # central vacío "placeholder"
+        self.actualizar_titulo('PROCESAMIENTO INTEGRADO', False)
+        self.habilitar_menus()
+
         
     def recibir_datos_inicio(self, archivo, directorio_trabajo, responsable,periodo):
-        #print("Resibiendo datos:",archivo, directorio_trabajo, responsable,periodo)
         self.archivo = archivo
         self.directorio_trabajo = directorio_trabajo
         self.responsable = responsable
@@ -78,9 +83,7 @@ class VentanaPrincipal(QMainWindow):
         self.setCentralWidget(widget)
         self.actualizar_titulo(titulo,bandera_titulo)
         widget.showMaximized()
-
-        if hasattr(widget, 'cerrado'):
-            widget.cerrado.connect(self.restaurar_estado_sismico)
+        widget.destroyed.connect(self._al_destruir_central)
 
     def limpiar_variables_temporales(self):
         """
@@ -89,7 +92,6 @@ class VentanaPrincipal(QMainWindow):
         """
         from PyQt5.QtWidgets import QWidget
         try:
-            print("Limpiando variables temporales:")
             # 1) Desacoplar el widget central de forma segura
             widget_central = self.takeCentralWidget()  # devuelve el widget y deja el central en None
 
@@ -154,42 +156,11 @@ class VentanaPrincipal(QMainWindow):
                         delattr(self, nombre_atributo)
                     except Exception as e:
                         print(f"No se pudo eliminar el atributo {nombre_atributo}: {e}")
-
-            print("Saliendo de limpiar variables")
-
         except Exception as e:
             # Este except te permitirá ver si el crash proviene de otro punto
             print(f"Error en limpieza de Extraer_evento: {e}")
 
 
-
-
-    def limpiar_variables_temporales_(self):
-        """Elimina atributos temporales y limpia el widget central y su contenido gráfico."""
-        # Limpia el widget central si hay alguno cargado
-        #print("Limpiando variables temporales:")
-        if self.centralWidget() is not None:
-            widget_actual = self.centralWidget()
-            # Si tiene método para limpieza interna (como gráficos), lo llamamos
-            if hasattr(widget_actual, 'limpiar_estado'):
-                try:
-                    widget_actual.limpiar_estado()
-                except Exception as e:
-                    print(f"Error al limpiar el estado interno del widget: {e}")
-            # Eliminar del layout y de memoria
-            widget_actual.setParent(None)
-            widget_actual.deleteLater()
-        # Lista de atributos temporales que pueden haberse creado
-        for atributo in list(self.__dict__.keys()):
-            if atributo not in self.variables_permitidas:
-                try:
-                    delattr(self, atributo)
-                except Exception as e:
-                    print(f"No se pudo eliminar el atributo {atributo}: {e}")
-
-        #print("Saliendo de limpiar variables")
-
-        
     def construccion_menu(self):
         # Crear barra de menú
         self.barra_menu = self.menuBar()
@@ -280,9 +251,28 @@ class VentanaPrincipal(QMainWindow):
         self.accion_reextraer.triggered.connect(self.reextracion)
         self.menu_procesamiento.addAction(self.accion_reextraer)
 
+        ##########################################################################################
+        #  Menú cuatro: Otras redes
+        ##########################################################################################
+
+
+        # Crear menú Otras redes
+        self.menu_otras_redes = self.barra_menu.addMenu('Otras redes')
+
+        # Crear acción IGEPN
+        self.accion_ingresar_IGEPN = QAction('IGEPN', self)
+        self.accion_ingresar_IGEPN.triggered.connect(self.ingresar_IGEPN)
+        self.menu_otras_redes.addAction(self.accion_ingresar_IGEPN)
+
+        # Crear acción USGS
+        self.accion_ingresar_USGS = QAction('USGS', self)
+        self.accion_ingresar_USGS.triggered.connect(self.ingresar_USGS)
+        self.menu_otras_redes.addAction(self.accion_ingresar_USGS)
+
+
 
         ##########################################################################################
-        #  Menú cuatro: Informes
+        #  Menú cinco: Informes
         ##########################################################################################
 
 
@@ -311,7 +301,7 @@ class VentanaPrincipal(QMainWindow):
         self.menu_informes.addAction(self.accion_shapes)
 
         ##########################################################################################
-        #  Menú cinco: Ayuda
+        #  Menú seis: Ayuda
         ##########################################################################################
 
 
@@ -347,12 +337,7 @@ class VentanaPrincipal(QMainWindow):
         self.setCentralWidget(self.widget_central)
         self.layout_principal = QVBoxLayout(self.widget_central)
 
-
-        # Solo el menú de Inicio queda habilitado al principio
-        self.menu_configuracion.setEnabled(False)
-        self.menu_procesamiento.setEnabled(False)
-        self.menu_informes.setEnabled(False)
-        self.menu_ayuda.setEnabled(False)
+        self.deshabilitar_menus()
 
 
         # Agregar el componente de estado de procesamiento sísmico
@@ -366,22 +351,25 @@ class VentanaPrincipal(QMainWindow):
 
 
     def inicializar_dia(self):
-        #print("Menu inicializando dia.")
         self.limpiar_variables_temporales()
-        self.deshabilitar_menus()
-        # Crear e inicializar la ventana
         self.inicio_proceso = Inicio_proceso(self.directorio_trabajo, self.responsable,self.periodo)
         # Conectar señales
         self.inicio_proceso.inicializado.connect(self.recibir_datos_inicio)
-        self.inicio_proceso.cerrado.connect(self.restaurar_estado_sismico)        
-        # Cargar el widget en el centro
-        self.cargar_widget_central(self.inicio_proceso, 'PROCESAMIENTO INTEGRADO  -  INICIO DE PROCESAMIENTO',False)
-        #self.limpiar_variables_temporales()
-        #print("Saliendo de inicializar dia")
+        #self.inicio_proceso.cerrado.connect(self.restaurar_estado_sismico)        
+        self.cargar_widget_central(self.inicio_proceso, 'PROCESAMIENTO INTEGRADO  -  INICIALIZADO',True)
+        self.habilitar_menus()
+
 
     def salir(self):
-        self.close()
+        if self.accion_inicializar_dia.isVisible():
+            self.close()
+        else:
+            print("Saliendo a menu inicio")
+            self.deshabilitar_menus()
+            self.limpiar_variables_temporales()
+            self.actualizar_titulo('PROCESAMIENTO INTEGRADO',False)
 
+            
         ##########################################################################################
         #  Menú dos: Configuración
         ##########################################################################################
@@ -438,15 +426,19 @@ class VentanaPrincipal(QMainWindow):
         self.actualizar_titulo('PROCESAMIENTO INTEGRADO  -  MARCAR FASES SISMICAS',True)
 
         # Conectar el evento de cierre de la ventana de fases para restaurar el título y habilitar los menús
-        self.fases_ventana.closeEvent = self.restaurar_estado_sismico
+        self.fases_ventana.destroyed.connect(self._al_destruir_central)
+
 
     def marcar_eventos(self):
         # Deshabilitar menús al ejecutar esta acción
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
         # Integrar la funcionalidad de Marcar Eventos en la ventana principal
-        self.marcar_eventos = Marcar_evento(self.archivo, self.directorio_trabajo, self.responsable, self.periodo)
-        self.cargar_widget_central(self.marcar_eventos, 'PROCESAMIENTO INTEGRADO  -  MARCAR EVENTOS EN REGISTRO CONTINUO',True)
+        print("Marcar eventos 1")
+        self.vista_marcar_eventos = Marcar_evento(self.archivo, self.directorio_trabajo, self.responsable, self.periodo)
+        print("Marcar eventos 2")
+        self.cargar_widget_central(self.vista_marcar_eventos, 'PROCESAMIENTO INTEGRADO  -  MARCAR EVENTOS EN REGISTRO CONTINUO',True)
+
 
     def procesamiento(self):
         self.limpiar_variables_temporales()
@@ -464,14 +456,31 @@ class VentanaPrincipal(QMainWindow):
     def reextracion(self):
         self.limpiar_variables_temporales()
         self.deshabilitar_menus()
-        
         extraer_dia(self.archivo,self.responsable,True)
         self.habilitar_menus()
 
+
         ##########################################################################################
-        #  Menú tres: Informes
+        #  Menú cuatro : Otras redes
         ##########################################################################################
 
+    def ingresar_IGEPN(self):
+        self.limpiar_variables_temporales()
+        self.deshabilitar_menus()
+        QMessageBox.information(self, 'Otras redes', 'Ingresar IGEPN')
+        self.habilitar_menus()
+
+
+    def ingresar_USGS(self):
+        self.limpiar_variables_temporales()
+        self.deshabilitar_menus()
+        QMessageBox.information(self, 'Otras redes', 'Ingresar USGS')
+        self.habilitar_menus()
+
+
+        ##########################################################################################
+        #  Menú cinco: Informes
+        ##########################################################################################
 
     def reporte_diario(self):
         self.limpiar_variables_temporales()
@@ -481,7 +490,6 @@ class VentanaPrincipal(QMainWindow):
         try:
             # Lanza el script Python externo
             subprocess.Popen(['python', 'reporte_diario.py'])
-            print("Script ejecutado con éxito.")
         except Exception as e:
             print(f"Error al intentar ejecutar el script: {e}")
 
@@ -515,7 +523,6 @@ class VentanaPrincipal(QMainWindow):
     def acerca_de(self):
         QMessageBox.information(self, 'Acerca de', 'Esta es una aplicación de ejemplo de PyQt5.')
 
-
         ##########################################################################################
         #  Metodos generales
         ##########################################################################################
@@ -526,21 +533,25 @@ class VentanaPrincipal(QMainWindow):
         if bandera_titulo:
             texto='Directorio: '+self.directorio_trabajo+'\nDia: '+self.archivo+'\nPeriodo: '+self.periodo+'\nUsuario: '+self.responsable
             self.etiqueta_titulo.setText(texto)
-        # Obtener el nombre del archivo si ya se definió
-
-    def restaurar_estado_sismico(self):
-        self.limpiar_variables_temporales()  # <- limpieza al cerrar submenú
-        self.actualizar_titulo('PROCESAMIENTO INTEGRADO',False)
-        self.habilitar_menus()
+        else:
+            self.etiqueta_titulo.setText('')
 
     def habilitar_menus(self):
         self.menu_configuracion.setEnabled(True)
         self.menu_procesamiento.setEnabled(True)
+        self.menu_otras_redes.setEnabled(True)
+        self.menu_informes.setEnabled(True)
+        self.menu_ayuda.setEnabled(True)
+        self.accion_inicializar_dia.setVisible(False)
 
     def deshabilitar_menus(self):
         # Deshabilitar todos los elementos del menú excepto Ayuda.
         self.menu_configuracion.setEnabled(False)
         self.menu_procesamiento.setEnabled(False)
+        self.menu_otras_redes.setEnabled(False)
+        self.menu_informes.setEnabled(False)
+        self.menu_ayuda.setEnabled(False)
+        self.accion_inicializar_dia.setVisible(True)
 
     def paintEvent(self, event):
         painter = QPainter(self)

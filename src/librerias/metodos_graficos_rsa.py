@@ -1786,69 +1786,70 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
     lienzo.showPage()
     return lienzo
 
-def grafico_cobertura(lienzo,evento,coordenadas,tamanio,directorio_trabajo):
-    # Función de transformación de coordenadas geográficas a las coordenadas del lienzolienzo
-    def transformar_coordenadas(coordenadas,tamanio,lon, lat):
-        """ Convierte coordenadas geográficas en coordenadas del lienzo """
-        x_escala = (lon - coordenadas[IDX_LONGITUD_MINIMA]) / (coordenadas[IDX_LONGITUD_MAXIMA]- coordenadas[IDX_LONGITUD_MINIMA])
-        y_escala = (lat - coordenadas[IDX_LATITUD_MINIMA]) / (coordenadas[IDX_LATITUD_MAXIMA] - coordenadas[IDX_LATITUD_MINIMA])
 
+def grafico_cobertura(lienzo, evento, coordenadas, tamanio, directorio_trabajo):
+    from math import sqrt
+
+    def dibujar_triangulo(lienzo, x_canvas, y_canvas, radio_punto, stroke=1, fill=1):
+        """Dibuja un triángulo equilátero centrado en (x_canvas, y_canvas)."""
+        altura = sqrt(3) * radio_punto
+        x1, y1 = x_canvas,              y_canvas + radio_punto
+        x2, y2 = x_canvas - radio_punto, y_canvas - (altura - radio_punto)
+        x3, y3 = x_canvas + radio_punto, y_canvas - (altura - radio_punto)
+
+        path = lienzo.beginPath()
+        path.moveTo(x1, y1)
+        path.lineTo(x2, y2)
+        path.lineTo(x3, y3)
+        path.close()
+        lienzo.drawPath(path, stroke=stroke, fill=fill)
+
+    def transformar_coordenadas(coordenadas, tamanio, lon, lat):
+        x_escala = (lon - coordenadas[IDX_LONGITUD_MINIMA]) / (coordenadas[IDX_LONGITUD_MAXIMA] - coordenadas[IDX_LONGITUD_MINIMA])
+        y_escala = (lat - coordenadas[IDX_LATITUD_MINIMA])  / (coordenadas[IDX_LATITUD_MAXIMA]  - coordenadas[IDX_LATITUD_MINIMA])
         x_canvas = tamanio[IDX_POSICION_X] + x_escala * tamanio[IDX_ANCHO]
-        y_canvas = tamanio[IDX_POSICION_Y] + y_escala * tamanio[IDX_ALTO]  
-
+        y_canvas = tamanio[IDX_POSICION_Y] + y_escala * tamanio[IDX_ALTO]
         return x_canvas, y_canvas
 
-
     def dibujo_poligono(lienzo, distancia, color):
-        
-        # Obtener el polígono de cobertura como un objeto de GeoPandas
-        poligono,estaciones = cobertura_red(archivo_estaciones, distancia)  
-
+        poligono, estaciones = cobertura_red(archivo_estaciones, distancia)  
         if poligono is None or poligono.empty:
-            return lienzo  # Si no hay datos, no se grafica nada
-
-        # Extraer coordenadas del polígono
-        geometria = poligono.geometry.iloc[0]  # Extraer la primera (y única) geometría
+            return lienzo, []
+        geometria = poligono.geometry.iloc[0]
         if geometria.geom_type != 'Polygon':
-            return lienzo  # Si no es un polígono, no continuamos
-
-        # Obtener los vértices del polígono
+            return lienzo, []
         vertices = list(geometria.exterior.coords)
+        puntos_transformados = [transformar_coordenadas(coordenadas, tamanio, lon, lat) for lon, lat in vertices]
 
-        # Transformar todos los puntos del polígono a coordenadas del lienzo
-        puntos_transformados = [transformar_coordenadas(coordenadas,tamanio,lon, lat) for lon, lat in vertices]
-
-        # Dibujar el polígono con la API de paths en ReportLab
         path = lienzo.beginPath()
-        path.moveTo(*puntos_transformados[0])  # Mover al primer punto
-
-        for punto in puntos_transformados[1:]:  # Dibujar líneas a los otros puntos
+        path.moveTo(*puntos_transformados[0])
+        for punto in puntos_transformados[1:]:
             path.lineTo(*punto)
-        path.close()  # Cerrar el polígono
+        path.close()
         lienzo.setStrokeColor(color)
         lienzo.setLineWidth(1)
-        lienzo.drawPath(path, stroke=1, fill=0)  # Dibuja el polígono sin relleno
+        lienzo.drawPath(path, stroke=1, fill=0)
         lienzo.setStrokeColor(colors.black)
-        return lienzo,estaciones
+        return lienzo, estaciones
+
     # Obtener directorios y archivo de estaciones
     directorios = obtener_directorios(evento)
     archivo_estaciones = directorio_trabajo + directorios['archivo_estaciones'] 
 
- 
-    lienzo,estaciones =dibujo_poligono(lienzo, 150, colors.greenyellow)
-    lienzo,estaciones =dibujo_poligono(lienzo, 50,colors.red)
+    lienzo, estaciones = dibujo_poligono(lienzo, 150, colors.greenyellow)
+    lienzo, estaciones = dibujo_poligono(lienzo, 50, colors.red)
     
-
-    # **Dibujar las estaciones como puntos rojos**
+    # Dibujar las estaciones como triángulos azules
     lienzo.setFillColor(colors.blue)
-    radio_punto = 3  # Tamaño del punto
-
+    radio_punto = 3
     for estacion in estaciones:
-        x_geo, y_geo = estacion  # Extraer coordenadas
-        x_canvas, y_canvas = transformar_coordenadas(coordenadas,tamanio,x_geo, y_geo)  # Convertir a lienzo
-        lienzo.circle(x_canvas, y_canvas, radio_punto, stroke=1, fill=1)  # Dibujar punto
+        x_geo, y_geo = estacion
+        x_canvas, y_canvas = transformar_coordenadas(coordenadas, tamanio, x_geo, y_geo)
+        dibujar_triangulo(lienzo, x_canvas, y_canvas, radio_punto, stroke=1, fill=1)
+
     lienzo.setStrokeColor(colors.black)
     return lienzo
+
 
 
 
