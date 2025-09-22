@@ -30,11 +30,13 @@ class CustomScrollArea(QScrollArea):
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - event.angleDelta().y())
 
 
-class Marcar_evento(QWidget):
+class Marcar_evento(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
     def __init__(self, archivo, directorio_trabajo, responsable, periodo, parent=None):
         super().__init__(parent)
         print("ENtrando a subprograma marcar eventos")
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setWindowFlags(Qt.Widget)    # 👈 clave: se embebe dentro del MainWindow
         self.directorio_trabajo = directorio_trabajo
         self.archivo=archivo
         self.responsable=responsable
@@ -77,7 +79,7 @@ class Marcar_evento(QWidget):
         # Establecer el layout principal en el widget central
         widget_central = QWidget()
         widget_central.setLayout(layout_principal)
-        self.setCentralWidget(widget_central)
+        self.setCentralWidget(widget_central)   #Ya está llamada por el menu principal
         # Conectar los botones a funciones
         self.btn_anterior.clicked.connect(lambda: self.navegar_segmento(-1))
         self.btn_siguiente.clicked.connect(lambda: self.navegar_segmento(1))
@@ -98,9 +100,6 @@ class Marcar_evento(QWidget):
         self.canvas.mpl_connect('button_press_event', self.marcar_o_borrar_cruz)
         # Inicializar la interfaz
         self.cambio_de_fecha()
-        self.showMaximized()        
-        # Lanzar la ventana en modo pantalla completa
-        #self.showFullScreen()  # Asegúrate de que esta línea esté al final del constructor
 
 
     def procesar_y_graficar(self):
@@ -393,9 +392,20 @@ class Marcar_evento(QWidget):
 
     def closeEvent(self, event):
         """
-        Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
+        Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza.
         """
-        print("Saliendo de Marcar eventos")
+        print("Saliendo de Marcar eventos - closeEvent ejecutado")
+    
+        # Limpiar estado antes de emitir señal
         self.limpiar_estado()
+        
+        # Emitir señal una sola vez
         self.cerrado.emit()
-        QTimer.singleShot(0, self.cerrado.emit)
+    
+        # Aceptar el evento de cierre
+        event.accept()
+    
+        print("closeEvent completado - señal cerrado emitida")
+
+
+

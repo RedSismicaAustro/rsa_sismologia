@@ -120,7 +120,7 @@ class VentanaPrincipal(QMainWindow):
         # Establecer como widget activo
         self.widget_activo = widget
         self.setCentralWidget(widget)
-        #widget.showMaximized()
+        widget.showMaximized()
         
         # Configurar estado durante inicialización
         self.deshabilitar_menus()
@@ -181,8 +181,8 @@ class VentanaPrincipal(QMainWindow):
         # Habilitar menús de trabajo
         self.habilitar_menus()
         
-        # Título con información del día inicializado
-        self.actualizar_titulo('PROCESAMIENTO INTEGRADO', True)
+        # Título base para estado de trabajo
+        self.actualizar_titulo('PROCESAMIENTO INTEGRADO', False)
         
         print("Estado de trabajo establecido - Menús disponibles")
 
@@ -207,18 +207,10 @@ class VentanaPrincipal(QMainWindow):
         self.actualizar_titulo(titulo, mostrar_detalles)
         
         # 4. Mostrar widget
-        #widget.showMaximized()
+        widget.showMaximized()
         
-        # 5. Conectar señal de cierre - MÉTODO DIRECTO
-        def on_widget_closed():
-            print(f"DEBUG: Widget {widget.__class__.__name__} se está cerrando")
-            QTimer.singleShot(0, self.volver_estado_trabajo)
-        
-        widget.destroyed.connect(on_widget_closed)
-        
-        if hasattr(widget, 'cerrado'):
-            print(f"DEBUG: Conectando señal 'cerrado' de {widget.__class__.__name__}")
-            widget.cerrado.connect(on_widget_closed)
+        # 5. Conectar señal de cierre
+        widget.destroyed.connect(self.volver_estado_trabajo)
         
         print(f"Menú {widget.__class__.__name__} cargado exitosamente")
         return True
@@ -243,14 +235,9 @@ class VentanaPrincipal(QMainWindow):
             self.widget_activo.deleteLater()
             self.widget_activo = None
 
-    def notificar_cierre_subprograma(self):
-        """Método que los subprogramas pueden llamar directamente para notificar su cierre"""
-        print("DEBUG: notificar_cierre_subprograma llamado directamente")
-        QTimer.singleShot(0, self.volver_estado_trabajo)
-
     def volver_estado_trabajo(self):
-        """Regresa al estado de trabajo después de cerrar un menú - RELANZA ESTADO COMPLETO"""
-        print("=== REGRESANDO A ESTADO DE TRABAJO - RELANZANDO ESTADO ===")
+        """Regresa al estado de trabajo después de cerrar un menú"""
+        print("=== REGRESANDO A ESTADO DE TRABAJO ===")
         
         # Limpiar referencia del widget
         self.widget_activo = None
@@ -258,17 +245,12 @@ class VentanaPrincipal(QMainWindow):
         # Establecer widget central limpio
         self.setCentralWidget(QWidget(self))
         
-        # RELANZAR COMPLETAMENTE EL ESTADO DE TRABAJO
+        # Restaurar estado de trabajo
         if self.datos_inicializados:
-            print("RELANZANDO establecer_estado_trabajo()...")
-            self.establecer_estado_trabajo()  # Esto ejecuta todo el proceso completo
-            print("ESTADO DE TRABAJO COMPLETAMENTE RELANZADO")
+            self.habilitar_menus()
+            self.actualizar_titulo('PROCESAMIENTO INTEGRADO', False)
         else:
             self.configurar_estado_inicial()
-            
-        # Forzar actualización inmediata
-        self.repaint()
-        QApplication.processEvents()
 
     def limpiar_estado_completo(self):
         """Limpia completamente el estado de la aplicación"""
@@ -473,8 +455,7 @@ class VentanaPrincipal(QMainWindow):
             self.archivo, 
             self.directorio_trabajo, 
             self.responsable, 
-            self.periodo,
-            self  # Pasar referencia a la ventana principal
+            self.periodo
         )
         
         success = self.cargar_widget_menu(
@@ -488,7 +469,6 @@ class VentanaPrincipal(QMainWindow):
 
     def extraer_eventos(self):
         """Cargar menú de extraer eventos"""
-        print("Iniciando Extraer Eventos...")
         widget_extraer = Extraer_evento(
             self.archivo,
             self.directorio_trabajo,
@@ -496,14 +476,11 @@ class VentanaPrincipal(QMainWindow):
             self.periodo
         )
         
-        success = self.cargar_widget_menu(
+        self.cargar_widget_menu(
             widget_extraer,
             'PROCESAMIENTO INTEGRADO - EXTRACCIÓN DE EVENTOS',
             True
         )
-        if success:
-            print("Extraer Eventos cargado exitosamente")
-
 
     def procesamiento(self):
         """Cargar menú de procesamiento"""
@@ -611,12 +588,8 @@ class VentanaPrincipal(QMainWindow):
         if mostrar_detalles and self.datos_inicializados:
             detalles = f'Directorio: {self.directorio_trabajo}\nDía: {self.archivo}\nPeriodo: {self.periodo}\nUsuario: {self.responsable}'
             self.etiqueta_titulo.setText(detalles)
-        elif mostrar_detalles and not self.datos_inicializados:
-            # Si se solicitan detalles pero no hay inicialización, mostrar texto simple
-            self.etiqueta_titulo.setText(texto)
         else:
-            # Si no se solicitan detalles, limpiar la etiqueta
-            self.etiqueta_titulo.setText(texto)
+            self.etiqueta_titulo.setText(texto if not mostrar_detalles else '')
 
     def habilitar_menus(self):
         """Habilita menús en estado de trabajo"""
