@@ -94,16 +94,12 @@ class Otras_redes(QMainWindow):
                 if (mejor_delta_seg is None) or (delta_seg < mejor_delta_seg):
                     mejor_delta_seg = delta_seg
                     mejor_evento = evento
-
-
-
             # Resultado por cada evento de otras redes
             if mejor_delta_seg < 60:
                 if mejor_evento[2]=='SISMO':
                     for evento_catalogo in catalogo:
                         if mejor_evento[1]==evento_catalogo[IDX_EVENTO]:
                             break
-                    
                     evento_otras_redes[IDX_INDICE]=evento_catalogo[IDX_INDICE][:-2]+evento_otras_redes[IDX_INDICE][-2:]
                     evento_otras_redes[IDX_EVENTO]=evento_catalogo[IDX_EVENTO]
                 else:
@@ -133,16 +129,20 @@ class Otras_redes(QMainWindow):
         Soporta tablas separadas por TABs o por columnas alineadas con 2+ espacios.
         """
         texto = textedit.toPlainText()
+        
         variables=texto.split(self.redes_diccionario[self.red]["divisor"])  
         filas=[]
         if self.red=='IGEPN':
-            variables=variables[1:-1]#Se generan al inicio y al final valores con ''
+           
+            variables = [x for x in variables if x != '']
+            print(variables)
             for i in range(0,len(variables),self.n_columnas):
                 filas.append(variables[i:i+self.n_columnas])
         else:
             for variable in variables:
                 filas.append(variable.split(','))
         catalogo=[]
+
         for evento_otras_redes in filas[1:]:
             cadena=evento_otras_redes[self.redes_diccionario[self.red]["hora"]]
             if self.red=='IGEPN':
@@ -166,6 +166,7 @@ class Otras_redes(QMainWindow):
             ubicacion=evento_otras_redes[self.redes_diccionario[self.red]["ubicacion"]]
             evento=[id_evento,str(anio),str(mes),str(dia),str(hora),str(minuto),str(segundo),str(latitud),str(longitud),str(profundidad),'','','','','',str(magnitud),tipo,self.red,ruta,ubicacion]
             catalogo.append(evento)
+        print(catalogo)
         return catalogo
 
 
