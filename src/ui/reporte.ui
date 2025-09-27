@@ -939,27 +939,14 @@ MAGNITUD</string>
     </property>
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>628</y>
+      <x>20</x>
+      <y>630</y>
       <width>81</width>
       <height>31</height>
      </rect>
     </property>
     <property name="text">
      <string>Guardar</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="Btn_abrir">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>628</y>
-      <width>81</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Abrir</string>
     </property>
    </widget>
    <widget class="QLabel" name="Lbl_directorio">
@@ -985,19 +972,6 @@ MAGNITUD</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignJustify|Qt::AlignTop</set>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="Btn_drive">
-    <property name="geometry">
-     <rect>
-      <x>480</x>
-      <y>630</y>
-      <width>75</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>.../dia/</string>
     </property>
    </widget>
    <widget class="QPushButton" name="Btn_estacion">

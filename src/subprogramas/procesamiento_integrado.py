@@ -38,7 +38,8 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import QTimer
 from PyQt5.QtCore import pyqtSignal
-
+import xml.etree.ElementTree as ET
+from metodos_graficos_rsa import reporte_resumen
 def activar_hilo(self):
         #archivo_monitoreo=self.parent.archivos_procesamiento_virtual[2]
         while not(self.bandera_procesamiento):
@@ -179,17 +180,9 @@ class Procesar_evento(QMainWindow):
         except Exception as e:
             print(f"Error en limpieza de Extraer_evento: {e}")
 
-
-
-
-    
-    def closeEvent(self, event):
-        print("Cerrar_archivo")
-        
     def cambiar_coeficientes_(self):
         self.cambio_coeficientes_filtro = Cambio_Coeficientes_Filtro(self.canales_habilitados)
         
-  
     def Abrir_archivo(self):  #Depurado
         print("Abrir_archivo")
         self.Cmb_bx_tipo_evento.clear()
@@ -390,7 +383,50 @@ class Procesar_evento(QMainWindow):
             #self.guardar_evento()
 
     def Salir_(self):
-        self.close()
+        print("Saliendo sin procesamiento", self.horario)
+        self.eventos_reporte,self.catalogo,self.eventos, \
+        self.vector,self.evento_canales, \
+        self.root,self.responsables,self.resumen=cargar_dia(self.directorio['archivo_csv'])
+        escritura_archivo(self.directorio['archivo_responsables'],self.responsables)
+        tree = ET.ElementTree(self.root)
+        banderas=[0,0,0,0]
+        if self.horario=='00:00 - 12:00':
+            banderas[3]=1
+        elif  self.horario=='12:00 - 18:00':
+            banderas[3]=2
+        else:
+            banderas[3]=3
+        archivo_reporte_teporal=os.path.join(self.directorio['Directorio_base'],Path(self.archivo).name+'_'+self.horario[:2]+'_'+self.responsable+'.pdf')
+        nombre = Path(self.archivo).stem    
+        fecha = QDate(int(nombre[0:4]), int(nombre[4:6]), int(nombre[6:8]))
+        self.estaciones_eventos=[]
+        reporte_resumen(archivo_reporte_teporal, "Reporte temporal",fecha ,fecha ,self.catalogo,self.resumen,    1,       0,         banderas,      self.estaciones_eventos,self.directorio_trabajo,tree,0,self.eventos_reporte,1)
+        os.startfile(archivo_reporte_teporal) 
+
+        aux="Se revisó archivo reporte\n"+ archivo_reporte_teporal
+
+        message_box = QMessageBox(
+            QMessageBox.Question,
+            "¡Importante!",
+            aux, QMessageBox.Yes | QMessageBox.No ,
+            self.window()
+        )
+        result = message_box.exec_()
+        if result == QMessageBox.Yes:
+            for xx in range(0,3):
+                try:
+                    os.remove(archivo_reporte_teporal)
+                    break
+
+                except PermissionError:
+                    mensaje=" Archivo " +archivo_reporte_teporal+" en uso\nCiérrelo"
+                    QMessageBox.information(self, "AVISO", mensaje)
+
+            self.close()
+
+     
+        
+        
 
     def closeEvent(self, event):
         """
@@ -663,10 +699,6 @@ class estaciones_(QDialog):
         print("Saliendo de estaciones en close")
 
     def Salir_(self):
-        
-        print("Saliendo sin procesamiento")
-        archivo_reporte_teporal=os.path.join(self.directorio['directorio_base'],Path(self.archivo).name+self.horario+self.responsable+'.pdf')
-        print(archivo_reporte_teporal)
         self.close()
 
 

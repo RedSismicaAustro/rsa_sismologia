@@ -31,8 +31,10 @@ from subprogramas.fases import VentanaPrincipal as FasesVentana
 from subprogramas.extraer_integrado import Extraer_evento
 from subprogramas.marcar_eventos import Marcar_evento
 from subprogramas.procesamiento_integrado import Procesar_evento,verificar_drives_virtuales,FileMonitor,cargar_combo_eventos,activar_hilo
-
+from subprogramas.reporte_diario import Reporte_diario
+from subprogramas.reporte_acumulado import Reporte
 from subprogramas.inicio import Inicio_proceso
+from subprogramas.otras_redes import Otras_redes
 from datetime import datetime, timedelta
 from metodos_rsa import lectura_archivo,extraer_dia
 from metodos_gestion import obtener_directorios
@@ -51,7 +53,7 @@ class VentanaPrincipal(QMainWindow):
         self.showMaximized()
         self.directorio_trabajo='G:/Mi unidad/DIA/'
         self.responsable='RSA'
-        self.periodo='00H-12H'
+        self.periodo='' #'00H-12H'
         self.archivo=os.path.join(self.directorio_trabajo,datetime.today().strftime("%Y%m%d") + "000000")
         
         # Estado de inicialización
@@ -89,28 +91,7 @@ class VentanaPrincipal(QMainWindow):
         self.responsable = responsable
         self.periodo = periodo
 
-    def inicializar_dia(self):
-        """Proceso de inicialización que establece el estado base para todos los menús"""
-        print("=== INICIANDO INICIALIZACIÓN DE DÍA ===")
-        
-        # 1. Limpiar estado anterior completamente
-        self.limpiar_estado_completo()
-        
-        # 2. Crear widget de inicialización
-        self.inicio_proceso = Inicio_proceso(
-            self.directorio_trabajo, 
-            self.responsable, 
-            self.periodo
-        )
-        
-        # 3. Conectar señales de inicialización
-        self.inicio_proceso.inicializado.connect(self.completar_inicializacion)
-        self.inicio_proceso.cerrado.connect(self.cancelar_inicializacion)
-        
-        # 4. Cargar widget de inicialización
-        self.cargar_widget_inicializacion(self.inicio_proceso)
-        
-        print("Widget de inicialización cargado")
+
 
     def cargar_widget_inicializacion(self, widget):
         """Carga específicamente el widget de inicialización"""
@@ -295,7 +276,7 @@ class VentanaPrincipal(QMainWindow):
                 'archivo', 'directorio_trabajo', 'responsable', 'periodo',
                 'datos_inicializados', 'widget_activo', 'variables_permitidas',
                 'menuBar', 'statusBar', 'barra_menu', 'menu_inicio', 'menu_configuracion',
-                'menu_procesamiento', 'menu_otras_redes', 'menu_informes', 'menu_ayuda',
+                'menu_procesamiento',  'menu_informes','menu_otros_informes' ,'menu_ayuda',
                 'accion_inicializar_dia', 'accion_salir', 'barra_herramientas',
                 'etiqueta_logo', 'etiqueta_titulo', 'widget_central', 'layout_principal',
                 'logo_pixmap', 'RAIZ_PROYECTO'
@@ -352,10 +333,6 @@ class VentanaPrincipal(QMainWindow):
         ##########################################################################################
         self.menu_configuracion = self.barra_menu.addMenu('Configuración')
 
-        self.accion_seleccionar_drive = QAction('Directorio trabajo', self)
-        self.accion_seleccionar_drive.triggered.connect(self.seleccionar_drive)
-        self.menu_configuracion.addAction(self.accion_seleccionar_drive)
-
         self.accion_estaciones = QAction('Estaciones', self)
         self.accion_estaciones.triggered.connect(self.estaciones)
         self.menu_configuracion.addAction(self.accion_estaciones)
@@ -372,8 +349,34 @@ class VentanaPrincipal(QMainWindow):
         self.accion_ingresar_datos_ev.triggered.connect(self.ingresar_datos_estacion_ev)
         self.menu_configuracion.addAction(self.accion_ingresar_datos_ev)
 
+        self.accion_ingresar_IGEPN = QAction('Datos IGEPN', self)
+        self.accion_ingresar_IGEPN.triggered.connect(self.ingresar_IGEPN)
+        self.menu_configuracion.addAction(self.accion_ingresar_IGEPN)
+
+        self.accion_ingresar_USGS = QAction('Datos USGS', self)
+        self.accion_ingresar_USGS.triggered.connect(self.ingresar_USGS)
+        self.menu_configuracion.addAction(self.accion_ingresar_USGS)
+
+
         ##########################################################################################
-        #  Menú tres: procesamiento
+        #  Menú tres: Informes
+        ##########################################################################################
+        self.menu_informes = self.barra_menu.addMenu('Informes')
+
+        self.accion_reporte_periodo = QAction('Reporte periodo', self)
+        self.accion_reporte_periodo.triggered.connect(self.reporte_periodo)
+        self.menu_informes.addAction(self.accion_reporte_periodo)
+
+        self.accion_reporte_enjambre = QAction('Enjambre sísmico', self)
+        self.accion_reporte_enjambre.triggered.connect(self.reporte_enjambre)
+        self.menu_informes.addAction(self.accion_reporte_enjambre)
+
+        self.accion_shapes = QAction('Shapes', self)
+        self.accion_shapes.triggered.connect(self.creacion_shapes)
+        self.menu_informes.addAction(self.accion_shapes)
+
+        ##########################################################################################
+        #  Menú cuatro: procesamiento
         ##########################################################################################
         self.menu_procesamiento = self.barra_menu.addMenu('Procesamiento')
 
@@ -398,38 +401,14 @@ class VentanaPrincipal(QMainWindow):
         self.menu_procesamiento.addAction(self.accion_reextraer)
 
         ##########################################################################################
-        #  Menú cuatro: Otras redes
+        #  Menú cinco: Otros Informes
         ##########################################################################################
-        self.menu_otras_redes = self.barra_menu.addMenu('Otras redes')
-
-        self.accion_ingresar_IGEPN = QAction('IGEPN', self)
-        self.accion_ingresar_IGEPN.triggered.connect(self.ingresar_IGEPN)
-        self.menu_otras_redes.addAction(self.accion_ingresar_IGEPN)
-
-        self.accion_ingresar_USGS = QAction('USGS', self)
-        self.accion_ingresar_USGS.triggered.connect(self.ingresar_USGS)
-        self.menu_otras_redes.addAction(self.accion_ingresar_USGS)
-
-        ##########################################################################################
-        #  Menú cinco: Informes
-        ##########################################################################################
-        self.menu_informes = self.barra_menu.addMenu('Informes')
+        self.menu_otros_informes = self.barra_menu.addMenu('Otros Informes')
 
         self.accion_reporte_diario = QAction('Reporte diario', self)
         self.accion_reporte_diario.triggered.connect(self.reporte_diario)
-        self.menu_informes.addAction(self.accion_reporte_diario)
+        self.menu_otros_informes.addAction(self.accion_reporte_diario)
 
-        self.accion_reporte_periodo = QAction('Reporte periodo', self)
-        self.accion_reporte_periodo.triggered.connect(self.reporte_periodo)
-        self.menu_informes.addAction(self.accion_reporte_periodo)
-
-        self.accion_reporte_enjambre = QAction('Enjambre sísmico', self)
-        self.accion_reporte_periodo.triggered.connect(self.reporte_enjambre)
-        self.menu_informes.addAction(self.accion_reporte_enjambre)
-
-        self.accion_shapes = QAction('Shapes', self)
-        self.accion_shapes.triggered.connect(self.creacion_shapes)
-        self.menu_informes.addAction(self.accion_shapes)
 
         ##########################################################################################
         #  Menú seis: Ayuda
@@ -439,6 +418,9 @@ class VentanaPrincipal(QMainWindow):
         self.accion_acerca_de = QAction('Acerca de', self)
         self.accion_acerca_de.triggered.connect(self.acerca_de)
         self.menu_ayuda.addAction(self.accion_acerca_de)
+
+
+
 
         # Configurar barra de herramientas
         self.barra_herramientas = QToolBar('Barra Principal')
@@ -465,6 +447,123 @@ class VentanaPrincipal(QMainWindow):
     # MÉTODOS ESPECÍFICOS PARA CADA MENÚ
     # =================================================================
 
+    ##########################################################################################
+    #  Menú uno: Inicio
+    ##########################################################################################
+
+    def inicializar_dia(self):
+        """Proceso de inicialización que establece el estado base para todos los menús"""
+        print("=== INICIANDO INICIALIZACIÓN DE DÍA ===")
+        
+        # 1. Limpiar estado anterior completamente
+        self.limpiar_estado_completo()
+        
+        # 2. Crear widget de inicialización
+        self.inicio_proceso = Inicio_proceso(
+            self.directorio_trabajo, 
+            self.responsable, 
+            self.periodo
+        )
+        
+        # 3. Conectar señales de inicialización
+        self.inicio_proceso.inicializado.connect(self.completar_inicializacion)
+        self.inicio_proceso.cerrado.connect(self.cancelar_inicializacion)
+        
+        # 4. Cargar widget de inicialización
+        self.cargar_widget_inicializacion(self.inicio_proceso)
+        
+        print("Widget de inicialización cargado")
+
+
+    ##########################################################################################
+    #  Menú dos: Configuración
+    ##########################################################################################
+
+
+    def estaciones(self):
+        QMessageBox.information(self, 'Configuración', 'Configuración de estaciones.')
+
+    def enlaces_digitales(self):
+        QMessageBox.information(self, 'Configuración', 'Configuración de enlaces digitales.')
+
+    def ingresar_datos_estacion_rg(self):
+        QMessageBox.information(self, 'Configuración', 'Ingresar datos de estación en registro continuo')
+
+    def ingresar_datos_estacion_ev(self):
+        QMessageBox.information(self, 'Configuración', 'Ingresar datos de estación en eventos')
+
+    def ingresar_IGEPN(self):
+        """Cargar menú de ingreso IGEPN"""
+        print("Iniciando IGEPN...")
+        
+        widget_marcar = Otras_redes(
+            self.archivo, 
+            self.directorio_trabajo, 
+            self.responsable, 
+            self.periodo,'IGEPN',
+            self  # Pasar referencia a la ventana principal
+        )
+        success = self.cargar_widget_menu(
+            widget_marcar,
+            'PROCESAMIENTO INTEGRADO - CARGAR DATOS DE IGEPN',
+            True
+        )
+        if success:
+            print("ingreso IGEPN cargado exitosamente")
+
+
+    def ingresar_USGS(self):
+        """Cargar menú de ingreso USGS"""
+        print("Iniciando USGS...")
+        
+        widget_marcar = Otras_redes(
+            self.archivo, 
+            self.directorio_trabajo, 
+            self.responsable, 
+            self.periodo,'USGS',
+            self  # Pasar referencia a la ventana principal
+        )
+        success = self.cargar_widget_menu(
+            widget_marcar,
+            'PROCESAMIENTO INTEGRADO - CARGAR DATOS DE IGEPN',
+            True
+        )
+        if success:
+            print("ingreso USGS cargado exitosamente")
+
+
+
+    ##########################################################################################
+    #  Menú tres: Informes
+    ##########################################################################################
+
+
+    def reporte_periodo(self):
+        """Cargar menú Reporte Diario"""
+        widget_procesar = Reporte(
+            self.archivo,
+            self.directorio_trabajo,
+            self.responsable,
+            self.periodo
+        )
+        
+        self.cargar_widget_menu(
+            widget_procesar,
+            'PROCESAMIENTO INTEGRADO - REPORTES',
+            True
+        )
+
+    def reporte_enjambre(self):
+        QMessageBox.information(self, 'Informe', 'Reporte Enjambre.')
+
+    def creacion_shapes(self):
+        QMessageBox.information(self, 'Informe', 'Creacion de Shapes')
+
+
+    ##########################################################################################
+    #  Menú cuatro: procesamiento
+    ##########################################################################################
+
     def marcar_eventos(self):
         """Cargar menú de marcar eventos"""
         print("Iniciando Marcar Eventos...")
@@ -476,13 +575,11 @@ class VentanaPrincipal(QMainWindow):
             self.periodo,
             self  # Pasar referencia a la ventana principal
         )
-        
         success = self.cargar_widget_menu(
             widget_marcar,
             'PROCESAMIENTO INTEGRADO - MARCAR EVENTOS EN REGISTRO CONTINUO',
             True
         )
-        
         if success:
             print("Marcar Eventos cargado exitosamente")
 
@@ -541,57 +638,28 @@ class VentanaPrincipal(QMainWindow):
         extraer_dia(self.archivo, self.responsable, True)
         self.habilitar_menus()
 
-    ##########################################################################################
-    #  Menú dos: Configuración
-    ##########################################################################################
-
-    def seleccionar_drive(self):
-        folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Select Folder')
-        if folderpath:
-            if not folderpath.endswith('/'):
-                folderpath += '/'
-            self.directorio_trabajo = folderpath
-
-    def estaciones(self):
-        QMessageBox.information(self, 'Configuración', 'Configuración de estaciones.')
-
-    def enlaces_digitales(self):
-        QMessageBox.information(self, 'Configuración', 'Configuración de enlaces digitales.')
-
-    def ingresar_datos_estacion_rg(self):
-        QMessageBox.information(self, 'Configuración', 'Ingresar datos de estación en registro continuo')
-
-    def ingresar_datos_estacion_ev(self):
-        QMessageBox.information(self, 'Configuración', 'Ingresar datos de estación en eventos')
 
     ##########################################################################################
-    #  Menú cuatro : Otras redes
-    ##########################################################################################
-
-    def ingresar_IGEPN(self):
-        QMessageBox.information(self, 'Otras redes', 'Ingresar IGEPN')
-
-    def ingresar_USGS(self):
-        QMessageBox.information(self, 'Otras redes', 'Ingresar USGS')
-
-    ##########################################################################################
-    #  Menú cinco: Informes
+    #  Menú tres: Otros Informes
     ##########################################################################################
 
     def reporte_diario(self):
-        try:
-            subprocess.Popen(['python', 'reporte_diario.py'])
-        except Exception as e:
-            print(f"Error al intentar ejecutar el script: {e}")
+        """Cargar menú Reporte Diario"""
+        widget_procesar = Reporte_diario(
+            self.archivo,
+            self.directorio_trabajo,
+            self.responsable,
+            self.periodo
+        )
+        
+        self.cargar_widget_menu(
+            widget_procesar,
+            'PROCESAMIENTO INTEGRADO - PROCESAMIENTO DE EVENTOS',
+            True
+        )
 
-    def reporte_periodo(self):
-        QMessageBox.information(self, 'Informe', 'Reporte Periodo.')
 
-    def reporte_enjambre(self):
-        QMessageBox.information(self, 'Informe', 'Reporte Enjambre.')
 
-    def creacion_shapes(self):
-        QMessageBox.information(self, 'Informe', 'Creacion de Shapes')
 
     ##########################################################################################
     #  Menú seis: Ayuda
@@ -599,6 +667,12 @@ class VentanaPrincipal(QMainWindow):
 
     def acerca_de(self):
         QMessageBox.information(self, 'Acerca de', 'Esta es una aplicación de ejemplo de PyQt5.')
+
+
+
+
+
+
 
     ##########################################################################################
     #  Metodos de estado de menús
@@ -609,7 +683,10 @@ class VentanaPrincipal(QMainWindow):
         self.setWindowTitle(texto)
         
         if mostrar_detalles and self.datos_inicializados:
-            detalles = f'Directorio: {self.directorio_trabajo}\nDía: {self.archivo}\nPeriodo: {self.periodo}\nUsuario: {self.responsable}'
+            if self.periodo!='':
+                detalles = f'Directorio: {self.directorio_trabajo}\nDía: {self.archivo}\nPeriodo: {self.periodo}\nUsuario: {self.responsable}'
+            else:
+                detalles = f'Directorio: {self.directorio_trabajo}\nDía: PERIODO \nPeriodo: {self.periodo}\nUsuario: {self.responsable}'
             self.etiqueta_titulo.setText(detalles)
         elif mostrar_detalles and not self.datos_inicializados:
             # Si se solicitan detalles pero no hay inicialización, mostrar texto simple
@@ -620,20 +697,20 @@ class VentanaPrincipal(QMainWindow):
 
     def habilitar_menus(self):
         """Habilita menús en estado de trabajo"""
-        self.menu_configuracion.setEnabled(True)
-        self.menu_procesamiento.setEnabled(True)
-        self.menu_otras_redes.setEnabled(True)
-        self.menu_informes.setEnabled(True)
-        self.menu_ayuda.setEnabled(True)
+        if self.periodo=='':
+            self.menu_configuracion.setEnabled(True)
+            self.menu_informes.setEnabled(True) 
+        else:
+            self.menu_procesamiento.setEnabled(True)
+            self.menu_otros_informes.setEnabled(True)
         self.accion_inicializar_dia.setVisible(False)
 
     def deshabilitar_menus(self):
         """Deshabilita menús (estado inicial o dentro de menú)"""
         self.menu_configuracion.setEnabled(False)
-        self.menu_procesamiento.setEnabled(False)
-        self.menu_otras_redes.setEnabled(False)
         self.menu_informes.setEnabled(False)
-        self.menu_ayuda.setEnabled(False)
+        self.menu_procesamiento.setEnabled(False)
+        self.menu_otros_informes.setEnabled(False)
         self.accion_inicializar_dia.setVisible(True)
 
     def paintEvent(self, event):

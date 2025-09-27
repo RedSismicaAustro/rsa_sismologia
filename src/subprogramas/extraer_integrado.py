@@ -590,18 +590,6 @@ class Extraer_evento(QMainWindow):
         self.cerrado.emit()
         QTimer.singleShot(0, self.cerrado.emit)
 
-
-
-
-
-
-
-
-
-
-
-
-
     def limpiar_estado_completo(self):
         """
         Limpia completamente todos los recursos antes de cerrar la ventana.

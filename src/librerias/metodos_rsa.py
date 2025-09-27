@@ -1372,9 +1372,9 @@ def ordenar_y_eliminar_duplicados(catalogo, indice, bandera=True):
     Returns:
         Lista ordenada y sin duplicados.
     """    
-    print("Entrando a ordenar y eliminar duplicados.")
+    
     if bandera:
-        print("catalogo")
+        
         if not catalogo or not isinstance(catalogo, list):
             raise ValueError("El catálogo debe ser una lista no vacía.")
 
@@ -1386,7 +1386,7 @@ def ordenar_y_eliminar_duplicados(catalogo, indice, bandera=True):
             raise IndexError(f"El índice {indice} es inválido para algunas filas.")
 
     else:
-        print("eventos")
+        
         datos=catalogo
 
     # Eliminar duplicados
@@ -1525,11 +1525,14 @@ def extraer_dia(archivo,responsable,bandera_todo):
                 pass
             else:
                 nombre_archivo=directorios["archivo_csv"]
+            lista_eventos=lectura_archivo(nombre_archivo)
             archivo_guardar=directorios["archivo_tiempos"]
             if os.path.exists(archivo_guardar):
-                pass
-            with open(nombre_archivo,newline='') as lista_csv:
-                lista_eventos=csv.reader(lista_csv,delimiter=';',quotechar=';')
+                datos_tiempo=lectura_archivo(archivo_guardar)
+            else:
+                datos_tiempo=[["RSA","12H","","","","","","","",""],["RSA","18H","","","","","","","",""],["RSA","24H","","","","","","","",""]]
+                escritura_archivo(archivo_guardar, datos_tiempo)
+            if True:
                 cont_sismo=[0,0,0]
                 cont_indefinido=[0,0,0]
                 cont_FC=[0,0,0]
@@ -1585,12 +1588,22 @@ def extraer_dia(archivo,responsable,bandera_todo):
                             cont_local[2]=cont_local[2]+1
                         else:
                             cont_ruido[2]=cont_ruido[2]+1
-            archivo_dato=open(archivo_guardar,'a')            
             for i in (0,1,2):
                 total=cont_sismo[i]+cont_FF[i]+cont_FC[i]+cont_indefinido[i]+cont_tele[i]+cont_local[i]+cont_ruido[i]
-                if(total!=0):
-                    archivo_dato.write(responsable+";"+str(hora_[i])+"H;"+str(total)+";"+str(cont_sismo[i])+";"+str(cont_FF[i])+";"+str(cont_FC[i])+";"+str(cont_indefinido[i])+";"+str(cont_tele[i])+";"+str(cont_local[i])+";"+str(cont_ruido[i])+'\n')
-            archivo_dato.close        
+                if(total!=0 and datos_tiempo[i][2]==""):
+                    datos_tiempo[i][0]=responsable
+                    datos_tiempo[i][1]=str(hora_[i])+"H"
+                    datos_tiempo[i][2]="0"
+                if datos_tiempo[i][2]!="":
+                    datos_tiempo[i][2]=str(total)
+                    datos_tiempo[i][3]=str(cont_sismo[i])
+                    datos_tiempo[i][4]=str(cont_FF[i])
+                    datos_tiempo[i][5]=str(cont_FC[i])
+                    datos_tiempo[i][6]=str(cont_indefinido[i])
+                    datos_tiempo[i][7]=str(cont_tele[i])
+                    datos_tiempo[i][8]=str(cont_local[i])
+                    datos_tiempo[i][9]=str(cont_ruido[i])
+            escritura_archivo(archivo_guardar, datos_tiempo)
             eventos=lectura_archivo(directorios['archivo_csv'])
             maximo=len(eventos)
             ventana = VentanaProgreso("Extrayendo eventos...", maximo)
@@ -2072,7 +2085,6 @@ def cargar_dia(archivo_csv):
     for i in range (0,3):
         total=cont_sismo[i]+cont_FF[i]+cont_FC[i]+cont_indefinido[i]+cont_tele[i]+cont_local[i]+cont_ruido[i]
         if(total!=0):
-            print(indice_responsables[i])
             aux=[responsables[indice_responsables[i]][0],hora_[i],total,cont_sismo[i],cont_FF[i],cont_FC[i],cont_indefinido[i],cont_tele[i],cont_local[i],cont_ruido[i]]
             aux=aux+contador_n_canales[i]
             variable_responsables.append(aux)

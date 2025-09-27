@@ -521,299 +521,6 @@ def mapa(lienzo,imagen, tamanio, coordenadas,salto,bandera):
     lienzo.rect(xpos,ypos,ancho,alto) #c.rect(50,200,300,60)
     return lienzo
 
-
-def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen,mapa_,detalle,banderas,estaciones,directorio,arbol,resumen_responsables,eventos,bandera_relleno):
-    # Mètodo que genera el reporte de resumen en pdf, pudiendo ser de un día o un período entero sin restricción del tiempo
-    #
-    #
-    # archivo_pdf ---es el nombre en extención pdf del archivo ejemplo archivo.pdf
-    # subtítulo -----variable string que define el subtítulo a imprimir
-    # fecha_ini----- inicio del period del reporte
-    # fecha_fin------ fecha de fin del reporte, si es diario, este valor es el mismo que fecha_ini
-    # catalogo ------catalogo correspodiente al dia o al periodo                             .
-    # resumen -------resumen del día o período, tiene dos formatos, el primero es:
-    #                [['DIA', 'SISMO', 'FF', 'FC', 'TELESISMOS', 'Evento_local', 'INDEFINIDO', 'Ruido'],
-    #                 ['Total:', 36, 44, 42, 15, 20, 44, 19],
-    #                 ['2', '3', '2', '0', '1', '13', '6'],
-    #                                   .
-    #                                   .
-    #                                   .
-    #                 ['6', '7', '3', '0', '3', '2', '0']]
-    #               
-    #
-    #                el sigueintes  es:
-    #               [0 0 2...6]  donde los dos primeros valores son 0 y los sigueintes son el numero total de eventos procesados por día.
-    # mapa_----------Varible para escoger el mapa dado por el archivo mapa.csv
-    # detalle -------Tipo de mapa    0, 1 y 2 con basico, intermnedio y detallado respectivamente
-    # banderas-------
-    #                bandera_dia---variable booleanaque habilita o deshabilita el cuadro resumen, permite usar el mismo método para hacer el reporte diario o el de período 
-    #                              en el reporte   0  no aparecen el cuadro reesumen ni las horas  1 aparece todo
-    #                bandera_reporte
-    #                bandera_firma
-    #                
-    # estaciones---- estaciones involucradas en le reporte diario, si es período este tiene valor de 0
-    # directorio---- direcorio base donde se tomará la información de los días del reporte, usado en periodo.
-    # arbol--------- base de datos en xml del periodo de reporte
-    # resumen_responsables----
-    # eventos        Todos los eventos generados en el día.
-    #print("Reporte resumen:\n")
-    bandera_dia=banderas[0]
-    bandera_reporte=banderas[1]
-    bandera_firma=banderas[2]
-    raiz=arbol.getroot()
-    datos_estaciones=parametros_estaciones()
-    #numero_estacion=datos_estaciones[21]
-    tipo_canal=datos_estaciones['SENSOR']
-    #nombre_estacion=datos_estaciones[0]
-    codigo_estacion=datos_estaciones['CODIGO']
-    codigo_estacion[2]='CHAI'
-    vector=[] #Vartible que contiene la informacion de la ubicación para graficarla en el mapa resumen:[Coordenada en x,Coordenada en y,Profundidad,Magnitud,red,ruta].red tiene valores de 0 o 1
-    for i in range(1,len(catalogo)):
-        if catalogo[i]!=[]:
-            x=float(catalogo[i][IDX_LATITUD])#Coordenada en x
-            y=float(catalogo[i][IDX_LONGITUD])#Coordenada en y
-            p=-1*float(catalogo[i][IDX_PROFUNDIDAD])#Profundidad
-            mag=float(catalogo[i][IDX_MAGNITUD])#Magnitud
-            ruta=catalogo[i][IDX_EVENTO]
-            if(catalogo[i][IDX_FUENTE]=="RSA"):
-                vector.append([x,y,p,mag,0,ruta])#El penultimo es una bandera, 0=RSA,1 es otras redes
-            else:
-                vector.append([x,y,p,mag,1,ruta])
-    marca_agua=(200, 100, 200, 95)
-    xpos=90
-    ypos=325
-    ancho=400
-    alto=400
-    tamanio=(xpos,ypos,ancho,alto)
-    datos=mapa_configuracion(mapa_,detalle)
-    mapa_despliegue=datos[0]
-    coordenadas=datos[1]##Longitud mínima, Latitud mínima, Longitud máxima, Latitud máxima
-    salto=datos[2]
-    estaciones_informe=datos[4]
-    titulo_hoja=datos[3]
-    bandera_marca=1 #1 imprima marcas, 0 no imprima marcas
-    titulo="SISMICIDAD REGIONAL REGISTRADA"
-    tamanio_hoja=A4
-    maximos_reporte=[]
-    lienzo = canvas.Canvas(archivo_pdf,pagesize=A4)
-    if not(mapa_==2 or mapa_==4):
-        lienzo=formato(marca_agua,tamanio_hoja,titulo,subtitulo,0,lienzo)
-        pos_x=55
-        pos_y=234
-
-    else:
-        tamanio=(81,216,432,432)#xpos,ypos,ancho,alto
-        marca_agua=(261, 66, 79, 36)#xpos,ypos,ancho,alto
-        lienzo=formato(marca_agua,tamanio_hoja,titulo,subtitulo,2,lienzo)
-        pos_x=85
-        pos_y=109
-    lienzo=mapa(lienzo,mapa_despliegue,tamanio,coordenadas,salto,bandera_marca)
-    lienzo=dibujo_sismos_(lienzo,vector,coordenadas,tamanio,mapa_,bandera_dia,bandera_relleno)
-    ubicacion_caja=(pos_x,pos_y)
-    lienzo=caja_simbologia(lienzo,resumen,vector,ubicacion_caja,mapa_,bandera_dia,bandera_relleno)
-
-        
-    ####################################################################
-    ####################################################################
-    #        REPORTE DE PERIODO
-    ####################################################################
-    ####################################################################
-
-    ####################################################################
-    ####### MAPA RESUMEN
-    ####################################################################
-        ################################################################
-        ##### REPORTE DE PERIODO
-        ################################################################
-    if bandera_dia:
-        #Impresión del resumen diario de eventos procesados a travez de un chart de barras.
-        lienzo=estadistica_(lienzo,resumen,fecha_ini,mapa_,bandera_dia)
-        ####################################################
-        ####SOLO PARA CONTROL INTENO mapa_=1
-        ####################################################
-        if mapa_==1:
-            ####################################################
-            ####HORAS LABORADAS
-            ####################################################
-            #print("Internos:")
-            lienzo.showPage()
-            lienzo=responsables_tiempos_(lienzo,resumen_responsables)
-            ##################################################################
-            ####INCREMENTO DEL CALATOLO PARA EVENTOS PROCESADOS SIN EXITO.
-            ##################################################################
-            if bandera_reporte:
-                for evento_dia in eventos:
-                    directorios=obtener_directorios(evento_dia[1])
-                    archivo_procesamiento=directorio+directorios['archivo_procesamiento']
-                    if os.path.exists(archivo_procesamiento):
-                        lectura=lectura_archivo(archivo_procesamiento)
-                        if len(lectura)==1:
-                            #os.remove(archivo_procesamiento)
-                            continue
-                        evento_buscado =int(evento_dia[1].replace('_', '')[:-4])
-                        aux=['00000000000000', '2025', '1', '1', '0', '0', '0', '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z', '0', ' ', 'No procesado', evento_dia[1],' , , ']
-                        tamanio_catalogo=len(catalogo)
-                        indice=1
-                        for i in range(indice,tamanio_catalogo):
-                            evento_analizado=int(catalogo[i][IDX_EVENTO].replace('_', '')[:-4])
-                            if evento_buscado==evento_analizado:
-                                break
-                            if evento_analizado>evento_buscado:
-                                catalogo.insert(i,aux)
-                                break
-        ####################################################################
-        ####### LISTA RESUMEN DE EVENTOS
-        ####################################################################
-        if not(mapa_==2 or mapa_==4):
-            contador1=0
-            #             Id año mes día hora min seg lat long prof Mag Fuente Ubicación
-            loc_centrada=(73,107,122,140,153, 171,190,220, 245,271, 295, 320,  360)
-            localizacion=(46,105,126,142,158, 173,188,212, 239,268, 293, 322,  350)
-            marca_agua=(120, 450, 400, 200)
-            for evento_catalogo in catalogo:
-                if evento_catalogo==[]:
-                    continue
-                if  evento_catalogo[19]==' ':
-                    continue
-                if contador1==80:
-                    contador1=0
-                contador1=contador1+1
-                contador2=0
-                if contador1==1:
-                    lienzo.showPage()
-                    lienzo=formato(marca_agua,tamanio_hoja,titulo_hoja,subtitulo,0,lienzo)#0 Portrait  1 Landscape
-                    lienzo.setFont('Helvetica', 7)
-                if  evento_catalogo[IDX_MAGNITUD]!= 'Mag':
-                    if  float(evento_catalogo[IDX_MAGNITUD])>4:
-                        lienzo.setFillColor(colors.blue)
-                    else:
-                        lienzo.setFillColor(colors.black)
-                for i in (0,1,2,3,4,5,6,7,8,9,15,17,19):
-                    texto=evento_catalogo[i]
-                    if contador1==1:
-                        lienzo.drawString(loc_centrada[contador2],740-contador1*8,catalogo[0][i])
-                    else:
-                        if contador2>5 and contador2<9:
-                            texto=str(round(float(texto),2))
-                        if contador2==10:
-                            texto=texto+evento_catalogo[i+1]
-                        lienzo.drawString(localizacion[contador2],740-contador1*8,texto)
-                    contador2=contador2+1
-            archivo_revision=archivo_pdf[:-8]+'revision.csv'
-            aux='Tarea 1: Aplicar filtros'
-
-            #####################################################################
-            # Generacion del archivo de revisón con los reponsables
-            #####################################################################
-            
-            lista_eventos_revision=[['Tarea 1: Aplicar filtros'],['Tarea 2: Cambiar parámeros de filtros'],
-                                    ['Tarea 3: Muy ruidosa para marcar fases'],['Tarea 4: Tiempos de coda similares o iguales en estaciones muy distintas.'],
-                                    ['Tarea 5: Muy ruidosa para marcar tiempos de coda'],['Tarea 6: Señal aportante no considerada'],
-                                    ['Tarea 7: Tiempo de coda mal marcada'],['Tarea 8: Fase mal marcada'],['Tarea 9: Otra'],
-                                     ['Evento','Responsable','Tarea','Especificacion(8: Otra)','Causas','Resuelto','Detalle resolución']]
-            for evento_catalogo in catalogo:
-                aux=[]
-                if evento_catalogo==[]:
-                    continue
-                if evento_catalogo[0][-1] !='0':
-                    continue
-                evento_sismico=evento_catalogo[IDX_EVENTO]
-                aux.append(evento_sismico)
-                hora_evento=int(evento_sismico[-10:-4])
-                indice_hora=int(hora_evento/60000)
-                if indice_hora==0:
-                    indice_hora=1
-                archivo=os.path.join(directorio,evento_sismico.replace('_', '')[:-4])
-                directorios=obtener_directorios(archivo)
-                archivo_responsable=directorios['archivo_responsables']
-                responsables_dia=lectura_archivo(archivo_responsable)
-
-                # Validar antes de usar
-                if not responsables_dia or not isinstance(responsables_dia, list) or indice_hora >= len(responsables_dia):
-                    aux.append("RSA")  
-                else:
-                    aux.append(responsables_dia[indice_hora][0])
-
-                lista_eventos_revision.append(aux)
-            escritura_archivo(archivo_revision,lista_eventos_revision)
-            if contador1>50:
-                lienzo.showPage()
-                lienzo=formato(marca_agua,tamanio_hoja,titulo_hoja,subtitulo,0,lienzo)#0 Portrait  1 Landscape
-                contador1=0
-            lienzo.setFont('Helvetica', 10)
-            x=100
-            y=740-(contador1+20)*8
-            if bandera_firma:
-                lienzo.drawString(x,y,"Ing. Remigio Guevara ")
-            lienzo.drawString(x,y-10,"Red Sísmica del Austro")
-        lienzo.showPage()
-        ####################################################################
-        ####### DETALLE DE EVENTOS
-        ####################################################################
-        if bandera_reporte and not(mapa_==2 or mapa_==4):  #Esta bandera habilita o no el detalle del reporte, está en el IDE del program reporte eventos.
-            print("Se imprime detalle de reporte")
-
-            maximos_reporte=imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_canal,mapa_,raiz,detalle)
-        else:
-            print("No se imprime detalle de reporte")
-
-        ####################################################################
-        #########   REPORTE DIARIO
-        ####################################################################
-    else:   
-        print("Reporte diario")
-        archivo=referencia_directorio_completa(archivo_pdf)
-        directorios=obtener_directorios(archivo)
-        #Impresión del resumen dea actividades por responsable de procesamiento.
-        dibujo_chart = Drawing(400, 200)
-        dibujo_chart.add(String(180,155,'Resumen de tiempos responsables:',fontSize=14))
-        lista_resp=lectura_archivo(directorios['archivo_responsables'])
-        aux=len(lista_resp)
-        reportes_sismos=num_reportes(directorios['Directorio_reportes'])
-        reportes_acelerogramas=num_reportes(directorios['Directorio_acelerogramas'])
-        revision=(360,180,180)
-        for i in range(0,aux):
-            eventos_reportados=reportes_sismos[i-1]+reportes_acelerogramas[i-1]
-            vector=lista_resp[i]
-            if i!=0:
-                formula=(revision[i-1]+int(vector[2])*60+int(vector[10])*300+int(vector[11])*600+int(vector[12])*1200+eventos_reportados*300)/60
-            vector=lista_resp[i][0:9]
-            if i==0:
-                vector.append("REP.")
-                vector.append("t (min)")
-            else:
-                vector.append(str(eventos_reportados))
-                vector.append(str(formula))
-            for j in range(0,len(vector)):
-                x_coor=105+j*40
-                y_coor=135-i*12
-                if j==0:
-                    x_coor=45
-                dibujo_chart.add(String(x_coor,y_coor,vector[j],fontSize=12))
-        dibujo_chart.drawOn(lienzo, 15,56)
-
-        #Aqui sería de colocar el reporte en detalle de los eventos diarios, para revisión , guardados en un vector.
-        catalogo_dia=[]
-
-        for evento_dia in eventos:
-            aux=[]
-            if evento_dia[2]=='FF' or evento_dia[2]=='FC':
-                aux=['00000000000000', '2025', '1', '1', '0', '0', '0', '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z', '0', ' ', 'No', evento_dia[1],' , , ']
-            
-            for catalogo_individual in catalogo:
-                if catalogo_individual[IDX_EVENTO]==evento_dia[1]:
-                    aux=catalogo_individual
-                    catalogo_dia.append(aux)
-                    aux=[]
-
-            if aux!=[]:
-                catalogo_dia.append(aux)
-        print("Es solo reporte diario!!!!!!!!")
-        lienzo.showPage()
-        maximos_reporte=imprimir_catalogo(catalogo_dia,arbol,lienzo,directorio,estaciones_informe,tipo_canal,mapa_,raiz,detalle)
-    lienzo.save()
-    return maximos_reporte
-
 def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,bandera_periodo,directorio_trabajo,mapa_escogido):#Bandera 1, imprime el perorte en una hoja, 0 saca el lienzo para sumar un reporte grande.
     # lienzo_archivo------- Nombre del lienzo para continuar graficando o el pdf del archivo pdf para empezar a graficar
     # evento_generar------ Datos del evento en el catalogo, contiene la información de la RSA. otras redes o de eventos no procesados.
@@ -821,8 +528,7 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
     # trCanal------- Datos mseed del evento
     # bandera_periodo------- 1 es reporte de periodo , 0 es reporte diario.
     # directorio_trabajo------- Directorio de trabajo.
-    print("Impresion reporte sismo:",lienzo_archivo)
-    
+
     ancho=450#Hay que sacar la proporción adecuada para la ubicación de los eventos. original 350, 3.5 grados
     alto=450#Hay que sacar la proporción adecuada para la ubicación de los eventos. original 350, 3.5 grados
     xpos=(A4[0]-ancho)/2
@@ -851,18 +557,22 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
             mensaje_1="Reporte IGEPN: Mag: "+str(evento_generar[1][IDX_MAGNITUD])+evento_generar[1][IDX_UNIDAD_MAG]+"  Prof: "+str(evento_generar[1][IDX_PROFUNDIDAD])+"  Lat: "+str(evento_generar[1][IDX_LATITUD])+"  Long: "+str(evento_generar[1][IDX_LONGITUD])
         if numero_redes>2:
             mensaje_2="Reporte USGS: Mag: "+str(evento_generar[2][IDX_MAGNITUD])+evento_generar[2][IDX_UNIDAD_MAG]+"  Prof: "+str(evento_generar[2][IDX_PROFUNDIDAD])+"  Lat: "+str(evento_generar[2][IDX_LATITUD])+"  Long: "+str(evento_generar[2][IDX_LONGITUD])
-
-
-
-
-    id_evento=evento_generar[reporte][IDX_INDICE]
-    fuente=evento_generar[reporte][IDX_FUENTE]
     evento=evento_generar[reporte][IDX_EVENTO]
     directorios=obtener_directorios(evento)
-    archivo_procesamiento=directorio_trabajo+directorios['archivo_procesamiento']
-    if not os.path.exists(archivo_procesamiento):
-        return lienzo_archivo
-
+    archivo_procesamiento=os.path.join(directorio_trabajo, directorios['archivo_procesamiento'])
+    existe_proc = os.path.exists(archivo_procesamiento)  # solo para el bloque de "intentos"
+    hay_rsa = any(f and f[IDX_FUENTE]=='RSA' for f in evento_generar)
+    forzar_sin_convergencia = (not hay_rsa) and existe_proc
+    if forzar_sin_convergencia:
+        idx_np = next((i for i,f in enumerate(evento_generar) if f and f[IDX_FUENTE]=='No procesado'), None)
+        if idx_np is not None:
+            reporte = idx_np
+            evento = evento_generar[reporte][IDX_EVENTO]
+            directorios = obtener_directorios(evento)
+            archivo_procesamiento = os.path.join(directorio_trabajo, directorios['archivo_procesamiento'])
+            existe_proc = os.path.exists(archivo_procesamiento)
+    id_evento=evento_generar[reporte][IDX_INDICE]
+    fuente=evento_generar[reporte][IDX_FUENTE]
     anio=int(evento_generar[reporte][IDX_ANIO])
     mes=int(evento_generar[reporte][IDX_MES])
     dia=int(evento_generar[reporte][IDX_DIA])
@@ -884,8 +594,11 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
     observaciones_2=" con epicentro "+aux_[0]+","
     if len(aux_)==3:
         observaciones_3=aux_[1]+", "+aux_[2]
-    else:
+    elif len(aux_)==2:
         observaciones_3=aux_[1]
+    else:
+        observaciones_3=''
+
     if profundidad<40:
         observaciones_1=" Sismo superficial,"
     elif profundidad<70:
@@ -905,10 +618,6 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
     hora_ev_UTM=date_UTM.toString('hh:mm:ss')+' (UTC) '
     fecha_ev_local=date_local.toString('dd')+' de '+date_local.toString('MMMM')+' de '+date_local.toString('yyyy')+' (tiempo local) '
     hora_ev_local=date_local.toString('hh:mm:ss')+' (Local) '
-
-
-
-
 # Mapa principal donde aparece la ubicación del sismo.
     for mapa_ in range(3,-1,-1):#0 Region 1 Ecuador, 2 Austro   3 Elecaustro
         detalle=0   #0 sin detalle, 1 basico    2 Detalle
@@ -922,7 +631,6 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
         latitud_max=coordenadas[IDX_LATITUD_MAXIMA]
         if (longitud>longitud_min and longitud<longitud_max) and (latitud>latitud_min and latitud<latitud_max):
             break
-
     tamanio_hoja=(595.2755,841.8897)
     if bandera_periodo:
         lienzo=lienzo_archivo
@@ -937,8 +645,10 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
     lienzo.setFillColor('Black')
     lienzo.setStrokeColor(colors.black)    
 
+   # === Cabecera de portada
+
     if id_evento=='00000000000000':
-        if fuente=='No':
+        if fuente=='No procesado':
             lienzo.setFont('Helvetica', 30)
             lienzo.drawString(200,630,'¡Sin convergencia!')
     else:
@@ -981,36 +691,22 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
 
 #Dibujo de los intentos en procesamiento
 
-    if mapa_escogido==1:
-            directorios=obtener_directorios(evento)
-            archivo_procesamiento=directorio_trabajo+directorios['archivo_procesamiento']
-            if os.path.exists(archivo_procesamiento):
-                intentos=lectura_archivo(archivo_procesamiento)
-                bandera_color=0
-                for intento in intentos:
-                    if bandera_color==0:
-                        lienzo.setStrokeColor(colors.blue)
-                        radio=4
-                    else:
-                        lienzo.setStrokeColor(colors.black)
-                        radio=2
-                    
-                    if intento[2]=='Inicio' or intento[2]=='Fallido' or intento[2]== 'Prof.(km)':
-                        pass
-                    else:
-                        if bandera_color==0:
-                            lienzo.setStrokeColor(colors.blue)
-                            radio=4
-                            bandera_color=1
-                        else:
-                            lienzo.setStrokeColor(colors.black)
-                            radio=2
-                        
-                        latitud=float(intento[4])   
-                        longitud=float(intento[5])
-                        coor_x=ancho*(longitud-longitud_min)/(longitud_max-longitud_min)+xpos 
-                        coor_y=alto*(latitud-latitud_min)/(latitud_max-latitud_min)+ypos 
-                        lienzo.circle(coor_x,coor_y,radio)
+    if mapa_escogido==1 and existe_proc:
+        intentos=lectura_archivo(archivo_procesamiento)
+        bandera_color=0
+        for intento in intentos:
+            if intento[2] in ('Inicio','Fallido','Prof.(km)'):
+                continue
+            if bandera_color==0:
+                lienzo.setStrokeColor(colors.blue); radio=4; bandera_color=1
+            else:
+                lienzo.setStrokeColor(colors.black); radio=2
+            latitud=float(intento[4]); longitud=float(intento[5])
+            cx=ancho*(longitud-longitud_min)/(longitud_max-longitud_min)+xpos
+            cy=alto*(latitud-latitud_min)/(latitud_max-latitud_min)+ypos
+            lienzo.circle(cx,cy,radio)
+    
+
 #Grafico del mapa pequeño del Ecuador en la parte inferior del reporte.
     if mapa_>1:
         datos=mapa_configuracion(1,0)# 1 Ecuador 0 Sin detalle
@@ -1024,10 +720,8 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
         ancho=140
         alto=140
         ypos=ypos+3
-        if(longitud<-79):
-            xpos=380 #Izquierda
-        else:
-            xpos=xpos+5 #Derecha
+        xpos=380 if (longitud<-79) else xpos+5
+        
         tamanio=(xpos,ypos,ancho,alto)
         lienzo=mapa(lienzo,mapa_despliegue, tamanio, coordenadas,salto,0)#mapa(lienzo,imagen, tamanio, coordenadas,salto,bandera)
 
@@ -1035,13 +729,13 @@ def impresion_reporte_sismo(lienzo_archivo, evento_generar, canales, trCanal,ban
         dibujo = Drawing(5,5)
         dibujo.add(Circle(0,0,3,strokeColor = colors.red,strokeWidth = 2,fillOpacity=0))
         coor_y=alto*(latitud-latitud_min)/(latitud_max-latitud_min)+ypos+3 #coor_y=140*(latitud+5.5)/7+ypos+3  #coor_y=alto*(latitud-latitud_min)/(latitud_max-latitud_min)+ypos
-        if(longitud<-79):
-            coor_x=ancho*(longitud-longitud_min)/(longitud_max-longitud_min)+380 #coor_x=140*(longitud+82)/7+380  #coor_x=ancho*(longitud-longitud_min)/(longitud_max-longitud_min)+xpos
-        else:
-            coor_x=ancho*(longitud-longitud_min)/(longitud_max-longitud_min)+xpos+5 #coor_x=140*(longitud+82)/7+xpos+5
+
+        #if(longitud<-79):
+        #    coor_x=ancho*(longitud-longitud_min)/(longitud_max-longitud_min)+380 #coor_x=140*(longitud+82)/7+380  #coor_x=ancho*(longitud-longitud_min)/(longitud_max-longitud_min)+xpos
+        #else:
+        #    coor_x=ancho*(longitud-longitud_min)/(longitud_max-longitud_min)+xpos+5 #coor_x=140*(longitud+82)/7+xpos+5
+        coor_x=ancho*(longitud-longitud_min)/(longitud_max-longitud_min)+(380 if (longitud<-79) else xpos+5)
         dibujo.drawOn(lienzo, coor_x, coor_y)
-
-
     if bandera_periodo:
         return lienzo
     else:
@@ -1482,20 +1176,19 @@ def imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_c
     # arbol              -   Arbol xml de todo el reporte, aqui está toda la información de la base de datos. 
     # lienzo             -   Lienzo, o archivo pdf donde se imprime los diferentes graficos
     # directorio         -   Directorio de trabajo ..\DIA\
-    # estaciones_infomre -   estaciones que conformen los informes
+    # estaciones_informe -   estaciones que conformen los informes
     # tipo_canal         -   Tipo de canal
     # mapa_              -   Mapa al cual se va a imprimri
     # raiz               -   base de datos XML
     # detalle            -   Averiguar que no me acuerdo
     maximos_reporte=[]
-    indice=1
-    
+    indice=0
     while indice<len(catalogo): #Trabaja sobre el catalogo sísmico generado, incluyendo los reportes de otras redes.
         ####################################################################
         #### SISMOGRAMAS
         ####################################################################
         print("Graficando:  ",catalogo[indice][IDX_EVENTO])
-        if catalogo[indice]==[]:
+        if catalogo[indice]==[] or catalogo[indice][IDX_EVENTO]=='ruta' :
             indice=indice+1
             continue
         lienzo.drawString(50,850,'EVENTO: '+catalogo[indice][IDX_EVENTO])
@@ -1579,7 +1272,6 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
 #estaciones_informe: Ver la posiblidad de cargar aqui con mapa configuracion
 # evento:    informacion del evento enele formato obtenido de AAMMDD_hhmmss.csv
 #pagina:   Informacion en 1 o = de que estestacion se tiene que imprimir
-    #print("Hoja señales")
     codigo_evento=('','Nombre','Longitud','Latitd','altura','Ganancia','Filtro','Dist. epicentral: ','    Azimut:','  ain: ','    p-sec: ',' tpcal: ','  p-res: ','  s-sec: ',  's-res: ','  Disparo: ','  Marc.s: ','  t_coda: ')
     unidades_evento=('','','°','°','mts ','dB','Hz.','Km ',' °',' ain',' s ',' tpcal',' s ',' s ',  ' s ',' ','  ',' s')
     datos_estaciones=parametros_estaciones()
@@ -1597,15 +1289,12 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
         indice_responsable=3
     responsable_evento=responsables[indice_responsable][0]        
 
-### SEÑALES
+# ==== XML (para RMS y marcas)
     evento_trabajo = raiz.find(f"./Evento[id_evento='{evento_catalogo[IDX_INDICE]}']")#
     # Convertir el elemento a una cadena XML
-    if evento_trabajo!=None:
-        valor_rms= evento_trabajo.findtext("rms")
-    else:
-        valor_rms="__"
-    estaciones_vector = []
-    estaciones_proceso = []
+    valor_rms = evento_trabajo.findtext("rms") if evento_trabajo is not None else "__"
+    estaciones_vector,estaciones_proceso = [],[]
+
     if evento_trabajo!=None:
         for estacion in evento_trabajo.iter("estacion"):
             estacion_vector=[]
@@ -1618,12 +1307,24 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
 #######################################################################
 #Impresion del reporte primera hoja
 #######################################################################
-    print(evento[2],bandera_primera_hoja ,evento_catalogo[IDX_INDICE])
+
+    # ==== PORTADA (mapa y cabecera) solo si corresponde
+    if bandera_primera_hoja:
+        # (a) ¿existe alguna fila con índice real?
+        hay_indice_real = any(
+            fila and len(fila) > IDX_INDICE and fila[IDX_INDICE] != '00000000000000'
+            for fila in evento_generar
+            )
+        # (b) ¿hay intentos de procesamiento en disco?
+        archivo_proc = os.path.join(directorio_trabajo, directorios['archivo_procesamiento'])
+        hay_intentos = os.path.exists(archivo_proc)
+
+        # Imprime portada si: hay datos reales  o  hubo intentos (mostrar "¡Sin convergencia!")
+        if hay_indice_real or hay_intentos:
+            lienzo = impresion_reporte_sismo(lienzo, evento_generar, pagina, trCanal, 1, directorio_trabajo, mapa_)
+            lienzo.showPage()
 
 
-    if bandera_primera_hoja:#and evento_catalogo[IDX_INDICE]!='00000000000000'
-        impresion_reporte_sismo(lienzo,evento_generar, pagina,trCanal,1,directorio_trabajo,mapa_)
-        lienzo.showPage()
     ### INFORMACION SOBRE LAS SEÑALES
     lienzo.setFont('Helvetica', 12)
     lienzo.drawString(0,850,"Señales")
@@ -1632,7 +1333,7 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
     trCanal_copia = copy.deepcopy(trCanal)
     trCanal_copia_filtrada = copy.deepcopy(trCanal)
     for dato in eventos_dia:
-        bandera_seleccion=(dato[2]=='SISMO' or dato[2]=='FF' or dato[2]=='FC')
+        bandera_seleccion=(dato[2] in ('SISMO','FF','FC'))
         if dato[1]==archivo:
             for i in range(0,NUMERO_ESTACIONES):
                 if bandera_seleccion:
@@ -1699,7 +1400,7 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
 ######################################################################
 #Impresión de las señales zoom
 ######################################################################
-        texto3=''        
+        #texto3=''        
         tamanio_=(90,800)
         drawing=imprimir_seniales(tamanio_,pagina,trCanal_copia,evento,0,1)
         drawing.drawOn(lienzo, 460, 90)
@@ -1850,7 +1551,305 @@ def grafico_cobertura(lienzo, evento, coordenadas, tamanio, directorio_trabajo):
     lienzo.setStrokeColor(colors.black)
     return lienzo
 
+import os
 
 
+
+
+def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen,mapa_,detalle,banderas,estaciones,directorio,arbol,resumen_responsables,eventos,bandera_relleno):
+    # Mètodo que genera el reporte de resumen en pdf, pudiendo ser de un día o un período entero sin restricción del tiempo
+    #
+    #
+    # archivo_pdf ---es el nombre en extención pdf del archivo ejemplo archivo.pdf
+    # subtítulo -----variable string que define el subtítulo a imprimir
+    # fecha_ini----- inicio del period del reporte
+    # fecha_fin------ fecha de fin del reporte, si es diario, este valor es el mismo que fecha_ini
+    # catalogo ------catalogo correspodiente al dia o al periodo                             .
+    # resumen -------resumen del día o período, tiene dos formatos, el primero es:
+    #                [['DIA', 'SISMO', 'FF', 'FC', 'TELESISMOS', 'Evento_local', 'INDEFINIDO', 'Ruido'],
+    #                 ['Total:', 36, 44, 42, 15, 20, 44, 19],
+    #                 ['2', '3', '2', '0', '1', '13', '6'],
+    #                                   .
+    #                                   .
+    #                                   .
+    #                 ['6', '7', '3', '0', '3', '2', '0']]
+    #               
+    #
+    #                el sigueintes  es:
+    #               [0 0 2...6]  donde los dos primeros valores son 0 y los sigueintes son el numero total de eventos procesados por día.
+    # mapa_----------Varible para escoger el mapa dado por el archivo mapa.csv
+    # detalle -------Tipo de mapa    0, 1 y 2 con basico, intermnedio y detallado respectivamente
+    # banderas-------
+    #                bandera_dia---variable booleanaque habilita o deshabilita el cuadro resumen, permite usar el mismo método para hacer el reporte diario o el de período 
+    #                              en el reporte   0  no aparecen el cuadro reesumen ni las horas  1 aparece todo
+    #                bandera_reporte
+    #                bandera_firma
+    #                
+    # estaciones---- estaciones involucradas en le reporte diario, si es período este tiene valor de 0
+    # directorio---- direcorio base donde se tomará la información de los días del reporte, usado en periodo.
+    # arbol--------- base de datos en xml del periodo de reporte
+    # resumen_responsables----
+    # eventos        Todos los eventos generados en el día.
+
+    bandera_dia=banderas[0]
+    bandera_reporte=banderas[1]
+    bandera_firma=banderas[2]
+    raiz=arbol.getroot()
+    datos_estaciones=parametros_estaciones()
+    #numero_estacion=datos_estaciones[21]
+    tipo_canal=datos_estaciones['SENSOR']
+    #nombre_estacion=datos_estaciones[0]
+    codigo_estacion=datos_estaciones['CODIGO']
+    codigo_estacion[2]='CHAI'
+    vector=[] #Vartible que contiene la informacion de la ubicación para graficarla en el mapa resumen:[Coordenada en x,Coordenada en y,Profundidad,Magnitud,red,ruta].red tiene valores de 0 o 1
+    for i in range(1,len(catalogo)):
+        if catalogo[i]!=[]:
+            x=float(catalogo[i][IDX_LATITUD])#Coordenada en x
+            y=float(catalogo[i][IDX_LONGITUD])#Coordenada en y
+            p=-1*float(catalogo[i][IDX_PROFUNDIDAD])#Profundidad
+            mag=float(catalogo[i][IDX_MAGNITUD])#Magnitud
+            ruta=catalogo[i][IDX_EVENTO]
+            if(catalogo[i][IDX_FUENTE]=="RSA"):
+                vector.append([x,y,p,mag,0,ruta])#El penultimo es una bandera, 0=RSA,1 es otras redes
+            else:
+                vector.append([x,y,p,mag,1,ruta])
+    marca_agua=(200, 100, 200, 95)
+    xpos=90
+    ypos=325
+    ancho=400
+    alto=400
+    tamanio=(xpos,ypos,ancho,alto)
+    datos=mapa_configuracion(mapa_,detalle)
+    mapa_despliegue=datos[0]
+    coordenadas=datos[1]##Longitud mínima, Latitud mínima, Longitud máxima, Latitud máxima
+    salto=datos[2]
+    estaciones_informe=datos[4]
+    titulo_hoja=datos[3]
+    bandera_marca=1 #1 imprima marcas, 0 no imprima marcas
+    titulo="SISMICIDAD REGIONAL REGISTRADA"
+    tamanio_hoja=A4
+    maximos_reporte=[]
+    lienzo = canvas.Canvas(archivo_pdf,pagesize=A4)
+    if not(mapa_==2 or mapa_==4):
+        lienzo=formato(marca_agua,tamanio_hoja,titulo,subtitulo,0,lienzo)
+        pos_x=55
+        pos_y=234
+
+    else:
+        tamanio=(81,216,432,432)#xpos,ypos,ancho,alto
+        marca_agua=(261, 66, 79, 36)#xpos,ypos,ancho,alto
+        lienzo=formato(marca_agua,tamanio_hoja,titulo,subtitulo,2,lienzo)
+        pos_x=85
+        pos_y=109
+    lienzo=mapa(lienzo,mapa_despliegue,tamanio,coordenadas,salto,bandera_marca)
+    lienzo=dibujo_sismos_(lienzo,vector,coordenadas,tamanio,mapa_,bandera_dia,bandera_relleno)
+    ubicacion_caja=(pos_x,pos_y)
+    lienzo=caja_simbologia(lienzo,resumen,vector,ubicacion_caja,mapa_,bandera_dia,bandera_relleno)
+
+        
+    ####################################################################
+    ####################################################################
+    #        REPORTE DE PERIODO
+    ####################################################################
+    ####################################################################
+
+    ####################################################################
+    ####### MAPA RESUMEN
+    ####################################################################
+        ################################################################
+        ##### REPORTE DE PERIODO
+        ################################################################
+    if bandera_dia:
+        #Impresión del resumen diario de eventos procesados a travez de un chart de barras.
+        lienzo=estadistica_(lienzo,resumen,fecha_ini,mapa_,bandera_dia)
+        ####################################################
+        ####SOLO PARA CONTROL INTENO mapa_=1
+        ####################################################
+        if mapa_==1:
+            ####################################################
+            ####HORAS LABORADAS
+            ####################################################
+            lienzo.showPage()
+            lienzo=responsables_tiempos_(lienzo,resumen_responsables)
+            ##################################################################
+            ####INCREMENTO DEL CALATOLO PARA EVENTOS PROCESADOS SIN EXITO.
+            ##################################################################
+            if bandera_reporte:
+                for evento_dia in eventos:
+                    directorios=obtener_directorios(evento_dia[1])
+                    archivo_procesamiento=directorio+directorios['archivo_procesamiento']
+                    if os.path.exists(archivo_procesamiento):
+                        lectura=lectura_archivo(archivo_procesamiento)
+                        if len(lectura)==1:
+                            #os.remove(archivo_procesamiento)
+                            continue
+                        evento_buscado =int(evento_dia[1].replace('_', '')[:-4])
+                        aux=['00000000000000', '2025', '1', '1', '0', '0', '0', '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z', '0', ' ', 'No procesado', evento_dia[1],' , , ']
+                        tamanio_catalogo=len(catalogo)
+                        indice=1
+                        for i in range(indice,tamanio_catalogo):
+                            evento_analizado=int(catalogo[i][IDX_EVENTO].replace('_', '')[:-4])
+                            if evento_buscado==evento_analizado:
+                                break
+                            if evento_analizado>evento_buscado:
+                                catalogo.insert(i,aux)
+                                break
+        ####################################################################
+        ####### LISTA RESUMEN DE EVENTOS
+        ####################################################################
+        if not(mapa_==2 or mapa_==4):
+            contador1=0
+            #             Id año mes día hora min seg lat long prof Mag Fuente Ubicación
+            loc_centrada=(73,107,122,140,153, 171,190,220, 245,271, 295, 320,  360)
+            localizacion=(46,105,126,142,158, 173,188,212, 239,268, 293, 322,  350)
+            marca_agua=(120, 450, 400, 200)
+            for evento_catalogo in catalogo:
+                if evento_catalogo==[]:
+                    continue
+                if  evento_catalogo[19]==' ':
+                    continue
+                if contador1==80:
+                    contador1=0
+                contador1=contador1+1
+                contador2=0
+                if contador1==1:
+                    lienzo.showPage()
+                    lienzo=formato(marca_agua,tamanio_hoja,titulo_hoja,subtitulo,0,lienzo)#0 Portrait  1 Landscape
+                    lienzo.setFont('Helvetica', 7)
+                if  evento_catalogo[IDX_MAGNITUD]!= 'Mag':
+                    if  float(evento_catalogo[IDX_MAGNITUD])>4:
+                        lienzo.setFillColor(colors.blue)
+                    else:
+                        lienzo.setFillColor(colors.black)
+                for i in (0,1,2,3,4,5,6,7,8,9,15,17,19):
+                    texto=evento_catalogo[i]
+                    if contador1==1:
+                        lienzo.drawString(loc_centrada[contador2],740-contador1*8,catalogo[0][i])
+                    else:
+                        if contador2>5 and contador2<9:
+                            texto=str(round(float(texto),2))
+                        if contador2==10:
+                            texto=texto+evento_catalogo[i+1]
+                        lienzo.drawString(localizacion[contador2],740-contador1*8,texto)
+                    contador2=contador2+1
+            archivo_revision=archivo_pdf[:-8]+'revision.csv'
+            aux='Tarea 1: Aplicar filtros'
+
+            #####################################################################
+            # Generacion del archivo de revisón con los reponsables
+            #####################################################################
+            
+            lista_eventos_revision=[['Tarea 1: Aplicar filtros'],['Tarea 2: Cambiar parámeros de filtros'],
+                                    ['Tarea 3: Muy ruidosa para marcar fases'],['Tarea 4: Tiempos de coda similares o iguales en estaciones muy distintas.'],
+                                    ['Tarea 5: Muy ruidosa para marcar tiempos de coda'],['Tarea 6: Señal aportante no considerada'],
+                                    ['Tarea 7: Tiempo de coda mal marcada'],['Tarea 8: Fase mal marcada'],['Tarea 9: Otra'],
+                                     ['Evento','Responsable','Tarea','Especificacion(8: Otra)','Causas','Resuelto','Detalle resolución']]
+            for evento_catalogo in catalogo:
+                aux=[]
+                if evento_catalogo==[]:
+                    continue
+                if evento_catalogo[0][-1] !='0':
+                    continue
+                evento_sismico=evento_catalogo[IDX_EVENTO]
+                aux.append(evento_sismico)
+                hora_evento=int(evento_sismico[-10:-4])
+                indice_hora=int(hora_evento/60000)
+                if indice_hora==0:
+                    indice_hora=1
+                archivo=os.path.join(directorio,evento_sismico.replace('_', '')[:-4])
+                directorios=obtener_directorios(archivo)
+                archivo_responsable=directorios['archivo_responsables']
+                responsables_dia=lectura_archivo(archivo_responsable)
+
+                # Validar antes de usar
+                if not responsables_dia or not isinstance(responsables_dia, list) or indice_hora >= len(responsables_dia):
+                    aux.append("RSA")  
+                else:
+                    aux.append(responsables_dia[indice_hora][0])
+
+                lista_eventos_revision.append(aux)
+            escritura_archivo(archivo_revision,lista_eventos_revision)
+            if contador1>50:
+                lienzo.showPage()
+                lienzo=formato(marca_agua,tamanio_hoja,titulo_hoja,subtitulo,0,lienzo)#0 Portrait  1 Landscape
+                contador1=0
+            lienzo.setFont('Helvetica', 10)
+            x=100
+            y=740-(contador1+20)*8
+            if bandera_firma:
+                lienzo.drawString(x,y,"Ing. Remigio Guevara ")
+            lienzo.drawString(x,y-10,"Red Sísmica del Austro")
+        lienzo.showPage()
+        ####################################################################
+        ####### DETALLE DE EVENTOS
+        ####################################################################
+        if bandera_reporte and not(mapa_==2 or mapa_==4):  #Esta bandera habilita o no el detalle del reporte, está en el IDE del program reporte eventos.
+            print("Se imprime detalle de reporte")
+
+            maximos_reporte=imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_canal,mapa_,raiz,detalle)
+        else:
+            print("No se imprime detalle de reporte")
+
+        ####################################################################
+        #########   REPORTE DIARIO
+        ####################################################################
+    else:   
+        print("Reporte diario")
+        archivo=referencia_directorio_completa(archivo_pdf)
+        directorios=obtener_directorios(archivo)
+        #Impresión del resumen dea actividades por responsable de procesamiento.
+        dibujo_chart = Drawing(400, 200)
+        dibujo_chart.add(String(180,155,'Resumen de tiempos responsables:',fontSize=14))
+        lista_resp=lectura_archivo(directorios['archivo_responsables'])
+        aux=len(lista_resp)
+        reportes_sismos=num_reportes(directorios['Directorio_reportes'])
+        reportes_acelerogramas=num_reportes(directorios['Directorio_acelerogramas'])
+        revision=(360,180,180)
+        for i in range(0,aux):
+            eventos_reportados=reportes_sismos[i-1]+reportes_acelerogramas[i-1]
+            vector=lista_resp[i]
+            if i!=0:
+                formula=(revision[i-1]+int(vector[2])*60+int(vector[10])*300+int(vector[11])*600+int(vector[12])*1200+eventos_reportados*300)/60
+            vector=lista_resp[i][0:9]
+            if i==0:
+                vector.append("REP.")
+                vector.append("t (min)")
+            else:
+                vector.append(str(eventos_reportados))
+                vector.append(str(formula))
+            for j in range(0,len(vector)):
+                x_coor=105+j*40
+                y_coor=135-i*12
+                if j==0:
+                    x_coor=45
+                dibujo_chart.add(String(x_coor,y_coor,vector[j],fontSize=12))
+        dibujo_chart.drawOn(lienzo, 15,56)
+
+        #Aqui sería de colocar el reporte en detalle de los eventos diarios, para revisión , guardados en un vector.
+        catalogo_dia=[]
+
+        for evento_dia in eventos:
+            aux=[]
+            if evento_dia[2]=='FF' or evento_dia[2]=='FC':
+                aux=['00000000000000', '2025', '1', '1', '0', '0', '0', '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z', '0', ' ', 'No procesado', evento_dia[1],' , , ']
+
+            # PATCH mínimo: incluir TODAS las filas del catálogo con el mismo IDX_EVENTO (RSA primero)
+            coincidencias = []
+            for catalogo_individual in catalogo:
+                if catalogo_individual and catalogo_individual[IDX_EVENTO]==evento_dia[1]:
+                    coincidencias.append(catalogo_individual)
+            if coincidencias:
+                # prioriza RSA primero, luego otras redes; mantiene contigüidad para imprimir_catalogo
+                coincidencias.sort(key=lambda f: 0 if f[IDX_FUENTE]=='RSA' else 1)
+                catalogo_dia.extend(coincidencias)
+            else:
+                if aux!=[]:
+                    catalogo_dia.append(aux)
+
+        print("Es solo reporte diario!!!!!!!!")
+        lienzo.showPage()
+        maximos_reporte=imprimir_catalogo(catalogo_dia,arbol,lienzo,directorio,estaciones_informe,tipo_canal,mapa_,raiz,detalle)
+    lienzo.save()
+    return maximos_reporte
 
 

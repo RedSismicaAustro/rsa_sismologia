@@ -89,7 +89,7 @@ class Inicio_proceso(QMainWindow):
         lista_resp = [sublista[0] for sublista in datos]
         self.cmbx_resposables.addItems(lista_resp)
 
-        horario=["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
+        horario=["","00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
         self.cmbx_periodo.addItems(horario)
 
         self.parametros=parametros_estaciones()#(nombre_canal_total_,nombre_canal,tipo_canal_,n_canales_,hab_canal)
@@ -158,6 +158,7 @@ class Inicio_proceso(QMainWindow):
         print("Cerrando inicio")
         self.visor_limpiar_completo()
         self.limpiar_estado()
+        print(self.archivo, self.directorio_trabajo, self.responsable,self.periodo)
         self.inicializado.emit(self.archivo, self.directorio_trabajo, self.responsable,self.periodo)
         self.cerrado.emit()
         super().closeEvent(event)
@@ -179,12 +180,21 @@ class Inicio_proceso(QMainWindow):
             
     def desplegar_mensaje(self):
         
-        mensaje = (
-            "<b>DIA:</b><br>" + self.date.toString("yyyy\\MM\\dd") +
-            "<br><b>DIRECTORIO DE TRABAJO:</b><br>" + str(self.directorio_trabajo)+
-            "<br><b>RESPONSABLE:</b><br>" + str(self.responsable)+
-            "<br><b>PERIODO:</b><br>" + str(self.periodo)
-            )
+        if self.periodo=='':
+            mensaje = (
+                "<b>DIA:</b><br>" + " PERIODO " +
+                "<br><b>DIRECTORIO DE TRABAJO:</b><br>" + str(self.directorio_trabajo)+
+                "<br><b>RESPONSABLE:</b><br>" + str(self.responsable)+
+                "<br><b>PERIODO:</b><br>" + str(self.periodo)
+                )
+            
+        else:
+            mensaje = (
+                "<b>DIA:</b><br>" + self.date.toString("yyyy\\MM\\dd") +
+                "<br><b>DIRECTORIO DE TRABAJO:</b><br>" + str(self.directorio_trabajo)+
+                "<br><b>RESPONSABLE:</b><br>" + str(self.responsable)+
+                "<br><b>PERIODO:</b><br>" + str(self.periodo)
+                )
 
         self.mensajes.setHtml(mensaje)
         

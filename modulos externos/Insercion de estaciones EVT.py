@@ -110,205 +110,349 @@ def obtener_estacion_dir(entrada):
 def obtener_estacion(entrada):
     return dic_estaciones.get(entrada, entrada)
 
-def ajustar_tiempos_stream_por_evento(eventos, stream, tolerancia_minutos):
 
+def ajustar_tiempos_stream_por_evento(eventos, stream, tolerancia_minutos):
+    """
+    Ajusta el starttime de cada traza del Stream para calzar con el evento más cercano
+    dentro de una tolerancia dada. Devuelve el stream ajustado, una bandera de si hubo
+    calce, el tipo de evento ('FF', 'FC', 'SISMO') y el nombre sugerido del .mseed.
+
+    Notas:
+    - Se espera que eventos sea una lista de filas donde evento[1] contiene
+      'YYYYMMDD_HHMMSS.sis' o al menos 'YYYYMMDD_HHMMSS'.
+    - Se robusteció el parseo para aceptar tanto 15 caracteres como con extensión.
+    """
     tr = stream[0]
-    estacion = obtener_estacion(tr.stats.station)
+    estacion = obtener_estacion(str(tr.stats.station).strip().upper())
     inicio = tr.stats.starttime
 
     tiempo_stream = inicio.datetime
     archivo_mseed = f"{estacion}_{inicio.strftime('%Y%m%d_%H%M%S')}.mseed"
-    tolerancia_segundos = tolerancia_minutos * 60
+    tolerancia_segundos = int(tolerancia_minutos) * 60
+
     mejor_evento = None
     mejor_diferencia = float('inf')
     mejor_tipo = None
+
     for evento in eventos:
-        tipo = evento[2]
+        # Validación mínima de longitud de fila
+        if not evento or len(evento) < 3:
+            continue
+
+        tipo = str(evento[2]).strip().upper()
         if tipo not in ("FF", "FC", "SISMO"):
             continue
-        try:
-            tiempo_evento = datetime.strptime(evento[1][:13], "%y%m%d_%H%M%S")
-        except:
+
+        # Aceptar varias formas en evento[1]: con o sin extensión
+        crudo = str(evento[1]).strip()
+        if "_" not in crudo:
             continue
+
+        # Extrae exactamente 'YYYYMMDD_HHMMSS' (15 chars) desde el inicio
+        ts_txt = crudo[:15]
+        try:
+            tiempo_evento = datetime.strptime(ts_txt, "%Y%m%d_%H%M%S")
+        except Exception:
+            # Intento alterno: dividir por '_' por si hay ruido
+            try:
+                fecha, hora = ts_txt.split("_")
+                if len(fecha) == 8 and len(hora) == 6:
+                    tiempo_evento = datetime.strptime(f"{fecha}_{hora}", "%Y%m%d_%H%M%S")
+                else:
+                    continue
+            except Exception:
+                continue
+
         diferencia = abs((tiempo_stream - tiempo_evento).total_seconds())
         if diferencia <= tolerancia_segundos and diferencia < mejor_diferencia:
             mejor_evento = tiempo_evento
             mejor_diferencia = diferencia
             mejor_tipo = tipo
-    if mejor_evento:
+
+    if mejor_evento is not None:
         diferencia_tiempo = mejor_evento - tiempo_stream
         bandera = True
     else:
         diferencia_tiempo = timedelta(seconds=0)
         bandera = False
+
+    # Ajusta todo el stream con el mismo delta
     for traza in stream:
         traza.stats.starttime += diferencia_tiempo
-    return stream, bandera, mejor_tipo,archivo_mseed
+
+    return stream, bandera, mejor_tipo, archivo_mseed
+
 
 
 def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_equipo: str = None) -> list:
     """
     Inserta un evento en la lista de eventos, guardando el archivo MiniSEED
-    con los parámetros originales del Stream.
-    Args:
-        directorio_grabar (str): Ruta del directorio donde se guardará el nuevo archivo.
-        eventos (list): Lista de eventos (estructura esperada: lista de listas).
-        st (Stream): Stream con los datos ya leídos y posiblemente modificados.
-    Returns:
-        list: Lista de eventos actualizada.
+    y marcando en 'eventos' la columna correspondiente a la estación.
+    Supone que 'eventos' tiene un encabezado en la fila 0 y que la segunda
+    columna (índice 1) es el nombre base de evento 'YYYYMMDD_HHMMSS.sis'.
     """
-    # Extraer datos temporales desde el primer Trace
+    # Extrae desde el stream
     tr = st[0]
-    estacion = obtener_estacion(tr.stats.station)
+    estacion = obtener_estacion(str(tr.stats.station).strip().upper())
     inicio = tr.stats.starttime
 
-    # Construcción del nombre del archivo: serial_YYYYMMDD_HHMMSS.mseed o estación_...
-    prefijo = serial_equipo if serial_equipo else estacion
+    # Nombre de salida .mseed; si hay serial, anteponerlo y crear subcarpeta
+    prefijo = str(serial_equipo) if serial_equipo else estacion
     nombre_archivo = f"{prefijo}_{inicio.strftime('%Y%m%d_%H%M%S')}.mseed"
 
-    # Si se usa serial, crear subdirectorio
+    destino = directorio_grabar
     if serial_equipo:
-        directorio_grabar = os.path.join(directorio_grabar, str(serial_equipo))
-        os.makedirs(directorio_grabar, exist_ok=True)
+        destino = os.path.join(directorio_grabar, str(serial_equipo))
+    os.makedirs(destino, exist_ok=True)
 
-    ruta_completa = os.path.join(directorio_grabar, nombre_archivo)
-    # Cargar parámetros de estación
+    ruta_completa = os.path.join(destino, nombre_archivo)
+
+    # Carga parámetros de estación
     parametros = parametros_estaciones()
-    estaciones = parametros['CODIGO']
+    estaciones = [str(x).strip().upper() for x in parametros['CODIGO']]
+    componentes = parametros['COMPONENTE']
     try:
-        indice = estaciones.index(estacion)
+        idx_est = estaciones.index(estacion)
     except ValueError:
-        print(f"Estación {estacion} no está en la configuración.")
+        print(f"[ADVERTENCIA] Estación '{estacion}' no está en la configuración.")
         return eventos
 
-    # Construir nombre del evento buscado (formato corto: AAMMDD_HHMMSS.sis)
-    
-    archivo_evento = f"{inicio.strftime('%y%m%d_%H%M%S')}.sis"
-    segundos_elementos = [evento[1] for evento in eventos]
+    # Homologar: el CSV guarda 'YYYYMMDD_HHMMSS.sis'
+    archivo_evento = f"{inicio.strftime('%Y%m%d_%H%M%S')}.sis"
+    segundos_elementos = [str(f[1]).strip() for f in eventos]  # asumiendo fila 0 = encabezado
+    # Busca desde fila 1 si la fila 0 es encabezado
+    try:
+        n_evento = segundos_elementos.index(archivo_evento)
+    except ValueError:
+        # Si la fila 0 es encabezado, intenta desde 1
+        try:
+            n_evento = segundos_elementos[1:].index(archivo_evento) + 1
+        except ValueError:
+            # No encontrado: salir limpio
+            return eventos
 
-    if archivo_evento not in segundos_elementos:
-        return eventos
-    n_evento = segundos_elementos.index(archivo_evento)
-
+    # Asegurar calib presente
     for tr in st:
         if not hasattr(tr.stats, "calib"):
-            tr.stats.calib = 1.0  # Asumimos 1.0 si no se definió (caso común en algunos formatos)
-  
+            tr.stats.calib = 1.0
+
+    # Escribir MSEED (parámetros por defecto)
     st.write(ruta_completa, format='MSEED')
 
-    # Actualizar eventos
-    eventos[n_evento][indice + 3] = estacion + parametros['COMPONENTE'][indice] + '1000000'
+    # Actualizar eventos de forma segura:
+    # Si tu estructura es [ID, FECHA, ..., columnas por estación], mantener 'indice + 3'
+    # pero validando rangos.
+    col_destino = idx_est + 3
+    if col_destino < len(eventos[n_evento]):
+        eventos[n_evento][col_destino] = estacion + componentes[idx_est] + '1000000'
+    else:
+        # Expandir fila si hiciera falta
+        faltan = col_destino - len(eventos[n_evento]) + 1
+        eventos[n_evento].extend([''] * faltan)
+        eventos[n_evento][col_destino] = estacion + componentes[idx_est] + '1000000'
 
     return eventos
 
-def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, bandera_insertar, directorio_destino=None):
+
+
+def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, bandera_insertar, directorio_destino=None, ventana_parent=None):
+    """
+    Lee un archivo EVT (Kinemetrics), trata de calzarlo en el catálogo del día para ajustar tiempos,
+    clasifica el evento y, si corresponde, inserta el .mseed y actualiza el CSV.
+
+    Parámetros:
+        archivo_evt (str): Ruta del archivo .EVT a procesar.
+        directorio_trabajo (str): Carpeta base C:/DIA/ (o similar) donde se arma 'archivo' AAAAMMDDhhmmss.
+        bandera_verificar (bool): Si True, genera gráfico; se guarda PNG y se abre en visor del sistema.
+        bandera_insertar (bool): Si True y el evento calza, inserta el .mseed y actualiza el CSV del día.
+        directorio_destino (str|None): Si se quiere forzar un destino por serial (crea subcarpetas por serial).
+        ventana_parent (QMainWindow|None): Si se pasa, se mantiene la ventana Matplotlib no modal viva
+                                           guardando la referencia en ventana_parent._figs_abiertas.
+
+    Retorna:
+        list[list]: Una lista con una sola fila de resumen del procesamiento del EVT.
+    """
+    import os, re, gc
+    from datetime import datetime
+    import matplotlib.pyplot as plt
+    from pathlib import Path
+
+    # Imports locales para abrir PNG sin bloquear la app
+    from PyQt5.QtCore import QUrl
+    from PyQt5.QtGui import QDesktopServices
+    from PyQt5.QtWidgets import QMessageBox
+
     datos_completos = []
+
+    # Reconstrucción descriptiva de la ruta por si no cae en diccionario
+    # (no cambiamos tu lógica, solo la hacemos más clara/robusta)
     directorios_almacenamiento = re.split(r"[\\/]", archivo_evt)
-    directorios = []
-    directorio_estacion_almacenado = ""
+    from collections import deque
+    partes_ruta_mapeadas = deque()
+    for d in directorios_almacenamiento:
+        if not d:
+            continue
+        partes_ruta_mapeadas.append(dic_estaciones_dir.get(d, d))
+    directorio_estacion_almacenado = " / ".join(partes_ruta_mapeadas) if partes_ruta_mapeadas else "Sin ruta"
 
-    for i, directorio_arbol in enumerate(directorios_almacenamiento):
-        if directorio_arbol in dic_estaciones_dir:
-            directorio_estacion_almacenado += dic_estaciones_dir[directorio_arbol] + " "
-        if directorio_arbol != '':
-            directorios.append(directorio_arbol)
-    if directorio_estacion_almacenado == '':
-        directorio_estacion_almacenado = "Fuera de diccionario: " + ' / '.join(directorios)
-    mensaje, mensaje_1, resultado_str = '', '', ''
-    archivo_mseed, archivo, estacion = '', '', 'Ninguna'
+    # Variables de salida
+    mensaje = ''
+    mensaje_1 = ''
+    resultado_str = ''
+    archivo_mseed = ''
+    archivo = ''
+    estacion = 'Ninguna'
     equipo_modelo, equipo_version, equipo_serial = 'Desconocido', 'Desconocida', 'Desconocido'
-    bandera_formato = 0
 
+    # Intento de lectura EVT
+    st = None
     try:
         st = read(archivo_evt, format='KINEMETRICS_EVT')
         evt_info = st[0].stats.kinemetrics_evt
-        #for stream in st:
-            #stream.data = stream.data.astype(np.int32)
-        bandera_formato = 1
-    except:
+    except Exception:
         archivo_mseed = "No es compatible al formato"
-        ejecutar_en_vm(archivo_evt,'O:\KINEMETRICS')
+        # Usar ruta cruda en Windows para evitar escapes inválidos
+        try:
+            ejecutar_en_vm(archivo_evt, r'O:\KINEMETRICS')
+        except Exception as e:
+            print(f"[AVISO] ejecutar_en_vm falló: {e}")
         mensaje = "Error: archivo no legible como EVT"
         mensaje_1 = "No insertado"
         datos_grabar = [archivo_evt, archivo_mseed, mensaje, "", mensaje_1,
-                    "", directorio_estacion_almacenado, "Desconocido",
-                    "Desconocido", "Desconocida", "Desconocido"]
+                        "", directorio_estacion_almacenado, "Desconocido",
+                        "Desconocido", "Desconocida", "Desconocido"]
         datos_completos.append(datos_grabar)
+        return datos_completos
 
-    if bandera_formato:
+    try:
+        # === Construcción de 'archivo' AAAAMMDDhhmmss con el directorio de trabajo ===
         t = st[0].stats.starttime
-        archivo=os.path.join(directorio_trabajo, f"{t.year % 100:02d}{t.month:02d}{t.day:02d}{t.hour:02d}{t.minute:02d}{t.second:02d}") 
+        archivo = os.path.join(
+            directorio_trabajo,
+            f"{t.year:04d}{t.month:02d}{t.day:02d}{t.hour:02d}{t.minute:02d}{t.second:02d}"
+        )
         directorios = obtener_directorios(archivo)
-            
-        # === EXTRAER INFO DEL EQUIPO ===
+
+        # === Extraer info del equipo de forma robusta ===
         try:
-            equipo_modelo =evt_info['comment']
-            equipo_version = evt_info['instrument']
-            equipo_serial = evt_info['serialnumber']
-        except Exception as e:
-            print(f"Error obteniendo info de equipo: {e}")
-        estacion =obtener_estacion(st[0].stats.station)
+            equipo_modelo  = str(evt_info.get('comment', 'Desconocido'))
+            equipo_version = str(evt_info.get('instrument', 'Desconocida'))
+            equipo_serial  = str(evt_info.get('serialnumber', 'Desconocido'))
+        except Exception:
+            pass
 
-        equipo_serial = str(equipo_serial) if directorio_destino else None
+        # Normaliza código de estación
+        estacion = obtener_estacion(str(st[0].stats.station).strip().upper())
 
-        directorio_final = directorio_destino if directorio_destino else directorios['Directorio_eventos']
+        # Si se pide destino por serial, renombra y dirige a esa carpeta
+        serial_para_nombre = str(equipo_serial) if directorio_destino else None
+        directorio_final = directorio_destino if directorio_destino else directorios.get('Directorio_eventos', directorios.get('directorio_eventos', directorio_trabajo))
 
-        if os.path.exists(directorios['archivo_csv']):
-            eventos = lectura_archivo(directorios['archivo_csv'])
-            st,bandera_localizacion,tipo,archivo_mseed =ajustar_tiempos_stream_por_evento(eventos, st, tolerancia_minutos=5)
-            if equipo_serial:
-                archivo_mseed=equipo_serial+archivo_mseed[4:]
-                archivo_mseed=os.path.join(directorio_final,equipo_serial,archivo_mseed)
-            
+        # Localiza CSV del día con tolerancia de may/min
+        ruta_csv = directorios.get('Archivo_csv') or directorios.get('archivo_csv')
+        if ruta_csv and os.path.exists(ruta_csv):
+            eventos = lectura_archivo(ruta_csv)
+
+            # === Ajuste de tiempos contra el catálogo (tolerancia 5 min) ===
+            st, bandera_localizacion, tipo, archivo_mseed_nominal = ajustar_tiempos_stream_por_evento(
+                eventos, st, tolerancia_minutos=5
+            )
+
+            # Arma ruta prevista del .mseed
+            if serial_para_nombre:
+                archivo_mseed = os.path.join(directorio_final, serial_para_nombre, serial_para_nombre + archivo_mseed_nominal[4:])
             else:
-                archivo_mseed=os.path.join(directorio_final,archivo_mseed)
-            t = st[0].stats.starttime
-            
+                archivo_mseed = os.path.join(directorio_final, archivo_mseed_nominal)
+
+            # === Clasificación (sobre copia para no tocar st principal) ===
             st_copia = st.copy()
             resultado = clasificar_evento_sismico(st_copia)
             resultado_str = ' / '.join([f"{k}: {v}" for k, v in resultado.items()])
-            if bandera_localizacion:
-                mensaje = "Evento encontrado: "+tipo
-            else:
-                mensaje = "Evento no encontrado"
 
-            if resultado['evento_sismico_probable']:
-                if bandera_verificar:
+            mensaje = "Evento encontrado: " + (tipo if bandera_localizacion else "No encontrado")
+
+            # === Verificación: guardar PNG y abrir visor del sistema (no bloquea) ===
+            if bandera_verificar:
+                try:
                     plt.close('all')
                     fig, axs = plt.subplots(len(st), 1, figsize=(10, 6), sharex=True)
-                    if len(st) == 1: axs = [axs]
+                    if len(st) == 1:
+                        axs = [axs]
                     for ax, tr in zip(axs, st):
-                            tiempo = tr.times("matplotlib")
-                            ax.plot(tiempo, tr.data, label=tr.id)
-                            ax.legend()
+                        tiempo = tr.times("matplotlib")
+                        ax.plot(tiempo, tr.data, label=tr.id)
+                        ax.legend(loc='upper right')
                     axs[-1].set_xlabel("Tiempo")
                     nombre_evt = os.path.basename(archivo_evt)
-                    titulo_grafico = f"Verificación del Evento\nEVT: {nombre_evt}  |  Evento: {archivo}  |  Resultado: {mensaje}"
+                    titulo_grafico = (
+                        f"Verificación del Evento\n"
+                        f"EVT: {nombre_evt}  |  Evento: {os.path.basename(archivo)}  |  Resultado: {mensaje}"
+                    )
                     plt.suptitle(titulo_grafico)
-                    plt.tight_layout()
-                    plt.show()
+
+                    # Mostrar la ventana Matplotlib en modo no modal y mantener referencia viva
+                    try:
+                        fig.show()
+                        plt.pause(0.001)  # cede control al loop de eventos
+
+                        if ventana_parent is not None:
+                            if not hasattr(ventana_parent, "_figs_abiertas"):
+                                ventana_parent._figs_abiertas = []
+                            ventana_parent._figs_abiertas.append(fig)
+                            # Limita cuántas figuras mantener (opcional)
+                            if len(ventana_parent._figs_abiertas) > 5:
+                                fig_vieja = ventana_parent._figs_abiertas.pop(0)
+                                try:
+                                    plt.close(fig_vieja)
+                                except Exception:
+                                    pass
+                        # Si no quieres mantener la ventana Matplotlib, descomenta:
+                        # plt.close(fig)
+                    except Exception as e:
+                        print(f"[AVISO] Mostrar figura no modal falló: {e}")
+
+                    # Pregunta por inserción si hay localización
                     if bandera_localizacion:
-                        respuesta = QMessageBox.question(None, "Insertar evento",
-                                                             "¿Deseas insertar este evento en la estructura de datos?",
-                                                             QMessageBox.Yes | QMessageBox.No)
+                        respuesta = QMessageBox.question(
+                            None, "Insertar evento",
+                            "Se guardó una imagen de verificación.\n¿Deseas insertar este evento en la estructura de datos?",
+                            QMessageBox.Yes | QMessageBox.No
+                        )
                         if respuesta == QMessageBox.No:
-                                mensaje_1 = 'No insertado'
-                                bandera_localizacion=False
+                            mensaje_1 = 'No insertado'
+                            bandera_localizacion = False
                     else:
                         QMessageBox.information(None, "AVISO", f"EVT: {nombre_evt}  {mensaje}")
+                except Exception as e:
+                    print(f"[AVISO] Verificación falló: {e}")
 
+            # === Inserción en catálogo / escritura CSV ===
             if bandera_insertar and bandera_localizacion:
-                eventos = insertar_evento(directorio_final, eventos, st, equipo_serial)
-                escritura_archivo(directorios['archivo_csv'], eventos)
-                mensaje_1 = 'Insertado'
+                try:
+                    eventos = insertar_evento(directorio_final, eventos, st, serial_para_nombre)
+                    escritura_archivo(ruta_csv, eventos)
+                    mensaje_1 = 'Insertado'
+                except Exception as e:
+                    mensaje_1 = f"No insertado: {e}"
         else:
-            archivo_mseed="No encontrado csv del dia:"+directorios['archivo_csv']
-        datos_grabar = [archivo_evt, archivo_mseed, mensaje, archivo, mensaje_1,
-                            resultado_str, directorio_estacion_almacenado, estacion,
-                            equipo_modelo, equipo_version, equipo_serial]
-        datos_completos.append(datos_grabar)
-    return datos_completos
+            archivo_mseed = f"No encontrado csv del dia: {ruta_csv}"
+            mensaje = "Sin CSV, no se puede localizar/insertar"
+    finally:
+        # Limpieza de memoria del Stream
+        try:
+            if st is not None:
+                st.clear()
+                del st
+        except Exception:
+            pass
+        gc.collect()
 
+    # Fila de salida
+    datos_grabar = [archivo_evt, archivo_mseed, mensaje, archivo, mensaje_1,
+                    resultado_str, directorio_estacion_almacenado, estacion,
+                    equipo_modelo, equipo_version, equipo_serial]
+    datos_completos.append(datos_grabar)
+    return datos_completos
 
 
 def transformar_copiar_lista_EVT(self, lista_rutas_evt):
@@ -325,11 +469,13 @@ def transformar_copiar_lista_EVT(self, lista_rutas_evt):
     for contador, archivo_evt in enumerate(lista_rutas_evt, start=1):
         print(archivo_evt)
         datos = transformar_copiar_EVT(archivo_evt,
-                                self.directorio_trabajo,
-                                self.checkBox_verificacion.isChecked(),
-                                self.checkBox_insercion.isChecked(),
-                                self.directorio_destino)
-        
+                                       self.directorio_trabajo,
+                                       self.checkBox_verificacion.isChecked(),
+                                       self.checkBox_insercion.isChecked(),
+                                       self.directorio_destino,
+                                       self  # <-- importante para que no “desaparezcan” las figuras
+                                       )
+
         
         datos_completos.extend(datos)
         self.progressBar.setValue(contador)
