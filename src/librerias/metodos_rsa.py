@@ -1705,9 +1705,11 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
                 sis_extraido = np.array([], dtype=np.int32)
             else:
                 nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
-                stcanal = read(nombre_mseed)
                 stcanal.detrend("demean")
-                if len(stcanal)==0:
+                if  os.path.exists(nombre_mseed):
+                    stcanal = read(nombre_mseed)
+                    stcanal.detrend("demean")
+                else:
                     continue
                 stcanal[componente].data = stcanal[componente].data.astype('int32')
                 sis_extraido = stcanal[componente].data
