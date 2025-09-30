@@ -103,6 +103,7 @@ def leer_mseed(archivo, tipo, t_inicio=None, t_final=None):
                 else:
                     stLeido = read(nombreMseed)
                 trCanal[i] = stLeido
+
         except FileNotFoundError:
             pass
  
@@ -992,7 +993,8 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
 #  archivo_rsa es el archivo genrardo por el fasthypo con extencion .rsa generada a partir del archivo.
 #  usuario es para tomar información del sistema o de procesamiento, cuaNdo el valor es '', toma del sistema y si no toma de procesamiento asignando los valores 
 #   del drive adecuado en las computadoras de procesamiento.
-    directorios=obtener_directorios(archivo)    
+    
+    directorios=obtener_directorios(os.path.join(directorio_trabajo,archivo))    
     eventos=lectura_archivo(directorios['archivo_csv'])
     archivo_procesamiento=verificar_coincidencias(eventos,archivo,archivos_fast(archivo,directorio_trabajo,usuario))
     archivo_fas=archivo_procesamiento[1]
@@ -1451,7 +1453,6 @@ def guardar_intento(archivo,directorio,responsables,procesamiento):
 
 
 def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
-    print("Entrando a verificacion")
     contador = 0
     sufijo = ['', 'a', 'b', 'c']
     clave_minuto = Path(evento_procesar).stem.replace('_', '')[:12]
@@ -1469,7 +1470,6 @@ def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
         contador = len(sufijo) - 1
     suf = sufijo[contador]
     if not suf:
-        print("Primer archivo")
         return archivos_fast  # sin cambios para el primero del minuto
 
     # .sis (0) y .fas (1) NO cambian; aplicar sufijo al resto
@@ -1481,7 +1481,6 @@ def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
     for i in range(3, 7):
         if archivos_fast[i]:
             archivos_fast[i] = archivos_fast[i] + suf
-    print("archivo " , suf,'\n',archivos_fast)
     return archivos_fast
 
         
@@ -2095,11 +2094,13 @@ def cargar_dia(archivo_csv):
 
     for i in range (0,3):
         total=cont_sismo[i]+cont_FF[i]+cont_FC[i]+cont_indefinido[i]+cont_tele[i]+cont_local[i]+cont_ruido[i]
+        print(total)
         if(total!=0):
             aux=[responsables[indice_responsables[i]][0],hora_[i],total,cont_sismo[i],cont_FF[i],cont_FC[i],cont_indefinido[i],cont_tele[i],cont_local[i],cont_ruido[i]]
             aux=aux+contador_n_canales[i]
             variable_responsables.append(aux)
     resumen=[["SISMO","FF","FC","TELESISMOS","Local_CONTROL","INDEFINIDO","Ruido"],[sum(cont_sismo),sum(cont_FF),sum(cont_FC),sum(cont_tele),sum(cont_local),sum(cont_indefinido),sum(cont_ruido)]]
+    print(variable_responsables)
     return eventos_reporte,catalogo,eventos,vector,canales_eventos_dia,root,variable_responsables,resumen
 
 def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,magnitud_,tipo_magnitud,texto,texto2,evento_reporte_escogido,indice,indice_local):
