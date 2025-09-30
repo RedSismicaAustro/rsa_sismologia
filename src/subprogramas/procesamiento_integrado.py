@@ -143,7 +143,7 @@ class Procesar_evento(QMainWindow):
         self.Btn_procesar.clicked.connect(self.procesar_)
         self.Btn_reportar.clicked.connect(self.reportar_)
         self.Btn_insertar.clicked.connect(self.insertar_)
-        self.Btn_renombrar.clicked.connect(self.renombrar_)
+        
         self.Cmb_bx_tipo_evento.activated[str].connect(self.cambio_evento)
         self.cmbx_t_evento.activated[str].connect(self.cargar_tipo_evento)
         self.cmbx_eventos.activated[str].connect(self.preparar_evento)
@@ -221,8 +221,6 @@ class Procesar_evento(QMainWindow):
                 self.evento_procesar=evento
                 self.parametro=evento[0]+"  "+evento[1]+"  "+evento[2]
                 break
-        if self.evento_procesar!='':
-            verificar_coincidencias(self.eventos, self.evento_procesar)
         aux=int(self.evento_procesar[1][-10:-4])
         if aux<120000:
             indice_hora=1
@@ -328,59 +326,6 @@ class Procesar_evento(QMainWindow):
         self.catalogo=ordenar_y_eliminar_duplicados(self.catalogo,0)
         self.guardar_evento()
         
-
-
-    def renombrar_(self,text):
-        #print("Renombrar:")
-        message_box = QMessageBox(
-            QMessageBox.Question,
-            "¡Importante!",
-            "  Va a renombrar el evento\nretándole 1 minuto",
-            QMessageBox.Yes | QMessageBox.No ,
-            self.window()
-        )
-        result = message_box.exec_()
-        if result == QMessageBox.Yes:
-            archivo=self.evento_procesar[1]
-            archivos_origen=archivos_fast(archivo,self.directorio_trabajo,'')
-            hora=obtencion_hora(archivo[:8]+archivo[9:15])
-            fecha_hora = hora
-            fecha_hora_menos_un_minuto = fecha_hora - timedelta(minutes=1)
-            formato_fecha_hora = "%Y%m%d_%H%M%S.sis"
-            indice_catalogo="%Y%m%d%H%M%00"
-            archivo_modificado = fecha_hora_menos_un_minuto.strftime(formato_fecha_hora)
-            archivos_destino=archivos_fast(archivo_modificado,self.directorio_trabajo,'')
-            archivos_destino[2]= archivos_destino[2][:-12]+archivo_modificado[-15:-11]+archivo_modificado[-10:-6]+'.rsa'
-            archivos_destino[3]= archivos_destino[2][:-12]+'Phase'+archivo_modificado[-13:-11]+archivo_modificado[-10:-9]+'.'+archivo_modificado[-9:-6]
-            archivos_destino[4]= archivos_destino[2][:-12]+archivo_modificado[-15:-11]+archivo_modificado[-10:-8]+'.'+archivo_modificado[-8:-6]+'L'
-            archivos_destino[5]= archivos_destino[2][:-12]+archivo_modificado[-15:-11]+archivo_modificado[-10:-8]+'.'+archivo_modificado[-8:-6]+'P'
-            archivos_destino[6]= archivos_destino[2][:-12]+archivo_modificado[-15:-11]+archivo_modificado[-10:-8]+'.'+archivo_modificado[-8:-6]+'S'
-            self.eventos[self.indice_evento_procesar][1]=archivo_modificado
-            for i,buscado in enumerate(self.eventos_reporte):
-                if buscado[1]==archivo:
-                    self.eventos_reporte[i][1]=archivo_modificado
-                    break
-            for i,buscado in enumerate(self.catalogo):
-                if buscado==[]:
-                    continue
-                if buscado[18]==archivo:
-                    self.catalogo[i][18]=archivo_modificado
-                    self.catalogo[i][0]=indice_catalogo
-                    break
-            estaciones=[]
-            for i in range(0,101):
-                if self.eventos[self.indice_evento_procesar][i+3]!='-':
-                    estaciones.append(self.eventos[self.indice_evento_procesar][i+3][:4])
-            for estacion in estaciones:
-                archivo_mseed_origen=self.directorio['Directorio_eventos']+'/'+estacion+'_20'+archivo[:-3]+'mseed'
-                archivo_mseed_destino=self.directorio['Directorio_eventos']+'/'+estacion+'_20'+archivo_modificado[:-3]+'mseed'
-                os.rename(archivo_mseed_origen,archivo_mseed_destino)
-            for i in range(0,7):
-                os.rename(archivos_origen[i], archivos_destino[i])
-            escritura_archivo(self.directorio['archivo_csv'],self.eventos)
-            escritura_archivo(self.directorio['archivo_reporte'],self.eventos_reporte)
-            escritura_archivo(self.directorio['archivo_catalogo'],self.catalogo)
-            #self.guardar_evento()
 
     def Salir_(self):
         print("Saliendo sin procesamiento", self.horario)
@@ -649,7 +594,8 @@ class estaciones_(QDialog):
     def closeEvent(self, event):
         archivo=self.parent.evento_procesar[1]
         archivos_1=archivos_fast(archivo,self.parent.directorio_trabajo,self.parent.responsable_evento)
-        archivos_2=archivos_fast(archivo,self.parent.directorio_trabajo,'')
+        archivos_2=verificar_coincidencias(self.parent.eventos,self.parent.evento_procesar,archivos_fast(archivo,self.parent.directorio_trabajo,''))
+        print('Copiando archivos: \n',archivos_1,archivos_2)
         copiar_archivos(archivos_1,archivos_2)
         for archivo_borrar in archivos_1:
             if os.path.exists(archivo_borrar):

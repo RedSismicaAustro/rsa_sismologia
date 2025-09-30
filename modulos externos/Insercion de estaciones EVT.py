@@ -199,7 +199,7 @@ def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_eq
     # Nombre de salida .mseed; si hay serial, anteponerlo y crear subcarpeta
     prefijo = str(serial_equipo) if serial_equipo else estacion
     nombre_archivo = f"{prefijo}_{inicio.strftime('%Y%m%d_%H%M%S')}.mseed"
-
+    
     destino = directorio_grabar
     if serial_equipo:
         destino = os.path.join(directorio_grabar, str(serial_equipo))
@@ -238,7 +238,7 @@ def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_eq
 
     # Escribir MSEED (parámetros por defecto)
     st.write(ruta_completa, format='MSEED')
-
+    print("\nInsertando evento  ",ruta_completa)
     # Actualizar eventos de forma segura:
     # Si tu estructura es [ID, FECHA, ..., columnas por estación], mantener 'indice + 3'
     # pero validando rangos.

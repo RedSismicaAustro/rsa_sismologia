@@ -961,6 +961,18 @@ def escritura_archivo(archivo, valores):
         QMessageBox.warning(None, "Error al escribir archivo", mensaje)
 
 
+def copiar_archivos__(archivos_origen, archivos_destino):
+    for i in range(7):
+        try:
+            cola = os.path.basename(archivos_origen[i])        # longitud real, con sufijo si existe
+            archivo_dest = archivos_destino[i][:-len(cola)] + cola
+            os.makedirs(os.path.dirname(archivo_dest), exist_ok=True)
+            shutil.copyfile(archivos_origen[i], archivo_dest)
+            print("Copiando:", archivos_origen[i], "->", archivo_dest)
+        except FileNotFoundError:
+            print("Archivo no encontrado:", archivos_origen[i])
+            pass
+
 
 def copiar_archivos(archivos_origen, archivos_destino):
     lista=(17,17,12,11,10,10,10)
@@ -981,7 +993,8 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
 #  usuario es para tomar información del sistema o de procesamiento, cuaNdo el valor es '', toma del sistema y si no toma de procesamiento asignando los valores 
 #   del drive adecuado en las computadoras de procesamiento.
     directorios=obtener_directorios(archivo)    
-    archivo_procesamiento=archivos_fast(archivo,directorio_trabajo,usuario)
+    eventos=lectura_archivo(directorios['archivo_csv'])
+    archivo_procesamiento=verificar_coincidencias(eventos,archivo,archivos_fast(archivo,directorio_trabajo,usuario))
     archivo_fas=archivo_procesamiento[1]
     archivo_rsa=archivo_procesamiento[2]
     archivo_fase=archivo_procesamiento[3]
@@ -1437,45 +1450,42 @@ def guardar_intento(archivo,directorio,responsables,procesamiento):
     return procesamiento
 
 
-def verificar_coincidencias(matriz, vector):
-    """
-    Verifica si la combinación de horas y minutos (hhmm) del segundo elemento del vector
-    se repite en los segundos elementos de las filas de la matriz, excluyendo el vector mismo.
-    Muestra un mensaje de advertencia con las coincidencias encontradas.
+def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
+    print("Entrando a verificacion")
+    contador = 0
+    sufijo = ['', 'a', 'b', 'c']
+    clave_minuto = Path(evento_procesar).stem.replace('_', '')[:12]
 
-    Parámetros:
-    matriz (lista de listas): La matriz en la que buscar coincidencias.
-    vector (lista): El vector con el elemento a verificar.
+    for evento in eventos:
+        tipo_evento = evento[2]
+        if tipo_evento != 'SISMO':
+            continue
+        if Path(evento[1]).stem.replace('_', '')[:12] == clave_minuto:
+            if evento[1] == evento_procesar:
+                break
+            contador += 1
 
-    Retorno:
-    None
-    """
-    # Obtenemos el segundo elemento del vector y extraemos horas y minutos
-    fecha_vector = vector[1]
-    horas_minutos_vector = fecha_vector[9:13]  # Extrae el componente hhmm de AAMMDD_hhmmss.sis
-    # Lista para almacenar los valores completos que coinciden
-    coincidencias = []
+    if contador >= len(sufijo):
+        contador = len(sufijo) - 1
+    suf = sufijo[contador]
+    if not suf:
+        print("Primer archivo")
+        return archivos_fast  # sin cambios para el primero del minuto
 
-    # Iteramos sobre cada fila de la matriz
-    for fila in matriz:
-        # Obtenemos el segundo elemento de la fila y extraemos horas y minutos
-        fecha_fila = fila[1]
-        horas_minutos_fila = fecha_fila[9:13]
+    # .sis (0) y .fas (1) NO cambian; aplicar sufijo al resto
+    # RSA (2): antes de la extensión .rsa
+    if archivos_fast[2].lower().endswith('.rsa'):
+        archivos_fast[2] = archivos_fast[2][:-4] + suf + '.rsa'
 
-        # Verificamos si las horas y minutos coinciden y no es la misma fila
-        if horas_minutos_vector == horas_minutos_fila and fila != vector:
-            # Si coinciden, agregamos el valor completo a las coincidencias
-            coincidencias.append(fecha_fila)
+    # Phase (3) y L/P/S (4..6): agregar sufijo al final del nombre
+    for i in range(3, 7):
+        if archivos_fast[i]:
+            archivos_fast[i] = archivos_fast[i] + suf
+    print("archivo " , suf,'\n',archivos_fast)
+    return archivos_fast
 
-    # Si hay coincidencias, mostramos un mensaje de advertencia
-    if coincidencias:
-        #app = QApplication(sys.argv)
-        mensaje_advertencia = f"Se encontraron coincidencias en horas y minutos:\n{', '.join(coincidencias)}"
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Warning)
-        msg_box.setText(mensaje_advertencia)
-        msg_box.setWindowTitle("Advertencia de Coincidencias de Horas y Minutos")
-        msg_box.exec_()
+        
+ 
 
 
 def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaciones_eventos,hab_grafico,bandera_marcas,pagina,filtros_estaciones,estaciones_eventos_total,bandera_todos):
@@ -1705,7 +1715,6 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
                 sis_extraido = np.array([], dtype=np.int32)
             else:
                 nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
-                stcanal.detrend("demean")
                 if  os.path.exists(nombre_mseed):
                     stcanal = read(nombre_mseed)
                     stcanal.detrend("demean")
