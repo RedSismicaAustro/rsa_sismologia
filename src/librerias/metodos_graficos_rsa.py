@@ -1064,6 +1064,7 @@ def imprimir_seniales(tamanio,canales,trcanal,evento,bandera_seniales,bandera_zo
     #####Obtension de los datos para graficar
     for i in range(0, 101):
         if trcanal[i]!=[] and trcanal[i][0]!=' ':#Es igual a ' ' cuando es la copia del mseed 
+ 
             trcanal[i].detrend(type='linear') #Correccion de linea de base
 
             datos_np[i]=trcanal[i][0].data
@@ -1227,7 +1228,7 @@ def imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_c
                         #eventos_a_graficar - > marca las estaciones habilitadas en el punto de interés                        
                         eventos_a_graficar=marcar_impresiones(evento,estaciones_informe,tipo_canal,mapa_)
                     break
-        
+        print(directorio+directorios['archivo_referencia'])
         trCanal=leer_mseed(directorio+directorios['archivo_referencia'],1)
         contador=0
         n=len(eventos_a_graficar)
