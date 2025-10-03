@@ -70,7 +70,6 @@ def activar_hilo(self):
         self.parent.Lbl_Mensajes.setText(mensaje)
     
 def cargar_combo_eventos(self,text):
-    print("cargando eventos")
     self.sismos_procesar=[]
     self.cmbx_eventos.clear()
     for i in range(0,len(self.eventos)):
@@ -159,9 +158,43 @@ class Procesar_evento(QMainWindow):
         self.lbl_directorio_trabajo=self.directorio_trabajo
         self.estaciones_eventos=[]
         self.bandera_marcas=1
+        self.revision_procesamiento=False
         self.grupo_carga.setEnabled(False)
         self.Abrir_archivo()
 
+        # Conectar las señales en el __init__ de tu ventana
+        d=datetime.today()              #obtención de la fecha y hora actual
+        d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
+
+        # Extraer AAAAMMDD desde self.archivo (puede ser ruta completa)
+        nombre_base = Path(self.archivo).stem          # -> "AAAAMMDD_hhmmss"
+        cadena_fecha = nombre_base.split('_', 1)[0]    # -> "AAAAMMDD"
+
+        # Construir QDate del archivo
+        anio = int(cadena_fecha[0:4])
+        mes  = int(cadena_fecha[4:6])
+        dia  = int(cadena_fecha[6:8])
+        qdate_archivo = QDate(anio, mes, dia)
+
+        # Comparación con d
+        son_iguales     = (qdate_archivo == d)
+
+        # Ejemplos de uso:
+        if son_iguales:
+            self.radioButton_inicial.setChecked(True)
+        else:
+            self.radioButton_revision.setChecked(True)
+        self.radioButton_inicial.toggled.connect(self.seleccionar_inicial)
+        self.radioButton_revision.toggled.connect(self.seleccionar_revision)
+    # Métodos asociados
+    def seleccionar_inicial(self, estado):
+        if estado:
+            pass
+                
+
+    def seleccionar_revision(self, estado):
+        if estado:
+            pass
 
     def limpiar_estado(self):
         """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""
@@ -184,7 +217,7 @@ class Procesar_evento(QMainWindow):
         self.cambio_coeficientes_filtro = Cambio_Coeficientes_Filtro(self.canales_habilitados)
         
     def Abrir_archivo(self):  #Depurado
-        print("Abrir_archivo")
+        print("Abrir_archivo",self.archivo)
         self.Cmb_bx_tipo_evento.clear()
         lista_filtros = ["Ruido", "FF", "FC","TELESISMO","SISMO","INDEFINIDO","Evento_local",'CONTROL','REVISION','TODOS']
         self.Cmb_bx_tipo_evento.addItems(lista_filtros)
@@ -193,11 +226,9 @@ class Procesar_evento(QMainWindow):
         self.directorio=obtener_directorios(self.archivo)
         self.grupo_carga.setEnabled(True)
         #Cargar día
-        print(self.directorio['archivo_csv'])
         self.eventos_reporte,self.catalogo,self.eventos,\
         vector,self.evento_canales,\
-        root,self.responsables,self.resumen=cargar_dia(self.directorio['archivo_csv'])
-
+        root,self.responsables,self.resumen=cargar_dia(self.directorio)
         cargar_combo_eventos(self,'SISMO')
         self.archivo_estaciones=self.directorio['archivo_estaciones']
         self.ck_box_hab_canal={}
@@ -228,7 +259,7 @@ class Procesar_evento(QMainWindow):
             indice_hora=2
         elif aux<240000:
             indice_hora=3
-        horario=['',"00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
+        horario=["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
         print(self.responsables,indice_hora,self.responsables[indice_hora][0])
         self.responsable_evento=self.responsables[indice_hora][0]
         self.Cmb_bx_tipo_evento.setCurrentText(self.evento_procesar[2])
@@ -272,7 +303,7 @@ class Procesar_evento(QMainWindow):
         self.catalogo,self.eventos_reporte=guardar_informacion_diaria(self.directorio['archivo_csv'],self.directorio_trabajo,self.catalogo,self.eventos)
         self.eventos_reporte,self.catalogo,self.eventos,\
         vector,self.evento_canales,\
-        root,self.responsables,self.resumen=cargar_dia(self.directorio['archivo_csv'])
+        root,self.responsables,self.resumen=cargar_dia(self.directorio)
         
 
     def cargar_tipo_evento(self, text):
@@ -293,6 +324,7 @@ class Procesar_evento(QMainWindow):
             else:
                 self.archivos_procesamiento_virtual=archivos_fast(archivo,self.directorio_trabajo,self.responsable_evento)
                 self.archivos_procesamiento_real=archivos_fast(archivo,self.directorio_trabajo,'')
+                print("Copiando desde real a virtual ")
                 copiar_archivos(self.archivos_procesamiento_real,self.archivos_procesamiento_virtual)
 
         else:
@@ -328,50 +360,120 @@ class Procesar_evento(QMainWindow):
         
 
     def Salir_(self):
+        """
+        Genera/abre un reporte temporal y controla el flujo según:
+          - radioButton_inicial / radioButton_revision / checkBox_detalles
+          - bandera self.revision_procesamiento (definida como False en otra instancia)
+
+        Comportamiento:
+          * inicial: checkBox_detalles siempre marcado y deshabilitado.
+          * revision: checkBox_detalles habilitado (usuario decide).
+          * checkBox_detalles desmarcado: salir sin hacer nada.
+          * primera vez (revision_procesamiento=False): genera/abre PDF, muestra aviso notorio y retorna sin cerrar.
+          * segunda vez (revision_procesamiento=True): ejecuta flujo original (confirmación para borrar y cerrar).
+        """
         print("Saliendo sin procesamiento", self.horario)
-        self.eventos_reporte,self.catalogo,self.eventos, \
-        self.vector,self.evento_canales, \
-        self.root,self.responsables,self.resumen=cargar_dia(self.directorio['archivo_csv'])
-        escritura_archivo(self.directorio['archivo_responsables'],self.responsables)
-        tree = ET.ElementTree(self.root)
-        banderas=[0,0,0,0]
-        if self.horario=='00:00 - 12:00':
-            banderas[3]=1
-        elif  self.horario=='12:00 - 18:00':
-            banderas[3]=2
+
+        # --- 1) Reglas de interfaz: radio buttons y checkbox de detalles ---
+        if self.radioButton_inicial.isChecked():
+            # En modo inicial: obligar detalles activados y bloquear el checkbox
+            self.checkBox_detalles.setChecked(True)
+            self.checkBox_detalles.setEnabled(False)
+        elif self.radioButton_revision.isChecked():
+            # En modo revisión: permitir al usuario marcar/desmarcar detalles
+            self.checkBox_detalles.setEnabled(True)
+
+        # Si no desea detalles, no hay nada que hacer
+        if not self.checkBox_detalles.isChecked():
+            self.close()
+            
+
+        # --- 2) Preparación de banderas (conserva tu lógica) ---
+        banderas = [0, 0, 0, 0]
+        if self.horario == '00:00 - 12:00':
+            banderas[3] = 1
+        elif self.horario == '12:00 - 18:00':
+            banderas[3] = 2
         else:
-            banderas[3]=3
-        archivo_reporte_teporal=os.path.join(self.directorio['Directorio_base'],Path(self.archivo).name+'_'+self.horario[:2]+'_'+self.responsable+'.pdf')
-        nombre = Path(self.archivo).stem    
+            banderas[3] = 3
+
+        # --- 3) Rutas y fecha ---
+        archivo_reporte_temporal = os.path.join(
+            self.directorio['Directorio_base'],
+            Path(self.archivo).name + '_' + self.horario[:2] + '_' + self.responsable + '.pdf'
+        )
+        nombre = Path(self.archivo).stem  # AAAAMMDD_hhmmss
         fecha = QDate(int(nombre[0:4]), int(nombre[4:6]), int(nombre[6:8]))
-        self.estaciones_eventos=[]
-        reporte_resumen(archivo_reporte_teporal, "Reporte temporal",fecha ,fecha ,self.catalogo,self.resumen,    1,       0,         banderas,      self.estaciones_eventos,self.directorio_trabajo,tree,0,self.eventos_reporte,1)
-        os.startfile(archivo_reporte_teporal) 
 
-        aux="Se revisó archivo reporte\n"+ archivo_reporte_teporal
+        # --- 4) Cargar datos del día y preparar arbol XML ---
+        self.eventos_reporte, self.catalogo, self.eventos, \
+        self.vector, self.evento_canales, \
+        self.root, self.responsables, self.resumen = cargar_dia(self.directorio)
 
+        escritura_archivo(self.directorio['archivo_responsables'], self.responsables)
+        tree = ET.ElementTree(self.root)
+        self.estaciones_eventos = []
+
+
+
+        # --- 6) Control por bandera de revisión ---
+        if not self.revision_procesamiento:
+ 
+            # --- 5) Generar el PDF temporal SIEMPRE que detalles esté marcado ---
+            reporte_resumen(
+                archivo_reporte_temporal, "Reporte temporal",
+                fecha, fecha,
+                self.catalogo, self.resumen,
+                1,
+                0,
+                banderas,
+                self.estaciones_eventos,
+                self.directorio_trabajo,
+                tree,
+                0,
+                self.eventos_reporte,
+                1
+                )
+            os.startfile(archivo_reporte_temporal)            
+  
+    # Primera pasada: activar bandera, avisar y NO cerrar
+            self.revision_procesamiento = True
+            # Mensaje MUY notorio en el label con ruta del archivo
+            mensaje_html = (
+                f"<span style='font-size:14pt; font-weight:700; color:#B00020;'>"
+                f"¡Revise el archivo!</span><br>"
+                f"<span style='font-size:12pt;'>{archivo_reporte_temporal}</span>"
+            )
+            self.Lbl_submensajes.setText(mensaje_html)
+            return
+        else:
+            self.Lbl_submensajes.setText("")
+        
+        # --- 7) Segunda pasada: flujo original con confirmación de borrado y cierre ---
+        aux = "Se revisó archivo reporte\n" + archivo_reporte_temporal
         message_box = QMessageBox(
             QMessageBox.Question,
             "¡Importante!",
-            aux, QMessageBox.Yes | QMessageBox.No ,
+            aux, QMessageBox.Yes | QMessageBox.No,
             self.window()
         )
         result = message_box.exec_()
+
         if result == QMessageBox.Yes:
-            for xx in range(0,3):
+            # Intentar borrar (hasta 3 intentos por archivo en uso)
+            for _ in range(3):
                 try:
-                    os.remove(archivo_reporte_teporal)
+                    os.remove(archivo_reporte_temporal)
                     break
-
                 except PermissionError:
-                    mensaje=" Archivo " +archivo_reporte_teporal+" en uso\nCiérrelo"
+                    mensaje = " Archivo " + archivo_reporte_temporal + " en uso\nCiérrelo"
                     QMessageBox.information(self, "AVISO", mensaje)
+        else:
+            self.revision_procesamiento = False
+            return
+        # Cierre de la ventana en la segunda pasada
+        self.close()
 
-            self.close()
-
-     
-        
-        
 
     def closeEvent(self, event):
         """
@@ -593,9 +695,9 @@ class estaciones_(QDialog):
 
     def closeEvent(self, event):
         archivo=self.parent.evento_procesar[1]
+        print("Copiando desde virtual a real")
         archivos_1=archivos_fast(archivo,self.parent.directorio_trabajo,self.parent.responsable_evento)
-        archivos_2=verificar_coincidencias(self.parent.eventos,self.parent.evento_procesar,archivos_fast(archivo,self.parent.directorio_trabajo,''))
-        print('Copiando archivos: \n',archivos_1,archivos_2)
+        archivos_2=verificar_coincidencias(self.parent.eventos,self.parent.evento_procesar[1],archivos_fast(archivo,self.parent.directorio_trabajo,''))
         copiar_archivos(archivos_1,archivos_2)
         for archivo_borrar in archivos_1:
             if os.path.exists(archivo_borrar):

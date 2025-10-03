@@ -185,7 +185,7 @@ class Reporte_diario(QMainWindow):
     def cargar_dia(self):
         self.eventos_reporte,self.catalogo,self.eventos, \
         self.vector,self.evento_canales, \
-        self.root,self.responsables,self.resumen=cargar_dia(self.directorios['archivo_csv'])
+        self.root,self.responsables,self.resumen=cargar_dia(self.directorios)
         self.Btn_graficar.setEnabled(False)
         self.Btn_pagina.setEnabled(False)
         self.cmbx_evento.setEnabled(False)

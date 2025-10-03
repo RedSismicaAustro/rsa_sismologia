@@ -30,7 +30,7 @@
      <property name="geometry">
       <rect>
        <x>0</x>
-       <y>430</y>
+       <y>510</y>
        <width>101</width>
        <height>23</height>
       </rect>
@@ -46,7 +46,7 @@
      <property name="geometry">
       <rect>
        <x>140</x>
-       <y>430</y>
+       <y>510</y>
        <width>91</width>
        <height>23</height>
       </rect>
@@ -59,7 +59,7 @@
      <property name="geometry">
       <rect>
        <x>5</x>
-       <y>270</y>
+       <y>350</y>
        <width>241</width>
        <height>141</height>
       </rect>
@@ -72,7 +72,7 @@
      <property name="geometry">
       <rect>
        <x>90</x>
-       <y>210</y>
+       <y>312</y>
        <width>141</width>
        <height>22</height>
       </rect>
@@ -82,7 +82,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>210</y>
+       <y>312</y>
        <width>81</width>
        <height>20</height>
       </rect>
@@ -98,7 +98,7 @@
      <property name="geometry">
       <rect>
        <x>90</x>
-       <y>240</y>
+       <y>280</y>
        <width>141</width>
        <height>22</height>
       </rect>
@@ -108,7 +108,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>240</y>
+       <y>280</y>
        <width>81</width>
        <height>20</height>
       </rect>
@@ -121,7 +121,7 @@
      <property name="geometry">
       <rect>
        <x>0</x>
-       <y>20</y>
+       <y>100</y>
        <width>248</width>
        <height>170</height>
       </rect>
@@ -131,6 +131,48 @@
        <pointsize>7</pointsize>
       </font>
      </property>
+    </widget>
+    <widget class="QGroupBox" name="cmbx_resposables_3">
+     <property name="geometry">
+      <rect>
+       <x>70</x>
+       <y>20</y>
+       <width>121</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string/>
+     </property>
+     <widget class="QRadioButton" name="radioButton_periodo">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>30</y>
+        <width>82</width>
+        <height>17</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Periodo</string>
+      </property>
+     </widget>
+     <widget class="QRadioButton" name="radioButton_diario">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>10</y>
+        <width>82</width>
+        <height>17</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Diario</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
     </widget>
    </widget>
   </widget>

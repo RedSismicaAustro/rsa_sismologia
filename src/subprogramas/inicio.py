@@ -89,7 +89,7 @@ class Inicio_proceso(QMainWindow):
         lista_resp = [sublista[0] for sublista in datos]
         self.cmbx_resposables.addItems(lista_resp)
 
-        horario=["","00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
+        horario=("00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00")
         self.cmbx_periodo.addItems(horario)
 
         self.parametros=parametros_estaciones()#(nombre_canal_total_,nombre_canal,tipo_canal_,n_canales_,hab_canal)
@@ -103,6 +103,31 @@ class Inicio_proceso(QMainWindow):
         self.responsable=responsable
         self.periodo=periodo
         self.showDate(d)
+
+        # Conectar las señales en el __init__ de tu ventana
+        self.radioButton_diario.toggled.connect(self.seleccionar_diario)
+        self.radioButton_periodo.toggled.connect(self.seleccionar_periodo)
+        self.cmbx_periodo.setCurrentIndex(1)
+        
+
+    # Métodos asociados
+    def seleccionar_diario(self, estado):
+            if estado:
+                self.dia.setEnabled(True)
+                self.cmbx_periodo.clear()
+                self.cmbx_periodo.addItems(("00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"))
+                self.cmbx_periodo.setEnabled(True)
+                self.cmbx_periodo.setCurrentIndex(0)
+                
+
+    def seleccionar_periodo(self, estado):
+            if estado:
+                self.dia.setEnabled(False)
+                self.cmbx_periodo.clear()
+                self.cmbx_periodo.addItems("")
+                self.cmbx_periodo.setEnabled(False)
+                self.cmbx_periodo.setCurrentIndex(4)
+
 
     def Iniciar(self):
         # Actualizar fecha y archivo

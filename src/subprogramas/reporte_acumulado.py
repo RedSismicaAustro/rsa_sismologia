@@ -165,7 +165,7 @@ class VentanaEstaciones(QtWidgets.QDialog):
 
 class Reporte(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    def __init__(self, archivo, directorio_trabajo, responsable, periodo, parent=None):#Constructor de la clase
+    def __init__(self, archivo, directorio_trabajo, responsable, horario, parent=None):#Constructor de la clase
         super(Reporte,self).__init__(parent)
         QMainWindow.__init__(self)
         #Carga la configuración del archivo .ui en el objeto
@@ -174,7 +174,13 @@ class Reporte(QMainWindow):
         ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", "reporte_mensual.ui")
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui, self)
-        self.Btn_abrir.clicked.connect(self.Abrir_archivo)
+        
+        self.directorio_trabajo = directorio_trabajo
+        self.archivo=archivo
+        self.responsable=responsable
+        self.horario=horario
+        
+        
         self.Btn_Salir.clicked.connect(self.Salir_)
         self.Btn_guardar.clicked.connect(self.Guardar_)
         self.Btn_cargar_catalogo.clicked.connect(self.cargar_catalogo_guardado)
@@ -248,7 +254,6 @@ class Reporte(QMainWindow):
         self.comboBox_anio.setCurrentIndex(int(self.hoy.year)-1995)
         self.comboBox_mes.setCurrentIndex(int(self.hoy.month)-1)
         self.directorio_trabajo="G:/Mi unidad/DIA/"
-        self.lbl_directorio.setText(self.directorio_trabajo)
         self.cmbx_zona.currentIndexChanged.connect(self.Cargar_catalogo)
         self.cmbx_mapa.currentIndexChanged.connect(self.Cargar_catalogo)
         self.cmbx_magnitud.currentIndexChanged.connect(self.Cargar_catalogo)
@@ -269,15 +274,7 @@ class Reporte(QMainWindow):
         self.arbol = ET.parse(archivo)
         self.raiz = self.arbol.getroot()
 
-    def Abrir_archivo(self):  #Depurado
-        folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Select Folder')
-        if folderpath[-1]=='/':
-            folderpath=folderpath
-        else:
-            folderpath=folderpath+'/'
-        self.directorio_trabajo=folderpath
-        self.lbl_directorio.setText(self.directorio_trabajo)
-        
+      
     def Guardar_(self):
         self.filtros()
         if self.periodo_reporte[0:9]=='Período: ':
@@ -294,7 +291,7 @@ class Reporte(QMainWindow):
             path.mkdir(parents=True)
         except FileExistsError:
             pass    
-        self.lbl_dir_archivo.setText(directorio_)
+
         self.archivo_dat_men=directorio_+nombre_+"_rep.csv"
         self.archivo_reportes_total=directorio_+nombre_+"_rep_total.csv"
         self.archivo_cat_men=directorio_+nombre_+"_cat.csv"
@@ -803,7 +800,6 @@ class Reporte(QMainWindow):
 
         try:
             self.directorio_trabajo=extraer_hasta_directorio(carpeta, 'DIA')
-            self.lbl_directorio.setText(self.directorio_trabajo)
 
             lista_archivos = os.listdir(carpeta)
             base = None

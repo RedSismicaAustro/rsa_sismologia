@@ -18,7 +18,7 @@
     <property name="geometry">
      <rect>
       <x>170</x>
-      <y>190</y>
+      <y>160</y>
       <width>131</width>
       <height>81</height>
      </rect>
@@ -53,151 +53,11 @@
      </property>
     </widget>
    </widget>
-   <widget class="QGroupBox" name="groupBox_3">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>10</y>
-      <width>391</width>
-      <height>171</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>10</pointsize>
-     </font>
-    </property>
-    <property name="title">
-     <string>DIRECTORIO</string>
-    </property>
-    <widget class="QLabel" name="lbl_directorio">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>86</y>
-       <width>301</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <pointsize>10</pointsize>
-      </font>
-     </property>
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-    <widget class="QLabel" name="lbl_dir_archivo">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>138</y>
-       <width>351</width>
-       <height>21</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <pointsize>10</pointsize>
-      </font>
-     </property>
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-    <widget class="QLabel" name="label_t_7">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>60</y>
-       <width>151</width>
-       <height>30</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <pointsize>10</pointsize>
-       <weight>50</weight>
-       <bold>false</bold>
-      </font>
-     </property>
-     <property name="text">
-      <string>DIRECTORIO DE TRABAJO</string>
-     </property>
-     <property name="scaledContents">
-      <bool>false</bool>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignCenter</set>
-     </property>
-     <property name="wordWrap">
-      <bool>false</bool>
-     </property>
-    </widget>
-    <widget class="QLabel" name="label_t_8">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="geometry">
-      <rect>
-       <x>4</x>
-       <y>110</y>
-       <width>81</width>
-       <height>31</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <pointsize>10</pointsize>
-       <weight>50</weight>
-       <bold>false</bold>
-      </font>
-     </property>
-     <property name="text">
-      <string>DIRECTORIO</string>
-     </property>
-     <property name="scaledContents">
-      <bool>false</bool>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignCenter</set>
-     </property>
-     <property name="wordWrap">
-      <bool>false</bool>
-     </property>
-    </widget>
-    <widget class="QLabel" name="Lbl_Mensajes">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="geometry">
-      <rect>
-       <x>100</x>
-       <y>10</y>
-       <width>271</width>
-       <height>41</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <family>Arial</family>
-       <pointsize>14</pointsize>
-      </font>
-     </property>
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-   </widget>
    <widget class="QPushButton" name="Btn_Salir">
     <property name="geometry">
      <rect>
-      <x>230</x>
-      <y>620</y>
+      <x>340</x>
+      <y>580</y>
       <width>81</width>
       <height>31</height>
      </rect>
@@ -210,7 +70,7 @@
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>400</y>
+      <y>370</y>
       <width>391</width>
       <height>131</height>
      </rect>
@@ -349,7 +209,7 @@
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>610</y>
+      <y>580</y>
       <width>81</width>
       <height>31</height>
      </rect>
@@ -365,7 +225,7 @@
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>560</y>
+      <y>530</y>
       <width>91</width>
       <height>31</height>
      </rect>
@@ -378,7 +238,7 @@
     <property name="geometry">
      <rect>
       <x>130</x>
-      <y>560</y>
+      <y>530</y>
       <width>71</width>
       <height>31</height>
      </rect>
@@ -388,7 +248,7 @@
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>190</y>
+      <y>160</y>
       <width>131</width>
       <height>81</height>
      </rect>
@@ -427,7 +287,7 @@
     <property name="geometry">
      <rect>
       <x>310</x>
-      <y>190</y>
+      <y>160</y>
       <width>111</width>
       <height>81</height>
      </rect>
@@ -469,7 +329,7 @@
     <property name="geometry">
      <rect>
       <x>50</x>
-      <y>540</y>
+      <y>510</y>
       <width>51</width>
       <height>19</height>
      </rect>
@@ -499,7 +359,7 @@
     <property name="geometry">
      <rect>
       <x>140</x>
-      <y>540</y>
+      <y>510</y>
       <width>51</width>
       <height>19</height>
      </rect>
@@ -529,7 +389,7 @@
     <property name="geometry">
      <rect>
       <x>204</x>
-      <y>540</y>
+      <y>510</y>
       <width>71</width>
       <height>19</height>
      </rect>
@@ -559,7 +419,7 @@
     <property name="geometry">
      <rect>
       <x>220</x>
-      <y>560</y>
+      <y>530</y>
       <width>51</width>
       <height>31</height>
      </rect>
@@ -572,7 +432,7 @@
     <property name="geometry">
      <rect>
       <x>380</x>
-      <y>560</y>
+      <y>530</y>
       <width>41</width>
       <height>31</height>
      </rect>
@@ -585,7 +445,7 @@
     <property name="geometry">
      <rect>
       <x>369</x>
-      <y>540</y>
+      <y>510</y>
       <width>51</width>
       <height>20</height>
      </rect>
@@ -615,7 +475,7 @@
     <property name="geometry">
      <rect>
       <x>360</x>
-      <y>565</y>
+      <y>535</y>
       <width>31</width>
       <height>19</height>
      </rect>
@@ -645,7 +505,7 @@
     <property name="geometry">
      <rect>
       <x>200</x>
-      <y>565</y>
+      <y>535</y>
       <width>30</width>
       <height>20</height>
      </rect>
@@ -671,8 +531,8 @@
    <widget class="QCheckBox" name="ck_box_reporte">
     <property name="geometry">
      <rect>
-      <x>150</x>
-      <y>610</y>
+      <x>120</x>
+      <y>580</y>
       <width>70</width>
       <height>17</height>
      </rect>
@@ -687,8 +547,8 @@
    <widget class="QCheckBox" name="ck_box_firma">
     <property name="geometry">
      <rect>
-      <x>150</x>
-      <y>630</y>
+      <x>191</x>
+      <y>580</y>
       <width>70</width>
       <height>17</height>
      </rect>
@@ -703,8 +563,8 @@
    <widget class="QCheckBox" name="ck_box_filtro">
     <property name="geometry">
      <rect>
-      <x>150</x>
-      <y>650</y>
+      <x>260</x>
+      <y>580</y>
       <width>70</width>
       <height>17</height>
      </rect>
@@ -716,24 +576,11 @@
      <bool>true</bool>
     </property>
    </widget>
-   <widget class="QPushButton" name="Btn_abrir">
-    <property name="geometry">
-     <rect>
-      <x>330</x>
-      <y>620</y>
-      <width>91</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>.../dia/</string>
-    </property>
-   </widget>
    <widget class="QGroupBox" name="groupBox_7">
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>280</y>
+      <y>250</y>
       <width>391</width>
       <height>121</height>
      </rect>
@@ -906,7 +753,7 @@
     <property name="geometry">
      <rect>
       <x>280</x>
-      <y>560</y>
+      <y>530</y>
       <width>81</width>
       <height>31</height>
      </rect>
@@ -919,7 +766,7 @@
     <property name="geometry">
      <rect>
       <x>280</x>
-      <y>540</y>
+      <y>510</y>
       <width>81</width>
       <height>20</height>
      </rect>
@@ -940,6 +787,22 @@
     </property>
     <property name="wordWrap">
      <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="textEdit">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>10</y>
+      <width>391</width>
+      <height>131</height>
+     </rect>
+    </property>
+    <property name="lineWrapMode">
+     <enum>QTextEdit::WidgetWidth</enum>
     </property>
    </widget>
   </widget>

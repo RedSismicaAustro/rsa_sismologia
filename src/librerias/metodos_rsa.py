@@ -969,7 +969,6 @@ def copiar_archivos__(archivos_origen, archivos_destino):
             archivo_dest = archivos_destino[i][:-len(cola)] + cola
             os.makedirs(os.path.dirname(archivo_dest), exist_ok=True)
             shutil.copyfile(archivos_origen[i], archivo_dest)
-            print("Copiando:", archivos_origen[i], "->", archivo_dest)
         except FileNotFoundError:
             print("Archivo no encontrado:", archivos_origen[i])
             pass
@@ -979,9 +978,9 @@ def copiar_archivos(archivos_origen, archivos_destino):
     lista=(17,17,12,11,10,10,10)
     for i in range(0,7):
         try:
+            print(archivos_origen[i], archivos_destino[i])
             archivo_dest=archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:]
             shutil.copyfile(archivos_origen[i],archivo_dest)
-            print("Copiando:",archivos_origen[i],archivo_dest)
         except FileNotFoundError:
             print("Archivo no encontrado:",archivos_origen[i])
             pass
@@ -1145,7 +1144,121 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
         return 
 
 
-def archivos_fast(evento, dir_trabajo, usuario):
+def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
+    """
+    Devuelve las rutas:
+        [ .sis, .fas, .rsa, Phase, .L, .P, .S ]
+
+    ─ Host    (usuario == '') → .sis/.fas con AAAA
+    ─ Virtual (usuario != '') → .sis/.fas con AA  (se recortan los dos primeros dígitos)
+
+    Formatos FASTHYPO (todos con año AA):
+        · MMDDhhmm.rsa
+        · PhaseDDh.hmm
+        · MMDDhh.mm[L|P|S]
+
+    Si el .rsa exacto no existe se suma 1 minuto y ese minuto “ajustado” se
+    reutiliza en Phase y L/P/S.
+
+    Parámetros:
+        evento: str  -> nombre del archivo '.sis' (ej: AAAAMMDD_hhmmss.sis o AAMMDD_hhmmss.sis)
+        dir_trabajo: str -> ruta base de trabajo
+        usuario: str -> '' host / 'alguien' virtual (se usan rutas de responsables.csv)
+        retornar_validaciones: bool -> si True retorna (rutas, existe, faltantes)
+
+    Retorna:
+        lista_rutas  (por defecto)
+        ó (lista_rutas, existe_dict, faltantes) si retornar_validaciones=True
+    """
+    # ------------------------------------------------------------------ #
+    # 1 · Carpetas base
+    # ------------------------------------------------------------------ #
+    print("", evento)
+    info = obtener_directorios(evento)
+    dir_dia  = os.path.join(dir_trabajo, info['Directorio_dia'])
+    dir_fast = os.path.join(dir_trabajo, info['Directorio_fastHypo'])
+
+    if usuario:
+        csv_path = os.path.join(ruta_datos, "responsables.csv")
+        for fila in lectura_archivo(csv_path):
+            if fila and fila[0].strip() == usuario.strip():
+                # columnas 1 y 2: dir_dia y dir_fast
+                dir_dia, dir_fast = fila[1], fila[2]
+                break
+
+    # ------------------------------------------------------------------ #
+    # 2 · Despiece de nombre base
+    # ------------------------------------------------------------------ #
+    base = evento[:-4]  # quita '.sis'
+    if len(base) == 13:  # AAMMDD_hhmmss
+        yy, mm, dd = 20 + int(base[:2]), base[2:4], base[4:6]
+        hh, minu, ss = base[7:9], base[9:11], base[11:13]
+        sisfas_base = base  # ya en AA
+    else:  # AAAAMMDD_hhmmss
+        yy, mm, dd = int(base[:4]), base[4:6], base[6:8]
+        hh, minu, ss = base[9:11], base[11:13], base[13:15]
+        # recorta '20' solo para virtual
+        sisfas_base = base if usuario == '' else base[2:]
+
+    # ------------------------------------------------------------------ #
+    # 3 · .sis / .fas
+    # ------------------------------------------------------------------ #
+    archivo_sis = os.path.join(dir_dia, f"{sisfas_base}.sis")
+    archivo_fas = os.path.join(dir_dia, f"{sisfas_base}.fas")
+
+    # ------------------------------------------------------------------ #
+    # 4 · .rsa  (intento minuto real)
+    # ------------------------------------------------------------------ #
+    rsa_nom = f"{mm}{dd}{hh}{minu}.rsa"
+    archivo_rsa = os.path.join(dir_fast, rsa_nom)
+
+    # ------------------------------------------------------------------ #
+    # 5 · Redondeo (+1 min) si falta el .rsa
+    # ------------------------------------------------------------------ #
+    if not os.path.exists(archivo_rsa):
+        dt = datetime(yy, int(mm), int(dd), int(hh), int(minu), int(ss)) + timedelta(minutes=1)
+        mm, dd, hh, minu = dt.strftime("%m %d %H %M").split()
+        rsa_nom = f"{mm}{dd}{hh}{minu}.rsa"
+        archivo_rsa = os.path.join(dir_fast, rsa_nom)
+
+    # ------------------------------------------------------------------ #
+    # 6 · Phase  y  L / P / S (mismo minuto usado en .rsa)
+    # ------------------------------------------------------------------ #
+    phase_nom = f"Phase{dd}{hh[0]}.{hh[1]}{minu}"
+    archivo_phase = os.path.join(dir_fast, phase_nom)
+
+    base_lp = f"{mm}{dd}{hh}.{minu}"
+    archivo_L = os.path.join(dir_fast, base_lp + 'L')
+    archivo_P = os.path.join(dir_fast, base_lp + 'P')
+    archivo_S = os.path.join(dir_fast, base_lp + 'S')
+
+    # ------------------------------------------------------------------ #
+    # 7 · Verificación de existencia
+    # ------------------------------------------------------------------ #
+    rutas = [archivo_sis, archivo_fas, archivo_rsa, archivo_phase, archivo_L, archivo_P, archivo_S]
+    etiquetas = ['.sis', '.fas', '.rsa', 'Phase', '.L', '.P', '.S']
+
+    existe = {etq: os.path.isfile(ruta) for etq, ruta in zip(etiquetas, rutas)}
+    faltantes = [etq for etq, ok in existe.items() if not ok]
+
+    # Resumen en consola (sin romper compatibilidad)
+    print(">>> RESUMEN FASTHYPO")
+    for etq, ruta in zip(etiquetas, rutas):
+        print(f"  {etq:<6} {'OK ' if existe[etq] else 'NO '}  ->  {ruta}")
+    if faltantes:
+        print("FALTAN:", ", ".join(faltantes))
+    else:
+        print("Todos los archivos requeridos están presentes.")
+
+    # ------------------------------------------------------------------ #
+    # 8 · Retorno
+    # ------------------------------------------------------------------ #
+    if retornar_validaciones:
+        return rutas, existe, faltantes
+    return rutas
+
+
+def archivos_fast__(evento, dir_trabajo, usuario):
     """
     Devuelve las rutas:
         [ .sis, .fas, .rsa, Phase, .L, .P, .S ]
@@ -1165,6 +1278,7 @@ def archivos_fast(evento, dir_trabajo, usuario):
     # ------------------------------------------------------------------ #
     # 1 · Carpetas base
     # ------------------------------------------------------------------ #
+    print("",evento)
     info = obtener_directorios(evento)
     dir_dia  = os.path.join(dir_trabajo, info['Directorio_dia'])
     dir_fast = os.path.join(dir_trabajo, info['Directorio_fastHypo'])
@@ -1221,6 +1335,8 @@ def archivos_fast(evento, dir_trabajo, usuario):
     archivo_S = os.path.join(dir_fast, base_lp + 'S')
 
     # ------------------------------------------------------------------ #
+    print(archivo_sis, archivo_fas, archivo_rsa,
+            archivo_phase, archivo_L, archivo_P, archivo_S)
     return [archivo_sis, archivo_fas, archivo_rsa,
             archivo_phase, archivo_L, archivo_P, archivo_S]
 
@@ -1453,10 +1569,11 @@ def guardar_intento(archivo,directorio,responsables,procesamiento):
 
 
 def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
+    print("Evento procesar:",evento_procesar)
     contador = 0
     sufijo = ['', 'a', 'b', 'c']
     clave_minuto = Path(evento_procesar).stem.replace('_', '')[:12]
-
+    print("Clave minuto:",clave_minuto)
     for evento in eventos:
         tipo_evento = evento[2]
         if tipo_evento != 'SISMO':
@@ -1481,6 +1598,7 @@ def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
     for i in range(3, 7):
         if archivos_fast[i]:
             archivos_fast[i] = archivos_fast[i] + suf
+    print(archivos_fast)
     return archivos_fast
 
         
@@ -1942,15 +2060,13 @@ def cargar_evento(parametro,eventos_reporte,catalogo,eventos,canales_eventos_dia
 
 
     
-def cargar_dia(archivo_csv):
+def cargar_dia(directorios):
     """
     Carga el dia para procesamiento o reporte
     Args:
         archivo_csv: Nombre del archivo para escoger el dian ia con formato AAMMDDhhmmss.
     """
-    directorio_trabajo=extraer_hasta_directorio(archivo_csv,'DIA')
-    archivo=referencia_directorio_completa(archivo_csv)
-    directorios=obtener_directorios(archivo)
+    directorio_trabajo=directorios['Directorio_trabajo']
     if not(os.path.exists(directorios['Directorio_base'])):
         return [],[],[],[],[],[],[],[]
     eventos_reporte=[['0',"Fecha; Hora (UTC)","Evento","Magn.","Prof.(km)","Lat.","Long.","Ubicación"]]
@@ -1961,7 +2077,7 @@ def cargar_dia(archivo_csv):
 
     contador_n_canales=[[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0]]#Tupla que contiene el número de estaciones por evento sísmico.
     root = ET.Element("sismo")
-    lista_eventos=lectura_archivo(archivo_csv)
+    lista_eventos=lectura_archivo(directorios['archivo_csv'])
     for evento_individual in lista_eventos:
             if evento_individual==[]:
                 continue
