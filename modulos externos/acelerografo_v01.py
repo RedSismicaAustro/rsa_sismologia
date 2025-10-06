@@ -192,8 +192,6 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setWindowTitle("PROCESAMIENTO SISMICO")
         self.setupUi(self)# Método Constructor de la ventana
         self.Btn_Iniciar.clicked.connect(self.Iniciar)
-        self.Btn_unir.clicked.connect(self.Unir_archivo)
-        self.Btn_graficar.clicked.connect(self.Graficar_archivo)
         self.Btn_drive.clicked.connect(self.seleccionar_drive)
         d=datetime.today()              #obtención de la fecha y hora actual
         d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
@@ -387,19 +385,6 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         st1[1].data=st1[1].data.filled()
         st1[2].data=st1[2].data.filled()
         st1.write('Prueba.mseed', format = 'MSEED', encoding = 'STEIM1', reclen = 512)
-
-    def Graficar_archivo(self):
-        archivo__ = QFileDialog.getOpenFileName(
-            parent=self,
-            caption='Archivo 1:',
-            directory=os.getcwd(),
-        )
-        archivo_1=archivo__[0]
-
-        st1 = obspy.read(archivo_1)
-        st1.plot()
-        input()
-        return
 
     def definir_dia(self):
         self.directorios_=obtener_directorios(self.archivo)
