@@ -33,7 +33,7 @@ import shutil
 import struct
 import numpy as np
 from pathlib import Path
-from metodos_rsa import loc_cabecera,imprimir_plt,conversion_mseed,leer_mseed,lectura_archivo
+from metodos_rsa import loc_cabecera,imprimir_plt,conversion_mseed,leer_mseed,lectura_archivo,escritura_archivo
 from metodos_gestion import parametros_estaciones,obtencion_hora,obtener_directorios
 from datetime import datetime
 import os 
@@ -75,6 +75,17 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso,Lbl_M
 
     # ------------------- Lectura de cabecera ----------------------------- #
     directorios = obtener_directorios(archivo_binario)
+    archivo_analogico=os.path.join(directorio_trabajo,"analogico.csv")
+    if os.path.exists(archivo_analogico):
+        referencias=lectura_archivo(archivo_analogico)
+        if referencias[0]!=archivo_binario:
+            referencias=[archivo_binario,0]
+            escritura_archivo(archivo_analogico,referencias)
+    else:
+        referencias=[archivo_binario,0]
+        escritura_archivo(archivo_analogico,referencias)
+    print(referencias)    
+        
     f = open(archivo_binario, 'rb')
     numero_segundo, configuracion, puntero = loc_cabecera(f)
 
