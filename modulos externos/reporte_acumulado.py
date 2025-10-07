@@ -671,7 +671,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             if os.path.exists(self.directorios['Directorio_base']):
                 eventos_reporte,catalogo,\
                 eventos,vector,canales_eventos_dia,\
-                self.root,self.responsable,resumen=cargar_dia(self.directorios['archivo_csv'])
+                self.root,self.responsable,resumen=cargar_dia(self.directorios)
                 self.eventos=self.eventos+eventos
                 self.catalogo=self.catalogo+catalogo[1:]
                 self.eventos_reporte=self.eventos_reporte+eventos_reporte[1:]
