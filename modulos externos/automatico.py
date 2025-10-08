@@ -87,11 +87,11 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso,Lbl_M
     
     numero_segundo, configuracion, puntero = loc_cabecera(f)
     texto_segundo = str(numero_segundo)
-    print(referencias,texto_segundo)
     with open(directorios['archivo_estaciones'], 'a', newline='') as archivo_estaciones:
         escritor_csv_ = csv.writer(archivo_estaciones, delimiter=';')
         for fila in configuracion:
             escritor_csv_.writerow(fila)
+    print(type(puntero),puntero)
     puntero = puntero - 5
     f.seek(0)
     cabecera = f.read(puntero)
@@ -108,8 +108,11 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso,Lbl_M
         barra_progreso.setRange(0, int(segundos_estimados))
         barra_progreso.setValue(0)
         QCoreApplication.processEvents()
-    puntero=int(referencias[1][1])
-    contador_segundos=int(referencias[1][3])
+
+    if puntero==0:
+        puntero=int(referencias[1][1])
+        contador_segundos=int(referencias[1][3])
+        print(puntero)
     f.seek(puntero-4) #Es el inicio del segundo menos 4 por el formato de datos b'\x08\x00\x05\x00'
     contador = 0
     contador_m = 0
