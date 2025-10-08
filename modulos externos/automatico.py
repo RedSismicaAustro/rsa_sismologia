@@ -23,11 +23,7 @@ import re
 import time
 import sys
 from PyQt5 import uic, QtWidgets
-
 from PyQt5.QtCore import QObject
-
-
-
 from PyQt5.QtCore import QDate
 import shutil
 import struct
@@ -76,19 +72,22 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso,Lbl_M
     # ------------------- Lectura de cabecera ----------------------------- #
     directorios = obtener_directorios(archivo_binario)
     archivo_analogico=os.path.join(directorio_trabajo,"analogico.csv")
+    referencias=[]
+    contador_segundos=0
+    referencias.append(['Archivo', 'puntero','segundo_m','contador_s'])
     if os.path.exists(archivo_analogico):
         referencias=lectura_archivo(archivo_analogico)
-        if referencias[0]!=archivo_binario:
-            referencias=[archivo_binario,0]
+        if referencias[1][0]!=archivo_binario:
+            referencias[1]=[archivo_binario,'0','00000',str(contador_segundos)]
             escritura_archivo(archivo_analogico,referencias)
     else:
-        referencias=[archivo_binario,0]
+        referencias.append([archivo_binario,'0','00000',str(contador_segundos)])
         escritura_archivo(archivo_analogico,referencias)
-    print(referencias)    
-        
     f = open(archivo_binario, 'rb')
+    
     numero_segundo, configuracion, puntero = loc_cabecera(f)
-
+    texto_segundo = str(numero_segundo)
+    print(referencias,texto_segundo)
     with open(directorios['archivo_estaciones'], 'a', newline='') as archivo_estaciones:
         escritor_csv_ = csv.writer(archivo_estaciones, delimiter=';')
         for fila in configuracion:
@@ -101,14 +100,16 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso,Lbl_M
         fout.write(cabecera)
     # ------------------- Estimación de segundos -------------------------- #
     tamano_archivo = os.path.getsize(archivo_binario)
-    segundos_estimados = max(0, (tamano_archivo - max(0, puntero))) // bytes_por_segundo
+    segundos_estimados = (max(0, (tamano_archivo - max(0, puntero))) // bytes_por_segundo)-int(referencias[1][3])
+    
     mensaje_lbl(Lbl_Mensajes, f"Segundos estimados: {segundos_estimados}",True)
  
     if barra_progreso is not None:
         barra_progreso.setRange(0, int(segundos_estimados))
         barra_progreso.setValue(0)
         QCoreApplication.processEvents()
-
+    puntero=int(referencias[1][1])
+    contador_segundos=int(referencias[1][3])
     f.seek(puntero-4) #Es el inicio del segundo menos 4 por el formato de datos b'\x08\x00\x05\x00'
     contador = 0
     contador_m = 0
@@ -124,6 +125,7 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso,Lbl_M
                 break
             if cabecera_0 == b'\x08\x00\x05\x00':
                 numero_segundo = f.read(5)      # <<< 5 bytes del número de segundo
+                texto_segundo = numero_segundo.decode('ascii', errors='ignore')
                 segundos_leidos.append(numero_segundo)  # Guardamos los 5 bytes
                 cabecera_1 = f.read(20)
                 if cabecera_1 == b'\x02\x20\x02\x00\x40\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00':
@@ -156,6 +158,7 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso,Lbl_M
                     if barra_progreso is not None:
                         barra_progreso.setValue(min(contador, int(segundos_estimados)))
                         QCoreApplication.processEvents()
+                    contador_segundos=contador_segundos+1
                 else:
                     continue
             else:
@@ -172,6 +175,9 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso,Lbl_M
                                 bandera_colgado=0
                           
                 continue
+            
+        referencias[1]=[archivo_binario,str(puntero_marcas),texto_segundo,str(contador_segundos)]
+        escritura_archivo(archivo_analogico,referencias)
     finally:
         f.close()
 
@@ -231,28 +237,6 @@ def mensaje_lbl(Lbl_Mensajes, mensaje, borrar=False):
 
             Lbl_Mensajes.insertPlainText(texto_nuevo)
 
-        QCoreApplication.processEvents()
-    except Exception:
-        pass
-
-
-def mensaje_lbl__(Lbl_Mensajes, mensaje, borrar=False):
-    """
-    Escribe en Lbl_Mensajes.
-    - borrar=True: reemplaza el texto.
-    - borrar=False: agrega el mensaje en la siguiente línea.
-    """
-    try:
-        Lbl_Mensajes.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        Lbl_Mensajes.setWordWrap(True)
-        texto_nuevo = "" if mensaje is None else str(mensaje)
-        if borrar:
-            Lbl_Mensajes.setText(texto_nuevo)
-        else:
-            actual = Lbl_Mensajes.text() or ""
-            if actual and not actual.endswith("\n"):
-                actual += "\n"
-            Lbl_Mensajes.setText(actual + texto_nuevo)
         QCoreApplication.processEvents()
     except Exception:
         pass

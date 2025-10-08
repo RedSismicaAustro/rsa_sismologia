@@ -381,7 +381,96 @@ def obtenerTraza(nombreCanal,num_canal, data, anio, mes, dia, horas, minutos, se
     traza = Trace(data = data, header = stats)
     return traza
 
-def conversion_mseed(canal_np,hab_canal,nombre_canal,fecha_,directorio):
+
+
+import os
+
+def conversion_mseed(canal_np, hab_canal, nombre_canal, fecha_, directorio):
+    """
+    Convierte canales habilitados a MiniSEED acumulando por día.
+    - SR fijo = 64 sps.
+    - Si ya existe el MSEED del día para el canal, se lee y se acumula al final (sin solapar):
+      starttime_nuevo = fin_prev + 1/64.
+    - Si no existe, el bloque inicia en 'fecha_' y el archivo se nombra con 00:00:00 del día.
+    - Se asume que 'canal_np[i]' contiene SOLO muestras nuevas (no repetidas).
+    """
+    # Asegurar tipo entero de 32 bits para STEIM1 (evita copias innecesarias)
+    if canal_np.dtype != np.int32:
+        canal_np = canal_np.astype(np.int32, copy=False)
+
+    # Componentes de tiempo para este bloque
+    anio, mes, dia = fecha_.year, fecha_.month, fecha_.day
+    horas, minutos, segundos = fecha_.hour, fecha_.minute, fecha_.second
+
+    # Nombre de archivo DIARIO: desde medianoche del mismo día
+    fecha_dia_cero = fecha_.replace(hour=0, minute=0, second=0, microsecond=0)
+    hora_string_dia = fecha_dia_cero.strftime('%Y%m%d_%H%M%S')  # yymmdd_000000
+
+    # SR por defecto (sps)
+    sr_defecto = 64.0
+    dt = 1.0 / sr_defecto
+
+    trCanal = [[], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []]
+
+    for i in range(16):
+        if hab_canal[i] != "0":
+            # Ruta del archivo diario del canal
+            base_dia = os.path.join(directorio, f"{nombre_canal[i]}_{hora_string_dia}")
+            nombre_mseed = base_dia + ".mseed"
+
+            # 1) Construir traza nueva con hora de referencia (se ajustará si ya existe archivo)
+            traza = obtenerTraza(
+                nombre_canal[i],
+                1,
+                canal_np[i],
+                anio, mes, dia, horas, minutos, segundos,
+                0  # subsegundos/offset si aplica
+            )
+
+            # Asegurar SR = 64 sps y starttime explícito
+            traza.stats.sampling_rate = sr_defecto
+            try:
+                traza.stats.starttime = UTCDateTime(anio, mes, dia, horas, minutos, segundos)
+            except Exception:
+                # Si por algún motivo falla, dejamos lo que ponga obtenerTraza
+                pass
+
+            st_nuevo = Stream(traces=[traza])
+
+            # 2) Si ya existe el archivo del día, leer y acumular al final sin solapes
+            if os.path.exists(nombre_mseed):
+                try:
+                    st_prev = read(nombre_mseed)
+                    # Unificar el previo (por si tiene varias trazas) antes de calcular fin_prev
+                    st_prev.merge(method=0, fill_value='latest')
+                    # Fin real del previo (máximo endtime entre trazas)
+                    fin_prev = max(tr.stats.endtime for tr in st_prev)
+                    # Ajustar inicio del nuevo bloque a continuación exacta
+                    traza.stats.starttime = fin_prev + dt
+                    # Acumular y volver a unificar
+                    st_prev += st_nuevo
+                    st_prev.merge(method=0, fill_value='latest')
+                    # Escribir de vuelta el archivo del día
+                    st_prev.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
+                    trCanal[i] = st_prev
+                except Exception:
+                    # Si algo sale mal al leer/mergear, como fallback escribe solo el nuevo
+                    st_nuevo.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
+                    trCanal[i] = st_nuevo
+            else:
+                # 3) No existe archivo del día: escribir solo el bloque nuevo (comienza en fecha_)
+                st_nuevo.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
+                trCanal[i] = st_nuevo
+        else:
+            trCanal[i] = []
+
+    return trCanal
+
+
+
+
+
+def conversion_mseed__(canal_np,hab_canal,nombre_canal,fecha_,directorio,trCanal_prev=None):
     #Canal_np es ela arreglo numpy donde está el registro continuo por estación
     #hab_canal es un vector donde están los canales habilitados del registro continuo de los 16 manejados en el sistema analógico
     #nombe_canal, vector con valores string de 4 caracteres para el nombre de cada uno de los canales
@@ -394,7 +483,12 @@ def conversion_mseed(canal_np,hab_canal,nombre_canal,fecha_,directorio):
     horas=fecha_.hour
     minutos=fecha_.minute
     segundos=fecha_.second
-    canal_np = canal_np.astype(np.int32)
+    if canal_np.dtype != np.int32:
+        canal_np = canal_np.astype(np.int32, copy=False)
+    if trCanal_prev is None:
+        trCanal_prev = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
+
+
     for i in range(0, 16):
          if hab_canal[i]!="0":
             # Nombre del archivo en funcion del tiempo de inicio
