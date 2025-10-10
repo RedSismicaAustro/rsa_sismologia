@@ -988,25 +988,6 @@ def codigos(opcion,archivo_abrir):
         return(aux)#return(aux,numero_segundo)
 
 
-def lectura_archivo__(archivo):
-    # Inicializamos una lista vacía para almacenar los valores
-    valores = []
-    try:
-        # Abrimos el archivo en modo lectura
-        with open(archivo, 'r') as file:
-            # Leemos cada línea del archivo
-            for linea in file:
-                # Dividimos la línea en valores usando punto y coma como separador
-                elementos = linea.strip().split(';')
-                # Agregamos los elementos a la lista
-                valores.append(elementos)
-    except FileNotFoundError:
-        print(f"El archivo {archivo} no fue encontrado.")
-        return None
-    return valores
-
-
-
 def lectura_archivo(archivo):
     """
     Lee un archivo de texto donde cada línea contiene valores separados por punto y coma.
@@ -1738,7 +1719,160 @@ def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaci
     grafico_evento_int(visor,stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
 
 
-def extraer_dia(archivo,responsable,bandera_todo):
+
+
+def extraer_dia(archivo, responsable, bandera_todo):
+    """
+    Procesa el día indicado por 'archivo':
+      - Selecciona el archivo fuente (AAAAMMDD_aux.csv si existe, caso contrario AAAAMMDD000000.csv)
+      - Lee eventos y actualiza los conteos por tramos (0–11, 12–17, 18–23)
+      - Actualiza/crea archivo de tiempos (archivo_tiempos)
+      - Recorre eventos_auxiliar, ejecuta 'extraccion' y consolida en el CSV principal
+    Asume que todos los archivos son generados por el sistema (sin cabeceras y con formato estable).
+    """
+    # ----------------------------------------------------------------------
+    # 1) Selección de archivo fuente y lecturas base
+    # ----------------------------------------------------------------------
+    directorios = obtener_directorios(archivo)
+
+    # Elegimos primero el archivo correcto y recién luego leemos (evita desfasajes)
+    nombre_archivo = directorios["archivo_auxiliar"]
+    if not os.path.exists(nombre_archivo):
+        nombre_archivo = directorios["archivo_csv"]
+
+    # Lecturas de listas (sin cabeceras, según tu pipeline)
+    lista_eventos = lectura_archivo(nombre_archivo)         # base para conteos por tramo
+    eventos_auxiliar = lectura_archivo(nombre_archivo)      # base para iterar en extraccion()
+
+    # Archivo donde se guardan conteos
+    archivo_guardar = directorios["archivo_tiempos"]
+
+    # Si existe, se usa; caso contrario se crea con 3 filas (12H, 18H, 24H)
+    if os.path.exists(archivo_guardar):
+        datos_tiempo = lectura_archivo(archivo_guardar)
+    else:
+        datos_tiempo = [
+            ["RSA", "12H", "", "", "", "", "", "", "", ""],
+            ["RSA", "18H", "", "", "", "", "", "", "", ""],
+            ["RSA", "24H", "", "", "", "", "", "", "", ""],
+        ]
+        escritura_archivo(archivo_guardar, datos_tiempo)
+
+    # ----------------------------------------------------------------------
+    # 2) Conteos por tramo y por tipo de evento (sin validaciones adicionales)
+    #    Tramos: 0 = 00–11, 1 = 12–17, 2 = 18–23
+    # ----------------------------------------------------------------------
+    # Estructura: cada clave tiene una lista [c0, c1, c2]
+    contadores = {
+        "sismo":       [0, 0, 0],
+        "ff":          [0, 0, 0],
+        "fc":          [0, 0, 0],
+        "indefinido":  [0, 0, 0],
+        "tele":        [0, 0, 0],
+        "local":       [0, 0, 0],
+        "ruido":       [0, 0, 0],
+    }
+    # Etiquetas de salida para datos_tiempo (coinciden con tus columnas)
+    etiquetas_tramo = [12, 18, 24]  # Semántico: 12H, 18H, 24H (tramo 18–23)
+
+    # Recorremos eventos tal como vienen (sin encabezados y con formato estable AAAAMMDD_hhmmss)
+    for fila in lista_eventos:
+        # fila[1] es 'AAAAMMDD_hhmmss' ⇒ la hora está en posiciones [9:11]
+        h = int(fila[1][9:11])
+
+        # Tramo según la hora
+        if h < 12:
+            idx = 0
+        elif h < 18:
+            idx = 1
+        else:
+            idx = 2
+
+        # Tipo exacto (según tu pipeline)
+        tipo = fila[2]
+
+        # Suma por tipo, con tus equivalencias para 'local'
+        if tipo == 'SISMO':
+            contadores["sismo"][idx] += 1
+        elif tipo == 'FF':
+            contadores["ff"][idx] += 1
+        elif tipo == 'FC':
+            contadores["fc"][idx] += 1
+        elif tipo == 'INDEFINIDO':
+            contadores["indefinido"][idx] += 1
+        elif tipo == 'TELESISMO':
+            contadores["tele"][idx] += 1
+        elif tipo == 'Evento_local' or tipo == 'CONTROL':
+            contadores["local"][idx] += 1
+        else:
+            contadores["ruido"][idx] += 1
+
+    # ----------------------------------------------------------------------
+    # 3) Actualización de datos_tiempo (sin pasos intermedios innecesarios)
+    # ----------------------------------------------------------------------
+    for i in (0, 1, 2):
+        total = (
+            contadores["sismo"][i] + contadores["ff"][i] + contadores["fc"][i] +
+            contadores["indefinido"][i] + contadores["tele"][i] +
+            contadores["local"][i] + contadores["ruido"][i]
+        )
+
+        # Si hay eventos en el tramo y la fila está vacía, completar responsable y etiqueta de tramo
+        if total != 0 and datos_tiempo[i][2] == "":
+            datos_tiempo[i][0] = responsable
+            datos_tiempo[i][1] = f"{etiquetas_tramo[i]}H"
+
+        # Si la fila ya está “abierta” (o la acabamos de abrir), escribir conteos
+        if datos_tiempo[i][2] != "" or total != 0:
+            datos_tiempo[i][2] = str(total)
+            datos_tiempo[i][3] = str(contadores["sismo"][i])
+            datos_tiempo[i][4] = str(contadores["ff"][i])
+            datos_tiempo[i][5] = str(contadores["fc"][i])
+            datos_tiempo[i][6] = str(contadores["indefinido"][i])
+            datos_tiempo[i][7] = str(contadores["tele"][i])
+            datos_tiempo[i][8] = str(contadores["local"][i])
+            datos_tiempo[i][9] = str(contadores["ruido"][i])
+
+    escritura_archivo(archivo_guardar, datos_tiempo)
+
+    # ----------------------------------------------------------------------
+    # 4) Extracción y consolidación en el CSV principal
+    #     - La barra de progreso usa el tamaño real de 'eventos_auxiliar'
+    #     - 'bandera_todo' vacía 'eventos' para reprocesar todo
+    # ----------------------------------------------------------------------
+    eventos = lectura_archivo(directorios['archivo_csv'])
+
+    # La barra debe reflejar lo que realmente vamos a iterar
+    maximo = len(eventos_auxiliar)
+    ventana = VentanaProgreso("Extrayendo eventos...", maximo)
+
+    try:
+        if bandera_todo:
+            eventos = []
+
+        # Lista de claves ya existentes (columna 1 = AAAAMMDD_hhmmss)
+        solo_eventos = [fila[1] for fila in eventos]
+
+        for i, evento_auxiliar in enumerate(eventos_auxiliar):
+            ventana.actualizar(i + 1)
+            evento = extraccion(evento_auxiliar, solo_eventos, archivo, False)
+            if evento is not None:
+                eventos.append(evento)
+                # (Opcional) si quisieras evitar duplicados dentro del mismo ciclo:
+                # solo_eventos.append(evento[1])
+
+        # Consolidación final (según tu convención: clave en la columna 1)
+        eventos = ordenar_y_eliminar_duplicados(eventos, 1, False)
+        escritura_archivo(directorios['archivo_csv'], eventos)
+
+    finally:
+        # Asegura cierre de la ventana incluso si hay una excepción intermedia
+        ventana.cerrar()
+
+
+
+
+def extraer_dia__(archivo,responsable,bandera_todo):
             directorios=obtener_directorios(archivo)
             nombre_archivo=directorios["archivo_auxiliar"]
             eventos_auxiliar=lectura_archivo(nombre_archivo)
@@ -1840,118 +1974,153 @@ def extraer_dia(archivo,responsable,bandera_todo):
             escritura_archivo(directorios['archivo_csv'],eventos)
             ventana.cerrar()
 
-def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
+
+def extraccion(evento_auxiliar, solo_eventos, archivo, bandera_forzar):
     """
-    evento_auxiliar              linea de lectura del archivo AAMMDD_aux.csv 
-    solo_eventos                 Todos los eventos procesados del día, se puede extraer un evento pasando solo_eventos=[]
-    archivo:                     archivo con formato ..\DIA\AAMMDD000000
-    bandera_forzar               bandera para forzar la lectura, así esté en el archivo AAMMDD000000.csv
+    evento_auxiliar : línea del AAMMDD_aux.csv 
+    solo_eventos    : lista de eventos ya procesados del día (para evitar duplicados)
+    archivo         : ruta base ..\DIA\AAMMDD000000
+    bandera_forzar  : se mantiene por compatibilidad (no se usa para iterar)
     """
-    
-    estaciones_analogicas=lectura_archivo(os.path.join(ruta_datos,'analogicas.csv'))
+    estaciones_analogicas = lectura_archivo(os.path.join(ruta_datos, 'analogicas.csv'))
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
-    evento,tipo_evento,t_inicio, t_final = evento_auxiliar[1],evento_auxiliar[2], float(evento_auxiliar[4]), float(evento_auxiliar[5])
-    print('Extrayendo ',evento)
+
+    evento, tipo_evento = evento_auxiliar[1], evento_auxiliar[2]
+    t_inicio, t_final = float(evento_auxiliar[4]), float(evento_auxiliar[5])
+    print('Extrayendo ', evento)
+
+    # Referencias de tiempo
     fecha_ = obtencion_hora(archivo)
     t_ini = fecha_ + t_inicio
     t_fin = fecha_ + t_final
-    numero_de_muestras=int((t_fin-t_ini)*64)
-    nombre_sis = os.path.join(directorios['Directorio_dia'] , t_ini.strftime('%Y%m%d_%H%M%S.sis'))
+    numero_de_muestras = int((t_fin - t_ini) * 64)
+
+    # Nombres de salida
+    nombre_sis = os.path.join(directorios['Directorio_dia'], t_ini.strftime('%Y%m%d_%H%M%S.sis'))
     hora_formateada = t_ini.strftime(" %H: %M: %S")
+
+    # Rango de tiempo inválido
     if t_inicio > t_final:
         QMessageBox.about(None, "Advertencia", "Hora incorrecta: Tiempo de inicio mayor a final")
         return
-    if evento not in solo_eventos:
-        if len(evento_auxiliar)>6:
-            estaciones=evento_auxiliar[7]
-            lista_estaciones_aportantes =estaciones.split()
-        else:
-            eventos=lectura_archivo(directorios['archivo_csv'])
-            lista_estaciones_aportantes=[]
-            for evento in eventos:
-                if evento[1]==evento_auxiliar[1]:
-                    break
-            for estacion_aportante in evento[3:]:
-                if estacion_aportante!='-':
-                    lista_estaciones_aportantes.append(estacion_aportante)
-            
-        estaciones_eventos_total=[]
-        for estaciones_aportantes in lista_estaciones_aportantes:
-            codigo_estacion=estaciones_aportantes[:4]
-            indice=parametros['CODIGO'].index(codigo_estacion)
-            estaciones_eventos_total.append(indice)
-    else:
-        return 
-    if tipo_evento != "Ruido":
-        sismo_extraido=[]
-        estaciones_con_senial=[]
-        for numero_estacion,estacion_habilitada in enumerate(parametros['HAB_CANAL']):
-            if  estacion_habilitada=='1':
-                archivo_mseed_dia=os.path.join(directorios['Directorio_registros'],parametros['CODIGO'][numero_estacion]+directorios['sufijo_mseed'])
-                if os.path.exists(archivo_mseed_dia):
-                    auxiliar=(numero_estacion,parametros['NOMBRE'][numero_estacion],parametros['CODIGO'][numero_estacion])
-                    estaciones_con_senial.append(auxiliar)
 
-        ####################################################
-        ####Estraccion de eventos en mseed por estación.
-        ####################################################
-        for estacion_con_senial in estaciones_con_senial:
-            numero_estacion=int(estacion_con_senial[0])
-            componente=int(parametros['COMPONENTE'][numero_estacion])-1
-            archivo_mseed_dia=os.path.join(directorios['Directorio_registros'],parametros['CODIGO'][numero_estacion]+directorios['sufijo_mseed'])
-            stcanal = read(archivo_mseed_dia, format="MSEED", starttime=t_ini, endtime=t_fin, nearest_sample=False)
-            if len(stcanal)==0:
-                    continue
-            # Aplica corrección de polaridad si es necesario
+    # Evitar reprocesar eventos ya presentes
+    if evento in solo_eventos:
+        return
+
+    # ------------------------------------------------------------------
+    # Estaciones aportantes (tokens):
+    # 1) CSV del día (preferente si existe la fila)
+    # 2) Auxiliar (completa lo faltante)
+    # ------------------------------------------------------------------
+    # Tokens desde auxiliar (si vinieron)
+    if len(evento_auxiliar) > 6 and evento_auxiliar[7].strip():
+        tokens_aux = evento_auxiliar[7].split()
+    else:
+        tokens_aux = []
+
+    # Tokens desde CSV del día (preferentes si existe la fila)
+    fila_csv = None
+    tokens_csv = []
+    eventos_csv_dia = lectura_archivo(directorios['archivo_csv'])
+    for fila_ev in eventos_csv_dia:
+        if fila_ev[1] == evento_auxiliar[1]:
+            fila_csv = fila_ev
+            break
+    if fila_csv:
+        # columnas 3..N contienen tokens o '-'
+        tokens_csv = [tok for tok in fila_csv[3:] if tok != '-']
+
+    # ------------------------------------------------------------------
+    # Extracción a .mseed por estación habilitada (si el evento no es "Ruido")
+    # ------------------------------------------------------------------
+    if tipo_evento != "Ruido":
+        sismo_extraido = []
+        estaciones_con_senial = []
+
+        # Estaciones habilitadas con mseed del día disponible
+        for numero_estacion, habil in enumerate(parametros['HAB_CANAL']):
+            if habil == '1':
+                archivo_mseed_dia = os.path.join(
+                    directorios['Directorio_registros'],
+                    parametros['CODIGO'][numero_estacion] + directorios['sufijo_mseed']
+                )
+                if os.path.exists(archivo_mseed_dia):
+                    estaciones_con_senial.append(
+                        (numero_estacion, parametros['NOMBRE'][numero_estacion], parametros['CODIGO'][numero_estacion])
+                    )
+
+        # Corte del intervalo y guardado del .mseed de evento por estación
+        for numero_estacion, _, codigo_est in estaciones_con_senial:
+            componente = int(parametros['COMPONENTE'][numero_estacion]) - 1
+            archivo_mseed_dia = os.path.join(
+                directorios['Directorio_registros'],
+                parametros['CODIGO'][numero_estacion] + directorios['sufijo_mseed']
+            )
+            stcanal = read(archivo_mseed_dia, format="MSEED",
+                           starttime=t_ini, endtime=t_fin, nearest_sample=False)
+            if len(stcanal) == 0:
+                continue
+
+            # Corrección de polaridad si aplica
             if parametros['POLARIDAD'][numero_estacion] == 'N':
                 stcanal[componente].data *= -1
-            # Guardar archivo .mseed
-            nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
-            stcanal.write(nombre_mseed, format='MSEED', encoding='STEIM1', reclen=512)
-            print('Grabando:',nombre_mseed)
-  
 
-        ####################################################
-        ####Converesión de las estaciones configuradas en estaciones analógicas
-        ####para el proceso V2.
-        ####################################################
+            # Guardar .mseed de evento
+            nombre_mseed_ev = os.path.join(
+                directorios['Directorio_eventos'],
+                codigo_est + t_ini.strftime('_%Y%m%d_%H%M%S.mseed')
+            )
+            stcanal.write(nombre_mseed_ev, format='MSEED', encoding='STEIM1', reclen=512)
+            print('Grabando:', nombre_mseed_ev)
+
+        # Conversión a “analógicas” (V2) y remuestreo a 64 Hz
         for estacion_analogica in estaciones_analogicas:
-            if estacion_analogica[0]=='ESTACION':
+            if estacion_analogica[0] == 'ESTACION':
                 continue
-            numero_estacion=int(estacion_analogica[0])
-            componente=int(parametros['COMPONENTE'][numero_estacion])-1
-            if numero_estacion not in estaciones_eventos_total:
-                stcanal=[]
+
+            numero_estacion = int(estacion_analogica[0])
+            componente = int(parametros['COMPONENTE'][numero_estacion]) - 1
+
+            nombre_mseed_ev = os.path.join(
+                directorios['Directorio_eventos'],
+                parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed')
+            )
+            if not os.path.exists(nombre_mseed_ev):
                 sis_extraido = np.array([], dtype=np.int32)
-            else:
-                nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
-                if  os.path.exists(nombre_mseed):
-                    stcanal = read(nombre_mseed)
-                    stcanal.detrend("demean")
+                sismo_extraido.append(sis_extraido)
+                continue
+
+            stcanal = read(nombre_mseed_ev)
+            stcanal.detrend("demean")
+            stcanal[componente].data = stcanal[componente].data.astype('int32')
+
+            sis_extraido = stcanal[componente].data
+            fs = stcanal[componente].stats.sampling_rate
+
+            if fs != 64:
+                sis_extraido = signal.resample(sis_extraido, numero_de_muestras)
+                sis_extraido = np.rint(sis_extraido).astype(np.int32)
+
+            # Forzar tamaño exacto
+            if sis_extraido.size != numero_de_muestras:
+                if sis_extraido.size > numero_de_muestras:
+                    sis_extraido = sis_extraido[:numero_de_muestras]
                 else:
-                    continue
-                stcanal[componente].data = stcanal[componente].data.astype('int32')
-                sis_extraido = stcanal[componente].data
-                muestras = stcanal[componente].stats.sampling_rate
-                if muestras!=64:
-                    sis_extraido = signal.resample(sis_extraido, numero_de_muestras)
-                    sis_extraido = np.rint(sis_extraido).astype(np.int32)
-                # Forzar tamaño correcto
-                if sis_extraido.size != numero_de_muestras:
-                    if sis_extraido.size > numero_de_muestras:
-                        sis_extraido = sis_extraido[:numero_de_muestras]
-                    else:
-                        faltantes = numero_de_muestras - sis_extraido.size
-                        sis_extraido = np.pad(sis_extraido, (0, faltantes), mode='constant')
+                    faltantes = numero_de_muestras - sis_extraido.size
+                    sis_extraido = np.pad(sis_extraido, (0, faltantes), mode='constant')
+
             sismo_extraido.append(sis_extraido)
-        # Crear archivo .sis si es evento sísmico
+
+        # Construcción del archivo .sis (solo si es SISMO)
         if tipo_evento == "SISMO":
-            archivo_cabecera = os.path.join(directorios['Directorio_trabajo'],"cabecera_sismo")
+            archivo_cabecera = os.path.join(directorios['Directorio_trabajo'], "cabecera_sismo")
             try:
                 with open(archivo_cabecera, 'rb') as archivo_leer:
                     cabecera = b''
                     contador = 0
+                    # Avanza dos etiquetas 0x0008
                     while contador < 2:
                         marcador = archivo_leer.read(2)
                         if marcador == b'\x08\x00':
@@ -1961,14 +2130,21 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
                             contador += 1
                     puntero = archivo_leer.tell()
                     archivo_leer.seek(0)
-                    cabecera = archivo_leer.read(puntero) + b'\x08\x00\x0B\x00' + hora_formateada.encode('utf-8') + archivo_leer.read()
+                    cabecera = (
+                        archivo_leer.read(puntero) +
+                        b'\x08\x00\x0B\x00' + hora_formateada.encode('utf-8') +
+                        archivo_leer.read()
+                    )
+
                 with open(nombre_sis, 'wb') as archivo_escribir:
                     archivo_escribir.write(cabecera)
+
                     segundo_ = t_ini.hour * 3600 + t_ini.minute * 60 + t_ini.second
                     segundo_string = f'{segundo_:05}'
                     archivo_escribir.write(segundo_string.encode())
+
                     k = 0
-                    for n in range( numero_de_muestras):
+                    for n in range(numero_de_muestras):
                         if k == 0:
                             archivo_escribir.write(
                                 b'\x02\x20\x02\x00\x40\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00\x00\x00\x00\x00'
@@ -1976,41 +2152,74 @@ def extraccion(evento_auxiliar,solo_eventos,archivo,bandera_forzar):
                         k += 1
                         if k == 64:
                             k = 0
-                        for i,estacion_analogica in enumerate(estaciones_analogicas):
-                            if estacion_analogica[0]=='ESTACION':
+
+                        for i, estacion_analogica in enumerate(estaciones_analogicas):
+                            if estacion_analogica[0] == 'ESTACION':
                                 continue
-                            m=i-1
-                            estacion=int(estacion_analogica[0])
-                            if parametros['HAB_CANAL'][estacion] == "1" and sismo_extraido[m].size>0:
+                            m = i - 1
+                            estacion = int(estacion_analogica[0])
+
+                            if parametros['HAB_CANAL'][estacion] == "1" and sismo_extraido[m].size > 0:
                                 valor = int(sismo_extraido[m][n])
                             else:
-                                valor=0
+                                valor = 0
 
-
-
-
-                            #if parametros['BITS'][estacion]=='20':
-                                #valor= int(valor/16)
                             try:
                                 archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
                             except OverflowError:
                                 print(valor)
-                                valor=0
+                                valor = 0
                                 archivo_escribir.write(valor.to_bytes(2, byteorder='little', signed=True))
             except FileNotFoundError:
                 print("Cabecera binaria no encontrada:", archivo_cabecera)
+
+    # ------------------------------------------------------------------
+    # Construcción de la línea para el CSV de eventos (101 columnas)
+    # ------------------------------------------------------------------
     if evento not in solo_eventos:
-        estaciones_eventos_total=[]
         lista_guiones = ['-'] * 101
-        if lista_estaciones_aportantes != []:#if tipo_evento != "Ruido":
-            for estacion_aportante in lista_estaciones_aportantes or bandera_forzar:
-                codigo_estacion=estacion_aportante[:4]
-                indice=parametros['CODIGO'].index(codigo_estacion)
-                nombre_mseed = os.path.join(directorios['Directorio_eventos'] ,parametros['CODIGO'][indice] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed'))
-                lista_guiones[indice]=estacion_aportante
-        evento=list(evento_auxiliar[:3])+lista_guiones
-    #input("Enter:")
+
+        # Paso 2: tokens desde CSV del día
+        for tok in tokens_csv:
+            cod = tok[:4]
+            try:
+                idx = parametros['CODIGO'].index(cod)
+                lista_guiones[idx] = tok
+            except ValueError:
+                pass
+
+        # Paso 3: tokens desde auxiliar (solo si no fue ya rellenado)
+        for tok in tokens_aux:
+            cod = tok[:4]
+            try:
+                idx = parametros['CODIGO'].index(cod)
+                if lista_guiones[idx] == '-':
+                    lista_guiones[idx] = tok
+            except ValueError:
+                pass
+
+        # Paso 4: generar token por existencia real de .mseed del evento
+        timestamp_ev = t_ini.strftime('_%Y%m%d_%H%M%S.mseed')
+        total_estaciones = min(101, len(parametros['CODIGO']))
+        for idx in range(total_estaciones):
+            if lista_guiones[idx] != '-':
+                continue  # ya cubierto por CSV o AUX
+
+            nombre_mseed_ev = os.path.join(
+                directorios['Directorio_eventos'],
+                parametros['CODIGO'][idx] + timestamp_ev
+            )
+            if os.path.exists(nombre_mseed_ev):
+                cod = parametros['CODIGO'][idx]
+                canal = str(parametros['COMPONENTE'][idx]) if str(parametros['COMPONENTE'][idx]) else '0'
+                hab = '0'  # No aportante si no vino en CSV/AUX
+                token_generado = f"{cod}{canal}{hab}000000"
+                lista_guiones[idx] = token_generado
+
+        evento = list(evento_auxiliar[:3]) + lista_guiones
+
     return evento
+
 
 def espectro_respuesta(acelerograma, dt,factor,directorio):
     """

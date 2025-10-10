@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-PROCESAMIENTO SISMICO – Unión incremental de MSEED con control usando digital.csv
+PROCESAMIENTO SISMICO – Unión incremental de MSEED con control multiestación (digital.csv)
 - Control: archivo_digital = os.path.join(directorio_trabajo, "digital.csv")
 - Formato: Archivo;Estacion;mseeds
-- Lógica: siempre une los archivos mseed NUEVOS y actualiza el control.
+  * Archivo  : AAAAMMDD000000 (día actual). Si no coincide → se reinicia todo el control.
+  * Estacion : EEEE (código por estación)
+  * mseeds   : "m1 m2 m3 ..." (nombres BASE, separados por espacio, sin rutas)
+- Lógica:
+  * Para cada estación habilitada, recolecta sus MSEED del día.
+  * Calcula cuáles son NUEVOS (no registrados en su fila).
+  * Une SIEMPRE los nuevos al archivo unido {EEEE}_{AAAAMMDD000000}.mseed.
+  * Actualiza/crea la fila de esa estación en digital.csv.
+  * Al final, escribe digital.csv completo (cabecera + N filas).
 """
 
 import os
 import sys
-import csv
 import re
 from pathlib import Path
 from datetime import datetime
@@ -42,8 +49,9 @@ from PyQt5 import uic, QtWidgets
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 from PyQt5.QtCore import QDate, QCoreApplication
 
+
 # =============================================================================
-# Utilitarios digitales (los tuyos + mínimos helpers internos SIN crear APIs nuevas)
+# Utilitarios de digital (manteniendo tu estilo y sin crear APIs nuevas de I/O)
 # =============================================================================
 
 def nombre_mseed(nombre_prefijo: str, fecha_):
@@ -126,6 +134,7 @@ def lectura_archivo_digital(self, archivo_bin: str):
 
     return np.asarray(datos)
 
+
 # =============================================================================
 # Interfaz PyQt – aplicación principal
 # =============================================================================
@@ -161,9 +170,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # Parámetros/estaciones
         archivo_digitales = os.path.join(ruta_proyecto, 'datos', "digitales.csv")
-        
         self.est_digitales_ = lectura_archivo(archivo_digitales)
-        print(self.est_digitales_ )
         self.estaciones_ = parametros_estaciones()
 
         self.estacion_habilitada = self.estaciones_['HAB_CANAL']
@@ -206,11 +213,12 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def Iniciar(self):
         """
-        Por cada estación/día:
+        Por cada estación habilitada:
           1) Recolecta MSEED del día
-          2) Une SIEMPRE los MSEED NO registrados (digital.csv)
-          3) Actualiza digital.csv
-          4) Genera dayplot del canal seleccionado
+          2) Une SIEMPRE los MSEED NO registrados (digital.csv, una fila por estación)
+          3) Actualiza/crea fila de la estación
+          4) Al final, escribe digital.csv completo
+          5) Genera dayplot del canal seleccionado
         """
         self.definir_dia()
 
@@ -220,21 +228,49 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             QMessageBox.information(self, "Advertencia", f"No existe el directorio: {self.directorio_binario}")
             return
 
-        dia_yyyymmdd = self.date.toString('yyyyMMdd')       # 8 dígitos
-        archivo_evento = dia_yyyymmdd + "000000"            # AAAAMMDD000000
-        archivo_digital = os.path.join(self.directorio_trabajo, "digital.csv")  # CONTROL ÚNICO por corrida/día
+        dia_yyyymmdd = self.date.toString('yyyyMMdd')   # 8 dígitos
+        archivo_evento = dia_yyyymmdd + "000000"        # AAAAMMDD000000
+        archivo_digital = os.path.join(self.directorio_trabajo, "digital.csv")  # CONTROL MULTIESTACIÓN
 
+        # ==============================
+        # Cargar CONTROL al inicio (una sola vez)
+        # ==============================
+        if os.path.exists(archivo_digital):
+            filas_ctrl = lectura_archivo(archivo_digital)
+        else:
+            filas_ctrl = []
+
+        # Normalizar cabecera
+        if not filas_ctrl or len(filas_ctrl) == 0 or filas_ctrl[0][0] != 'Archivo':
+            filas_ctrl = [['Archivo', 'Estacion', 'mseeds']]
+
+        # Si el archivo tiene filas de datos y el primer dato no corresponde al día actual,
+        # entonces REINICIAR TODO (nuevo día → empezar de cero).
+        # (se revisa la primera fila de datos válida)
+        indice_primera_fila_valida = None
+        for idx in range(1, len(filas_ctrl)):
+            if len(filas_ctrl[idx]) >= 2:
+                indice_primera_fila_valida = idx
+                break
+        if indice_primera_fila_valida is not None:
+            archivo_en_control = filas_ctrl[indice_primera_fila_valida][0]
+            if archivo_en_control != archivo_evento:
+                # Día distinto → reiniciar control (mantener solo cabecera)
+                filas_ctrl = [['Archivo', 'Estacion', 'mseeds']]
+
+        # ==============================
+        # Procesar estaciones habilitadas
+        # ==============================
         for estacion_digital in self.est_digitales_[1:]:
-            # Filtrado por habilitación
             num_estacion = int(estacion_digital[1])
             if self.estacion_habilitada[num_estacion] != '1':
                 print(f"Estación {self.nombre_estacion[num_estacion]}, {self.codigo_estacion[num_estacion]} no habilitada")
                 continue
             print(f"Estación {self.nombre_estacion[num_estacion]}, {self.codigo_estacion[num_estacion]} habilitada")
 
-            nombre_dir_estacion = estacion_digital[0]              # p.ej. 'OBSID' o 'DIGI01'
-            estacion = self.codigo_estacion[num_estacion]          # 'EEEE'
-            self.lista_archivos_mseed = []                         # limpia lista por estación
+            nombre_dir_estacion = estacion_digital[0]             # p.ej. 'OBSID' o 'DIGI01'
+            estacion = self.codigo_estacion[num_estacion]         # 'EEEE'
+            self.lista_archivos_mseed = []                        # limpia lista por estación
 
             # ¿Existe el directorio de la estación?
             if nombre_dir_estacion not in dir_aux:
@@ -249,13 +285,12 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 print(f"[ADVERTENCIA] No se pudo listar {ruta_est}: {e}")
                 continue
 
-            # --- Recolección de MSEED del día (igual a tu lógica original) ---
+            # --- Recolección de MSEED del día (como tu lógica original) ---
             dia_corto = dia_yyyymmdd[2:8]  # 'yyMMdd' si tus nombres dependen de eso
 
             if nombre_dir_estacion != 'OBSID':
                 for arch_ in arch_aux:
                     try:
-                        # Mantengo tu condición original de nombre:
                         if arch_[7:13] == dia_corto:
                             self.lista_archivos_mseed.append(os.path.join(ruta_est, arch_))
                     except Exception:
@@ -305,52 +340,41 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 continue
 
             # ==============================
-            # CONTROL: lectura/escritura con tus utilidades
+            # CONTROL: localizar/crear la fila de esta estación
             # ==============================
-            # Estructura fija: 2 líneas (cabecera + datos)
-            # Cabecera: ['Archivo','Estacion','mseeds']
-            # Datos:    [archivo_evento, estacion, 'm1 m2 m3 ...']
+            indice_fila_estacion = None
+            for idx in range(1, len(filas_ctrl)):
+                if len(filas_ctrl[idx]) >= 2:
+                    if filas_ctrl[idx][0] == archivo_evento and filas_ctrl[idx][1] == estacion:
+                        indice_fila_estacion = idx
+                        break
 
-            if os.path.exists(archivo_digital):
-                filas_ctrl = lectura_archivo(archivo_digital)
-            else:
-                filas_ctrl = []
+            if indice_fila_estacion is None:
+                filas_ctrl.append([archivo_evento, estacion, ''])
+                indice_fila_estacion = len(filas_ctrl) - 1
 
-            # Normalizar estructura mínima
-            if not filas_ctrl or len(filas_ctrl) < 2 or len(filas_ctrl[0]) < 3:
-                filas_ctrl = [['Archivo','Estacion','mseeds'],
-                              [archivo_evento, estacion, '']]
-            else:
-                # Si cambia evento/estación, reinicia la línea de datos
-                if filas_ctrl[1][0] != archivo_evento or filas_ctrl[1][1] != estacion:
-                    filas_ctrl = [['Archivo','Estacion','mseeds'],
-                                  [archivo_evento, estacion, '']]
-
-            # Lista previa de mseed registrados en control (nombres base separados por espacio)
-            campo_prev = filas_ctrl[1][2] if len(filas_ctrl[1]) > 2 else ''
+            # Lista previa de mseed registrados para ESTA estación
+            campo_prev = filas_ctrl[indice_fila_estacion][2] if len(filas_ctrl[indice_fila_estacion]) > 2 else ''
             previos = [p for p in str(campo_prev).strip().strip('"').strip("'").split(' ') if p]
-            previos = list(dict.fromkeys(previos))  # quita duplicados preservando orden
+            # Quitar duplicados preservando orden
+            previos = list(dict.fromkeys(previos))
             prev_set = set(previos)
 
-            # Detectados actuales (tomar basename para el control)
+            # Detectados actuales (basenames) y NUEVOS
             detectados_base = [os.path.basename(p) for p in self.lista_archivos_mseed]
-            detectados_base = [p for p in detectados_base if p]
-            detectados_base = list(dict.fromkeys(detectados_base))
-
-            # NUEVOS = detectados - previos
+            detectados_base = list(dict.fromkeys([p for p in detectados_base if p]))
             nuevos_base = [m for m in detectados_base if m not in prev_set]
 
-            # Mapear nuevos nombres base a rutas completas (para unir)
+            # Mapear nuevos basenames → rutas completas para unir
             mapa_rutas = {os.path.basename(p): p for p in self.lista_archivos_mseed}
             nuevos_rutas = [mapa_rutas[m] for m in nuevos_base if m in mapa_rutas]
 
             # ==============================
-            # UNIÓN: siempre unir lo nuevo
+            # UNIÓN: SIEMPRE de lo nuevo (ordenar por starttime real)
             # ==============================
             archivo_unido = os.path.join(self.directorio_registros, f"{estacion}_{archivo_evento}.mseed")
 
             if nuevos_rutas:
-                # Ordenar por starttime real (inline, sin helpers nuevos)
                 meta, atrasados = [], []
                 for ruta_m in nuevos_rutas:
                     try:
@@ -362,7 +386,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 meta.sort(key=lambda x: x[0])
                 ordenados = [r for _, r in meta] + atrasados
 
-                # Cargar base (si existe) y sumar nuevos en memoria
+                # Cargar base y sumar nuevos en memoria
                 if os.path.exists(archivo_unido):
                     st_base = obspy.read(archivo_unido)
                 else:
@@ -381,13 +405,10 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                     st_base.write(archivo_unido, format='MSEED', encoding='STEIM1', reclen=512)
 
             # ==============================
-            # ACTUALIZAR CONTROL digital.csv
+            # ACTUALIZAR FILA de esta estación en control
             # ==============================
             totales = previos + [m for m in nuevos_base]
-            filas_ctrl[0] = ['Archivo','Estacion','mseeds']
-            filas_ctrl[1] = [archivo_evento, estacion, " ".join(totales)]
-            escritura_archivo(archivo_digital, filas_ctrl)
-
+            filas_ctrl[indice_fila_estacion] = [archivo_evento, estacion, " ".join(totales)]
             print(f"[{estacion}] Nuevos unidos: {len(nuevos_base)} | Total registrados: {len(totales)}")
 
             # ---------- Parámetros y gráfico dayplot ----------
@@ -406,7 +427,8 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 continue
 
             try:
-                nombrepng = os.path.join(self.directorio, f"{estacion}_{archivo_evento}.png")
+                nombrepng = os.path.join(self.directorio, f"{estacion}_{archivo_evento[:8]}_{archivo_evento[8:]}.png")
+
                 st_final[canal_sel].plot(
                     type='dayplot',
                     outfile=nombrepng,
@@ -417,6 +439,10 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             except Exception as e:
                 print(f"[ADVERTENCIA] No se pudo generar dayplot para {estacion}: {e}")
 
+        # ==============================
+        # Al FINAL: escribir digital.csv completo (cabecera + N filas)
+        # ==============================
+        escritura_archivo(archivo_digital, filas_ctrl)
         print("¡¡Estaciones digitales terminadas!!")
 
     # ---------------- Rutas del día ---------------- #
