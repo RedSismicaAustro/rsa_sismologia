@@ -229,7 +229,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             return
 
         dia_yyyymmdd = self.date.toString('yyyyMMdd')   # 8 dígitos
-        archivo_evento = dia_yyyymmdd + "000000"        # AAAAMMDD000000
+        archivo_evento = dia_yyyymmdd + "_000000"        # AAAAMMDD000000
         archivo_digital = os.path.join(self.directorio_trabajo, "digital.csv")  # CONTROL MULTIESTACIÓN
 
         # ==============================
@@ -268,7 +268,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 continue
             print(f"Estación {self.nombre_estacion[num_estacion]}, {self.codigo_estacion[num_estacion]} habilitada")
 
-            nombre_dir_estacion = estacion_digital[0]             # p.ej. 'OBSID' o 'DIGI01'
+            nombre_dir_estacion = estacion_digital[0]             
             estacion = self.codigo_estacion[num_estacion]         # 'EEEE'
             self.lista_archivos_mseed = []                        # limpia lista por estación
 
@@ -286,55 +286,15 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 continue
 
             # --- Recolección de MSEED del día (como tu lógica original) ---
-            dia_corto = dia_yyyymmdd[2:8]  # 'yyMMdd' si tus nombres dependen de eso
 
-            if nombre_dir_estacion != 'OBSID':
-                for arch_ in arch_aux:
+
+            
+            for arch_ in arch_aux:
                     try:
-                        if arch_[7:13] == dia_corto:
+                        if arch_[5:13] == dia_yyyymmdd:
                             self.lista_archivos_mseed.append(os.path.join(ruta_est, arch_))
                     except Exception:
                         continue
-            else:
-                directorio_mseed = os.path.join(ruta_est, '20' + dia_corto)
-                if os.path.exists(directorio_mseed):
-                    try:
-                        archivos_obsid = sorted(os.listdir(directorio_mseed))
-                    except Exception as e:
-                        print(f"[ADVERTENCIA] No se pudo listar {directorio_mseed}: {e}")
-                        archivos_obsid = []
-
-                    lista_canal = ('EHN', 'EHE', 'EHZ')
-                    listas_por_canal = [[], [], []]
-                    for nombre_arch in archivos_obsid:
-                        try:
-                            canal = nombre_arch[8:11]
-                            if canal in lista_canal:
-                                idx = lista_canal.index(canal)
-                                listas_por_canal[idx].append(nombre_arch)
-                        except Exception:
-                            continue
-
-                    st = Stream()
-                    for i in range(0, len(listas_por_canal[0])):
-                        stream_resultante = Stream()
-                        for j in range(0, 3):
-                            ruta_c = os.path.join(directorio_mseed, listas_por_canal[j][i])
-                            try:
-                                arch_c = read(ruta_c)
-                                stream_resultante.append(arch_c[0])
-                            except Exception as e:
-                                print(f"[ADVERTENCIA] No se pudo leer {ruta_c}: {e}")
-                        st = st + stream_resultante
-                        st.merge(method=0, fill_value='latest')
-
-                    nombre_sal = os.path.join(ruta_est, f"OBSD_20{dia_corto}_000000.mseed")
-                    try:
-                        st.write(nombre_sal, format='MSEED', encoding='STEIM1', reclen=512)
-                        self.lista_archivos_mseed.append(nombre_sal)
-                    except Exception as e:
-                        print(f"[ADVERTENCIA] No se pudo escribir {nombre_sal}: {e}")
-
             if not self.lista_archivos_mseed:
                 print(f"Estacion {nombre_dir_estacion} no tiene registros para este día.")
                 continue
@@ -427,7 +387,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 continue
 
             try:
-                nombrepng = os.path.join(self.directorio, f"{estacion}_{archivo_evento[:8]}_{archivo_evento[8:]}.png")
+                nombrepng = os.path.join(self.directorio, f"{estacion}_{archivo_evento}.png")
 
                 st_final[canal_sel].plot(
                     type='dayplot',
