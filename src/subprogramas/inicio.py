@@ -124,7 +124,7 @@ class Inicio_proceso(QMainWindow):
             if estado:
                 self.dia.setEnabled(False)
                 self.cmbx_periodo.clear()
-                self.cmbx_periodo.addItems("")
+                self.cmbx_periodo.addItem(" ")
                 self.cmbx_periodo.setEnabled(False)
                 self.cmbx_periodo.setCurrentIndex(4)
 

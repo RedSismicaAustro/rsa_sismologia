@@ -32,7 +32,7 @@ from subprogramas.extraer_integrado import Extraer_evento
 from subprogramas.marcar_eventos import Marcar_evento
 from subprogramas.procesamiento_integrado import Procesar_evento,verificar_drives_virtuales,FileMonitor,cargar_combo_eventos,activar_hilo
 from subprogramas.reporte_diario import Reporte_diario
-from subprogramas.reporte_acumulado import Reporte
+from subprogramas.reporte_acumulado import Reporte_periodo
 from subprogramas.inicio import Inicio_proceso
 from subprogramas.otras_redes import Otras_redes
 from datetime import datetime, timedelta
@@ -540,7 +540,7 @@ class VentanaPrincipal(QMainWindow):
 
     def reporte_periodo(self):
         """Cargar menú Reporte Diario"""
-        widget_procesar = Reporte(
+        widget_procesar = Reporte_periodo(
             self.archivo,
             self.directorio_trabajo,
             self.responsable,

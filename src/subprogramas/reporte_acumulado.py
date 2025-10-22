@@ -163,10 +163,10 @@ class VentanaEstaciones(QtWidgets.QDialog):
         return seleccionadas
 
 
-class Reporte(QMainWindow):
+class Reporte_periodo(QMainWindow):
     cerrado = pyqtSignal()  # señal que se emitire al cerrar
     def __init__(self, archivo, directorio_trabajo, responsable, horario, parent=None):#Constructor de la clase
-        super(Reporte,self).__init__(parent)
+        super(Reporte_periodo,self).__init__(parent)
         QMainWindow.__init__(self)
         #Carga la configuración del archivo .ui en el objeto
 
@@ -253,7 +253,6 @@ class Reporte(QMainWindow):
         self.comboBox_semana.setCurrentIndex(int(semana)-1)
         self.comboBox_anio.setCurrentIndex(int(self.hoy.year)-1995)
         self.comboBox_mes.setCurrentIndex(int(self.hoy.month)-1)
-        self.directorio_trabajo="G:/Mi unidad/DIA/"
         self.cmbx_zona.currentIndexChanged.connect(self.Cargar_catalogo)
         self.cmbx_mapa.currentIndexChanged.connect(self.Cargar_catalogo)
         self.cmbx_magnitud.currentIndexChanged.connect(self.Cargar_catalogo)
