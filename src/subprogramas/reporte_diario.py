@@ -202,9 +202,14 @@ class Reporte_diario(QMainWindow):
                 self.cmbx_evento_escogido.addItem(str(x[0])+"  "+str(x[1])+"  "+str(x[2]))
         self.cmbx_evento_escogido.setEnabled(True)  
         self.Btn_limpiar.setEnabled(True) 
-        self.lbl_responsable_1.setText(self.responsables[1][0])
-        self.lbl_responsable_2.setText(self.responsables[2][0])
-        self.lbl_responsable_3.setText(self.responsables[3][0])
+        try:
+            
+            self.lbl_responsable_1.setText(self.responsables[1][0])
+            self.lbl_responsable_2.setText(self.responsables[2][0])
+            self.lbl_responsable_3.setText(self.responsables[3][0])
+        except Exception as e:
+            print(f"Error en responsable: {e}")
+            
         self.cmbx_evento_escogido.setEnabled(True)
         self.cmbx_evento.setEnabled(True)
         self.Btn_modificar.setEnabled(True)
