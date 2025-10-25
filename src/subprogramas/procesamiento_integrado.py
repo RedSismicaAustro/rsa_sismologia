@@ -21,53 +21,67 @@ if ruta_librerias not in sys.path:
 
 
 from metodos_gis_rsa import widget_grafico_mpl
-from metodos_rsa import obtencion_hora,leer_mseed,parametros_estaciones,grafico_evento_int,archivos_fast,verificar_coincidencias
+from metodos_rsa import leer_mseed,parametros_estaciones,grafico_evento_int,archivos_fast,verificar_coincidencias
 from metodos_rsa import copiar_archivos,lectura_archivo,escritura_archivo,guardar_informacion_diaria,guardar_intento,ordenar_y_eliminar_duplicados,insertar_evento_otras_redes,cargar_dia,cargar_evento
 from metodos_gestion import obtener_directorios
 from metodos_reportes_individuales import generar_reporte_sismo
 #from metodos_reportes_individuales import insertar_evento_otras_redes
-from PyQt5.QtWidgets import (QApplication,QMainWindow,QMessageBox,QDialog,QLabel,QCheckBox,QPushButton,QComboBox,QSpinBox,QTextEdit,QVBoxLayout,QWidget)
-from PyQt5 import uic, QtWidgets#Importamos módulo uic y Qtwidgets
+from PyQt5.QtWidgets import (QMainWindow,QMessageBox,QDialog,QLabel,QCheckBox,QPushButton,QComboBox,QSpinBox,QTextEdit,QVBoxLayout,QWidget)
+from PyQt5 import uic
 import matplotlib.pyplot as plt
-from datetime import datetime,timedelta
+from datetime import datetime
 from PyQt5.QtCore import QDate
 from PyQt5.QtCore import Qt,QTimer
 import time
-import threading
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from PyQt5.QtCore import QTimer
 from PyQt5.QtCore import pyqtSignal
 import xml.etree.ElementTree as ET
 from metodos_graficos_rsa import reporte_resumen
+
 def activar_hilo(self):
-        #archivo_monitoreo=self.parent.archivos_procesamiento_virtual[2]
-        while not(self.bandera_procesamiento):
-            archivo_monitoreo=archivos_fast(self.parent.evento_procesar[1],self.parent.directorio_trabajo,self.parent.responsable_evento)[2]
-            if not(os.path.exists(archivo_monitoreo)):
-                mensaje='Evento ' + archivo_monitoreo + " no encontrado\n Hay que ejecutar ProcesoV2"
-                self.parent.Lbl_submensajes.setText(mensaje)
-                #QMessageBox.information(self, "AVISO", mensaje)
-                time.sleep(5)
-                mensaje=''
-                self.parent.Lbl_submensajes.setText(mensaje)
-                time.sleep(5)
-            else:
-                self.bandera_procesamiento=1
-                break
-        # Crea una instancia de FileMonitor y pasa el programa principal y los parámetros
-        if self.bandera_procesamiento:
-            mensaje='Monitorizando en virtual'
-            self.file_monitor = FileMonitor(
-                archivo_monitoreo,
-                lambda procesamiento: self.update_procesamiento(procesamiento),
-                (self.parent.evento_procesar[1], self.parent.directorio_trabajo, self.parent.responsable_evento, self),
-                self.procesamiento
-            )
-            self.file_monitor.start()
+    """
+    Activa el hilo de monitoreo de archivo utilizando QThread.
+    Este hilo detecta cambios en el archivo de procesamiento virtual
+    y actualiza el procesamiento en la interfaz de manera segura.
+    """
+
+    while not self.bandera_procesamiento:
+        archivo_monitoreo = archivos_fast(
+            self.parent.evento_procesar[1],
+            self.parent.directorio_trabajo,
+            self.parent.responsable_evento
+        )[2]
+
+        if not os.path.exists(archivo_monitoreo):
+            mensaje = f"Evento {archivo_monitoreo} no encontrado\nHay que ejecutar ProcesoV2"
+            self.parent.Lbl_submensajes.setText(mensaje)
+            time.sleep(5)
+            self.parent.Lbl_submensajes.setText('')
+            time.sleep(5)
         else:
-            mensaje='Sin Monitorizar,\ntrabajando en la estructura\nde datos'
-        self.parent.Lbl_Mensajes.setText(mensaje)
+            self.bandera_procesamiento = 1
+            break
+
+    if self.bandera_procesamiento:
+        mensaje = 'Monitorizando en virtual'
+        # Crear hilo de monitoreo seguro
+        self.file_monitor = FileMonitorThread(
+            archivo_monitoreo,
+            self.parent.directorio_trabajo,
+            self.parent.responsable_evento,
+            self.procesamiento,
+            self.parent.evento_procesar[1]
+        )
+        # Conectar la señal del hilo con el método de actualización
+        self.file_monitor.procesamiento_actualizado.connect(self.update_procesamiento)
+        self.file_monitor.start()
+    else:
+        mensaje = 'Sin Monitorizar,\ntrabajando en la estructura\nde datos'
+
+    self.parent.Lbl_Mensajes.setText(mensaje)
+
+
     
 def cargar_combo_eventos(self,text):
     self.sismos_procesar=[]
@@ -79,34 +93,70 @@ def cargar_combo_eventos(self,text):
             self.cmbx_eventos.addItem(self.eventos[i][1])
             print(self.eventos[i][1])
     self.preparar_evento('')
-    
 
-class FileMonitor:
-    def __init__(self, file_path, update_callback, callback_params, procesamiento):
+
+# ---------------------------------------------------------------
+# HILO DE MONITOREO DE ARCHIVO - SEGURO PARA PyQt5
+# ---------------------------------------------------------------
+from PyQt5.QtCore import QThread
+import os
+
+class FileMonitorThread(QThread):
+    """
+    Hilo que monitorea un archivo en segundo plano.
+    Si el archivo cambia (fecha de modificación distinta),
+    se guarda automáticamente la información del procesamiento
+    y se emite una señal con el nuevo contenido para que la GUI se actualice.
+    """
+
+    procesamiento_actualizado = pyqtSignal(list)  # Señal Qt -> emite el procesamiento actualizado
+
+    def __init__(self, file_path, directorio, responsable, procesamiento, archivo_evento, parent=None):
+        super().__init__(parent)
         self.file_path = file_path
-        self.update_callback = update_callback
-        self.callback_params = callback_params
+        self.directorios = directorio
+        self.responsable = responsable
         self.procesamiento = procesamiento
-        self._stop_event = threading.Event()
-        self._thread = threading.Thread(target=self._monitor_file)
+        self.archivo_evento = archivo_evento
 
-    def start(self):
-        self._thread.start()
+    def run(self):
+        """Método principal del hilo: monitorea el archivo cada segundo."""
+        if not os.path.exists(self.file_path):
+            print("Archivo no encontrado:", self.file_path)
+            return
 
-    def stop(self):
-        self._stop_event.set()
-        self._thread.join()
+        try:
+            last_modified_time = os.path.getmtime(self.file_path)
+        except Exception as e:
+            print("Error inicial en monitoreo:", e)
+            return
 
-    def _monitor_file(self):
-        last_modified_time = os.path.getmtime(self.file_path)
-        while not self._stop_event.is_set():
-            current_modified_time = os.path.getmtime(self.file_path)
-            if current_modified_time != last_modified_time:
-                print(f'Archivo modificado: {time.ctime(current_modified_time)}')
-                last_modified_time = current_modified_time
-                archivo_csv, directorio, responsables, main_program = self.callback_params
-                self.update_callback(guardar_intento(archivo_csv,directorio,responsables,main_program.procesamiento))
+        # Bucle de monitoreo
+        while not self.isInterruptionRequested():
+            try:
+                current_modified_time = os.path.getmtime(self.file_path)
+                if current_modified_time != last_modified_time:
+                    last_modified_time = current_modified_time
+
+                    # Guardar la información actualizada (mantiene la lógica original)
+                    from metodos_rsa import guardar_intento
+                    nuevo_procesamiento = guardar_intento(
+                        self.archivo_evento,
+                        self.directorios,
+                        self.responsable,
+                        self.procesamiento
+                    )
+
+                    # Emite el resultado hacia la interfaz de forma segura
+                    self.procesamiento_actualizado.emit(nuevo_procesamiento)
+                    print(f"Archivo modificado: {time.ctime(current_modified_time)}")
+
+            except Exception as e:
+                print("Error en FileMonitorThread:", e)
+
             time.sleep(1)
+
+
 
 def verificar_drives_virtuales(responsable_evento):
     print("entrando a verificar drives virtuales", responsable_evento)
@@ -127,9 +177,56 @@ class Procesar_evento(QMainWindow):
     def __init__(self, archivo, directorio_trabajo, responsable, horario, parent=None):#Constructor de la clase
         super().__init__(parent)
         #Carga la configuración del archivo .ui en el objeto
+
+
+
+        # === Configurar el layout principal (panel izquierdo con UI externo) ===
+        from PyQt5 import uic
+        from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
+
+        layout_principal = QHBoxLayout()
+
+        # Panel izquierdo (contenedor con layout vertical)
+        contenedor_izquierdo = QWidget(self)
+        panel_izquierdo = QVBoxLayout(contenedor_izquierdo)
+        panel_izquierdo.setContentsMargins(0, 0, 0, 0)
+
+        # Cargar la interfaz desde el archivo .ui directamente sobre este QMainWindow
+
         ruta_ui = os.path.abspath(os.path.join(ruta_proyecto, 'src','ui',"Proceso.ui"))
         ruta_ui = os.path.abspath(ruta_ui)
-        uic.loadUi(ruta_ui,self)
+        uic.loadUi(ruta_ui, self)  # esto crea un centralWidget temporal
+
+        # Desacoplar el centralWidget del QMainWindow y reubicarlo en el panel izquierdo
+        widget_ui = self.takeCentralWidget()   # toma y quita el centralWidget actual
+        widget_ui.setParent(None)              # quita el padre para poder reubicarlo
+        panel_izquierdo.addWidget(widget_ui)   # lo coloca en el panel izquierdo
+
+        # Añadir el panel izquierdo al layout principal (proporción 1)
+        layout_principal.addWidget(contenedor_izquierdo, 1)
+
+        # === Panel derecho (mapa GIS embebido) ===
+        contenedor_derecho = QWidget(self)
+        panel_derecho = QVBoxLayout(contenedor_derecho)
+        panel_derecho.setContentsMargins(0, 0, 0, 0)
+
+        # Instancia única del widget de mapa (GIS/Matplotlib)
+        # Mantén esta referencia para actualizarlo desde la señal del diálogo estaciones_
+        self.widget_mapa = widget_grafico_mpl(self)
+        panel_derecho.addWidget(self.widget_mapa)
+
+        # Añadir el panel derecho al layout principal (proporción 4)
+        layout_principal.addWidget(contenedor_derecho, 4)
+        # === Fin panel derecho ===
+
+
+        # Crear contenedor central para el QMainWindow (no admite setLayout directo)
+        contenedor_central = QWidget(self)
+        contenedor_central.setLayout(layout_principal)
+        self.setCentralWidget(contenedor_central)
+        # === Fin del armado del panel izquierdo con UI externo ===
+
+
         self.directorio_trabajo = directorio_trabajo
         self.archivo=archivo
         self.responsable=responsable
@@ -160,8 +257,7 @@ class Procesar_evento(QMainWindow):
         self.bandera_marcas=1
         self.revision_procesamiento=False
         self.grupo_carga.setEnabled(False)
-        self.Abrir_archivo()
-
+ 
         # Conectar las señales en el __init__ de tu ventana
         d=datetime.today()              #obtención de la fecha y hora actual
         d = QDate(d.year, d.month,d.day)# obtención del año , mes y día en forma individual
@@ -186,6 +282,15 @@ class Procesar_evento(QMainWindow):
             self.radioButton_revision.setChecked(True)
         self.radioButton_inicial.toggled.connect(self.seleccionar_inicial)
         self.radioButton_revision.toggled.connect(self.seleccionar_revision)
+        self.Abrir_archivo()
+        # Variables de control para el estado del procesamiento
+        self.procesamiento = []      # vacío cuando no hay evento activo
+        self.en_estaciones = False   # indica si el usuario está dentro de estaciones_()
+        # --- Al iniciar el procesamiento ---
+        self.actualizar_mapa_desde_procesamiento(self.procesamiento)
+
+
+    
     # Métodos asociados
     def seleccionar_inicial(self, estado):
         if estado:
@@ -195,6 +300,44 @@ class Procesar_evento(QMainWindow):
     def seleccionar_revision(self, estado):
         if estado:
             pass
+
+    def actualizar_mapa_desde_procesamiento(self, procesamiento):
+        """
+        Redibuja el mapa embebido del panel derecho con el procesamiento recibido.
+        Si 'procesamiento' es vacío, muestra solo estaciones/contexto (estado base).
+        No abre ventanas ni cambia el foco.
+        """
+        try:
+            self.procesamiento = procesamiento
+
+            # --- Guardia: evento vacío -> dibujar base y salir ---
+            if not procesamiento:
+                self.widget_mapa.plot([], self.directorios['archivo_estaciones'])
+                if hasattr(self, "Lbl_submensajes"):
+                    self.Lbl_submensajes.setText("Mapa listo — sin evento seleccionado.")
+                return
+            # --- Fin guardia ---
+
+            bandera = self.widget_mapa.plot(
+                procesamiento,
+                self.directorios['archivo_estaciones']
+            )
+
+            if isinstance(bandera, (list, tuple)) and len(bandera) >= 2:
+                if bandera[0]:
+                    mensaje = 'Procesar con 6 fases mínimo,\n (Con 5 en la parte superior)'
+                elif bandera[1]:
+                    mensaje = 'Procesar con fases claras'
+                else:
+                    mensaje = 'No Procesar'
+                if hasattr(self, "Lbl_submensajes"):
+                    self.Lbl_submensajes.setText(mensaje)
+
+        except Exception as e:
+            print("Error al actualizar mapa desde el padre:", e)
+            if hasattr(self, "Lbl_submensajes"):
+                self.Lbl_submensajes.setText("Error al actualizar mapa (ver consola).")
+
 
     def limpiar_estado(self):
         """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""
@@ -217,20 +360,19 @@ class Procesar_evento(QMainWindow):
         self.cambio_coeficientes_filtro = Cambio_Coeficientes_Filtro(self.canales_habilitados)
         
     def Abrir_archivo(self):  #Depurado
-        print("Abrir_archivo",self.archivo)
         self.Cmb_bx_tipo_evento.clear()
         lista_filtros = ["Ruido", "FF", "FC","TELESISMO","SISMO","INDEFINIDO","Evento_local",'CONTROL','REVISION','TODOS']
         self.Cmb_bx_tipo_evento.addItems(lista_filtros)
         self.cmbx_t_evento.addItems(lista_filtros)
         self.cmbx_t_evento.setCurrentText('SISMO')
-        self.directorio=obtener_directorios(self.archivo)
+        self.directorios=obtener_directorios(self.archivo)
         self.grupo_carga.setEnabled(True)
         #Cargar día
         self.eventos_reporte,self.catalogo,self.eventos,\
         vector,self.evento_canales,\
-        root,self.responsables,self.resumen=cargar_dia(self.directorio)
+        root,self.responsables,self.resumen=cargar_dia(self.directorios)
         cargar_combo_eventos(self,'SISMO')
-        self.archivo_estaciones=self.directorio['archivo_estaciones']
+        self.archivo_estaciones=self.directorios['archivo_estaciones']
         self.ck_box_hab_canal={}
         self.lbl_nombre={}
         self.lbl_codigo={}
@@ -239,9 +381,9 @@ class Procesar_evento(QMainWindow):
 
     def guardar_evento(self):
         print("Guardar evento")
-        escritura_archivo(self.directorio['archivo_csv'],self.eventos)
-        escritura_archivo(self.directorio['archivo_reporte'],self.eventos_reporte)
-        escritura_archivo(self.directorio['archivo_catalogo'],self.catalogo)
+        escritura_archivo(self.directorios['archivo_csv'],self.eventos)
+        escritura_archivo(self.directorios['archivo_reporte'],self.eventos_reporte)
+        escritura_archivo(self.directorios['archivo_catalogo'],self.catalogo)
 
     def preparar_evento(self, text):
         print("Preparar evento:",self.cmbx_eventos.currentText())
@@ -260,7 +402,6 @@ class Procesar_evento(QMainWindow):
         elif aux<240000:
             indice_hora=3
         horario=["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
-        print(self.responsables,indice_hora,self.responsables[indice_hora][0])
         self.responsable_evento=self.responsables[indice_hora][0]
         self.Cmb_bx_tipo_evento.setCurrentText(self.evento_procesar[2])
         self.txt_responsables.setText(self.responsable_evento)
@@ -280,7 +421,7 @@ class Procesar_evento(QMainWindow):
             self.eventos,                            # Datos específicos del evento
             self.evento_canales,                     # Canales del evento
             self.directorio_trabajo,                 # Directorio de trabajo
-            self.directorio['Directorio_reportes']   # Directorio de reportes
+            self.directorios['Directorio_reportes']   # Directorio de reportes
             )
         self.estaciones_eventos_total=self.estaciones_eventos
 
@@ -299,11 +440,11 @@ class Procesar_evento(QMainWindow):
                 if self.evento_procesar[1]==evento[1]:
                     self.eventos[i][2]=self.Cmb_bx_tipo_evento.currentText()
                     break
-        escritura_archivo(self.directorio['archivo_csv'],self.eventos)
-        self.catalogo,self.eventos_reporte=guardar_informacion_diaria(self.directorio['archivo_csv'],self.directorio_trabajo,self.catalogo,self.eventos)
+        escritura_archivo(self.directorios['archivo_csv'],self.eventos)
+        self.catalogo,self.eventos_reporte=guardar_informacion_diaria(self.directorios['archivo_csv'],self.directorio_trabajo,self.catalogo,self.eventos)
         self.eventos_reporte,self.catalogo,self.eventos,\
         vector,self.evento_canales,\
-        root,self.responsables,self.resumen=cargar_dia(self.directorio)
+        root,self.responsables,self.resumen=cargar_dia(self.directorios)
         
 
     def cargar_tipo_evento(self, text):
@@ -311,9 +452,9 @@ class Procesar_evento(QMainWindow):
 
     def procesar_(self,text):
         archivo=self.evento_procesar[1]
-        self.archivo=os.path.join(self.directorio["Directorio_trabajo"],archivo[:8]+archivo[9:15])
-        print("Archivo a rocesar: ",self.archivo,self.responsable_evento)
-        self.directorio=obtener_directorios(self.archivo)
+        self.archivo=os.path.join(self.directorios["Directorio_trabajo"],archivo[:8]+archivo[9:15])
+        print("Archivo a procesar: ",self.archivo,self.responsable_evento)
+        self.directorios=obtener_directorios(self.archivo)
         if self.evento_procesar[2]=='SISMO':
             
             self.bandera_virtual=verificar_drives_virtuales(self.responsable_evento)
@@ -324,7 +465,6 @@ class Procesar_evento(QMainWindow):
             else:
                 self.archivos_procesamiento_virtual=archivos_fast(archivo,self.directorio_trabajo,self.responsable_evento)
                 self.archivos_procesamiento_real=archivos_fast(archivo,self.directorio_trabajo,'')
-                print("Copiando desde real a virtual ")
                 copiar_archivos(self.archivos_procesamiento_real,self.archivos_procesamiento_virtual)
 
         else:
@@ -332,7 +472,7 @@ class Procesar_evento(QMainWindow):
             msg = QMessageBox(QMessageBox.Information, "¡AVISO IMPORTANTE!", "Modificacion de aportes de estaciones y filtros")
             msg.setWindowFlags(msg.windowFlags() | Qt.WindowStaysOnTopHint)
             msg.exec_()
-        self.archivo_procesar=self.directorio['Directorio_procesamiento']+'/'+archivo[:-4]+'_proc.csv'
+        self.archivo_procesar=self.directorios['Directorio_procesamiento']+'/'+archivo[:-4]+'_proc.csv'
         if os.path.exists(self.archivo_procesar):
             self.procesamiento=lectura_archivo(self.archivo_procesar)
         else:
@@ -341,20 +481,29 @@ class Procesar_evento(QMainWindow):
             fecha_formateada = ahora.strftime("%Y-%m-%d %H:%M:%S")
             self.procesamiento.append(['0',fecha_formateada,"Inicio"," "," "," "," "])
         try:
-            path = Path(self.directorio['Directorio_procesamiento'])
+            path = Path(self.directorios['Directorio_procesamiento'])
             path.mkdir(parents=True)
         except FileExistsError:
             pass
-        estaciones_(self.estaciones_eventos,self.filtros_estaciones,self.responsable_evento,self).exec_()
+
+
+        self.en_estaciones = True
+        # Abrir la ventana estaciones_
+        dlg = estaciones_(self.estaciones_eventos, self.filtros_estaciones, self.responsable_evento, self)
+        dlg.exec_()
+
+        # --- Al cerrar estaciones_: volver al mapa vacío ---
+        self.en_estaciones = False
+        self.procesamiento = []
+        self.actualizar_mapa_desde_procesamiento(self.procesamiento)
+
 
     def reportar_(self):
-        #print('Reportar')
         generar_reporte_sismo(self.catalogo, self.evento_reporte_escogido, self.canales, self.trCanal, self.archivo_reporte)
 
     def insertar_(self,text):
-        #print('Insertar de otas redes')
         reporte_(self).exec_()
-        self.catalogo,self.eventos_reporte=guardar_informacion_diaria(self.directorio['archivo_csv'],self.directorio_trabajo,self.catalogo,self.eventos)
+        self.catalogo,self.eventos_reporte=guardar_informacion_diaria(self.directorios['archivo_csv'],self.directorio_trabajo,self.catalogo,self.eventos)
         self.catalogo=ordenar_y_eliminar_duplicados(self.catalogo,0)
         self.guardar_evento()
         
@@ -399,7 +548,7 @@ class Procesar_evento(QMainWindow):
 
         # --- 3) Rutas y fecha ---
         archivo_reporte_temporal = os.path.join(
-            self.directorio['Directorio_base'],
+            self.directorios['Directorio_base'],
             Path(self.archivo).name + '_' + self.horario[:2] + '_' + self.responsable + '.pdf'
         )
         nombre = Path(self.archivo).stem  # AAAAMMDD_hhmmss
@@ -408,9 +557,9 @@ class Procesar_evento(QMainWindow):
         # --- 4) Cargar datos del día y preparar arbol XML ---
         self.eventos_reporte, self.catalogo, self.eventos, \
         self.vector, self.evento_canales, \
-        self.root, self.responsables, self.resumen = cargar_dia(self.directorio)
+        self.root, self.responsables, self.resumen = cargar_dia(self.directorios)
 
-        escritura_archivo(self.directorio['archivo_responsables'], self.responsables)
+        escritura_archivo(self.directorios['archivo_responsables'], self.responsables)
         tree = ET.ElementTree(self.root)
         self.estaciones_eventos = []
 
@@ -557,6 +706,7 @@ class Cambio_Coeficientes_Filtro(QWidget):
         self.show()
 
 class estaciones_(QDialog):
+    senal_procesamiento_cambiado = pyqtSignal(list)
     def __init__(self, estaciones_eventos,filtros,responsable,parent=None):
         super(estaciones_,self).__init__(parent)
         self.setWindowTitle("ESTACIONES")
@@ -666,6 +816,7 @@ class estaciones_(QDialog):
         self.Btn_salir_procesamiento.clicked.connect(self.Salir_)
         self.Btn_salir_procesamiento.setVisible(True)
 
+        self.mapa_inicial_enviado = False  # control para primer dibujado
 
         self.bandera_procesamiento=0
 
@@ -687,12 +838,49 @@ class estaciones_(QDialog):
                     QMessageBox.information(self, "AVISO", mensaje)
                     self.accept()
 
-    def update_procesamiento(self, procesamiento):
-        self.procesamiento = procesamiento
-        if self.procesamiento[-1][2]!='Fallido':
-            if self.procesamiento[-1][3]=='0.0':
-                self.parent.Lbl_submensajes.setText("No se ha marcado el tiempo de coda")
+        # --- Dibujado inicial del mapa embebido (una sola vez) ---
+        try:
+            if not self.mapa_inicial_enviado and hasattr(self, 'procesamiento') and self.procesamiento:
+                self.Ubicacion_()  # usa el mismo flujo que en las actualizaciones
+                self.mapa_inicial_enviado = True
+        except Exception as e:
+            print("Error al emitir mapa inicial:", e)
 
+
+
+
+
+    def update_procesamiento(self, procesamiento):
+        """
+        Se ejecuta en el hilo principal cada vez que el monitor detecta un cambio.
+        Política:
+        - Actualiza self.procesamiento
+        - Crea/guarda inmediatamente el archivo de procesamiento (solo ese)
+        - Dispara el dibujado (como si se pulsara 'Ubicación'), sin abrir ventanas
+        - Sin modales ni cambio de foco
+        """
+        try:
+            # 1) Actualiza en memoria
+            self.procesamiento = procesamiento
+
+            # 2) Guardar archivo de procesamiento (primera vez incluida)
+            ruta_proc = self.parent.directorios['archivo_procesamiento']
+            os.makedirs(os.path.dirname(ruta_proc), exist_ok=True)
+            escritura_archivo(ruta_proc, self.procesamiento)
+
+            # 3) Mensaje discreto si falta coda
+            if self.procesamiento and len(self.procesamiento[-1]) > 3:
+                if self.procesamiento[-1][2] != 'Fallido' and self.procesamiento[-1][3] == '0.0':
+                    self.parent.Lbl_submensajes.setText("No se ha marcado el tiempo de coda")
+
+            # 4) Simular "aplastar Ubicación": dibuja en el panel derecho embebido
+            self.Ubicacion_()
+
+        except Exception as e:
+            print("Error en update_procesamiento:", e)
+            self.parent.Lbl_submensajes.setText("Error al guardar/actualizar (ver consola).")
+
+ 
     def closeEvent(self, event):
         archivo=self.parent.evento_procesar[1]
         print("Copiando desde virtual a real")
@@ -707,13 +895,20 @@ class estaciones_(QDialog):
                     QMessageBox.information(self, "Archivos abiertos", "Cierre el archivo en el Proceso V2.")
                     event.ignore()
         auxiliar=[]
-        ############# Hilo monitor de cambio de archivo#################
-        if self.bandera_procesamiento:
-            self.file_monitor.stop()
-            self.bandera_procesamiento=0
+
+
+
+        # ---------------------------------------------------------------
+        # Detener el hilo de monitoreo de forma segura
+        # ---------------------------------------------------------------
+        if hasattr(self, 'file_monitor') and self.file_monitor.isRunning():
+            self.file_monitor.requestInterruption()  # pide detener el hilo
+            self.file_monitor.wait()                 # espera a que termine correctamente
+            self.bandera_procesamiento = 0
             self.parent.Lbl_Mensajes.setText("Seguimiento terminado")
             self.parent.Lbl_submensajes.setText("")
-        ################################################################
+        # ---------------------------------------------------------------
+
         self.parent.estaciones_eventos=auxiliar
         self.parent.filtros_estaciones=self.filtros
         self.parent.procesamiento=self.procesamiento
@@ -740,10 +935,10 @@ class estaciones_(QDialog):
             self.parent.eventos[indice_evento][canal_+3]=cadena[:5]+valor+string_concatenado
             self.parent.filtros_estaciones[indice_estacion]=string_concatenado
         guardar_intento(self.parent.evento_procesar[1],self.parent.directorio_trabajo,self.parent.responsable_evento,self.procesamiento)
-        escritura_archivo(self.parent.directorio['archivo_csv'],self.parent.eventos) #Guarda los cambios.
-        escritura_archivo(self.parent.directorio['archivo_procesamiento'],self.procesamiento) #Guarda los cambios.
-        escritura_archivo(self.parent.directorio['archivo_reporte'],self.parent.eventos_reporte)
-        escritura_archivo(self.parent.directorio['archivo_catalogo'],self.parent.catalogo)
+        escritura_archivo(self.parent.directorios['archivo_csv'],self.parent.eventos) #Guarda los cambios.
+        escritura_archivo(self.parent.directorios['archivo_procesamiento'],self.procesamiento) #Guarda los cambios.
+        escritura_archivo(self.parent.directorios['archivo_reporte'],self.parent.eventos_reporte)
+        escritura_archivo(self.parent.directorios['archivo_catalogo'],self.parent.catalogo)
         print("Saliendo de estaciones en close")
 
     def Salir_(self):
@@ -752,7 +947,6 @@ class estaciones_(QDialog):
 
     def Graficar_(self):
         print("Entró a graficar")
-        plt.close()
         archivo=self.parent.evento_procesar[1]
         archivo=os.path.join(self.parent.directorio_trabajo,archivo[:8]+archivo[9:15])
         self.trCanal=leer_mseed(archivo,1)
@@ -762,17 +956,23 @@ class estaciones_(QDialog):
 
 
     def Ubicacion_(self):
-        print("Entró a ubicación")
-        self.grafico_window = ventana_grafico(self.procesamiento, self.parent.directorio['archivo_estaciones'], self)
-        self.grafico_window.show()
-        bandera = self.grafico_window.get_bandera()
-        if bandera[0]:
-            mensaje = 'Procesar con 6 fases mínimo,\n (Con 5 en la parte superior)'
-        elif bandera[1]:
-            mensaje = 'Procesar con fases claras'
-        else:
-            mensaje = 'No Procesar'
-        self.parent.Lbl_submensajes.setText(mensaje)
+        """
+        Dispara el dibujado de la ubicación en el panel derecho embebido
+        de la ventana padre. No abre ventanas nuevas.
+        """
+        try:
+            print("Entró a ubicación")
+            # Delegamos el dibujado al padre, que tiene el widget del mapa embebido
+            if hasattr(self.parent, "actualizar_mapa_desde_procesamiento"):
+                self.parent.actualizar_mapa_desde_procesamiento(self.procesamiento)
+            else:
+                print("Advertencia: el padre no tiene 'actualizar_mapa_desde_procesamiento'.")
+
+        except Exception as e:
+            print("Error en Ubicacion_:", e)
+            if hasattr(self.parent, "Lbl_submensajes"):
+                self.parent.Lbl_submensajes.setText("Error al actualizar ubicación (ver consola).")
+
 
 class reporte_(QDialog):
     def __init__(self, parent=None):
@@ -818,8 +1018,8 @@ class reporte_(QDialog):
         #self.indice=self.parent.indice_evento_procesar
 
     def closeEvent(self, event):
-        escritura_archivo(self.parent.directorio['archivo_reporte'],self.parent.eventos_reporte)
-        escritura_archivo(self.parent.directorio['archivo_catalogo'],self.parent.catalogo)
+        escritura_archivo(self.parent.directorios['archivo_reporte'],self.parent.eventos_reporte)
+        escritura_archivo(self.parent.directorios['archivo_catalogo'],self.parent.catalogo)
 
     def Limpiar_(self):
         self.textEdit.clear()

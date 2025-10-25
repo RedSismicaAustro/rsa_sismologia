@@ -33,6 +33,9 @@ def generar_reporte_sismo(catalogo, evento_escogido, canales, tr_canal, archivo_
         archivo_rep (str): Nombre del archivo del reporte.
     """
     # Seleccionar los registros del catálogo relacionados con el evento escogido
+    print(evento_escogido)
+    print(catalogo)
+
     catalogo_escogido = [
         registro for registro in catalogo if registro[18] == evento_escogido[0][1]
     ]

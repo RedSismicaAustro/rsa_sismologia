@@ -196,70 +196,32 @@ class widget_grafico_mpl(QWidget):
         super().__init__(parent)
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
-        
+        # Crea un Axes persistente para dibujar siempre sobre él
+        self.ax = self.figure.add_subplot(111)
+
         layout = QVBoxLayout()
         layout.addWidget(self.canvas)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
     def plot(self, procesamiento, archivo_estaciones):
-        return proceso_gis(self, procesamiento, archivo_estaciones)
+        # Limpia el axes embebido (no crees figuras nuevas)
+        self.ax.clear()
 
+        # Llama a tu pipeline GIS pasando SIEMPRE el axes embebido
+        # Ajusta 'proceso_gis' para que acepte 'ax' y dibuje TODO sobre él.
+        bandera = proceso_gis(
+            procesamiento=procesamiento,
+            archivo_estaciones=archivo_estaciones,
+            ax=self.ax
+        )
 
+        # Ajustes visuales opcionales
+        self.figure.tight_layout()
+        # Refresca el canvas embebido (no usar plt.show())
+        self.canvas.draw_idle()
 
-
-
-
-def proceso_gis_(procesamiento,archivo_estaciones):
-    #catalogo, es la información en el formato de catálogo sismico que se va a graficar en el mapa
-    #          con la posibilidad de que haya información de otras redes.
-    plt.clf()
-    gdf_1,estaciones = cobertura_red(archivo_estaciones,50)
-    gdf_2,estaciones = cobertura_red(archivo_estaciones,150)
-    ext=len(procesamiento)
-    file_path=os.path.join(ruta_proyecto,'datos','GIS','ecuador.shp')
-    mapa_ec = gpd.read_file(file_path)
-    # Control del tamaño de la figura del mapa
-    fig, ax = plt.subplots(1, 1, figsize=(8, 8))
-    # Control del encuadre (área geográfica) del mapa
-    ax.axis([-81.5, -75, -5, 1.5])
-    # Control del título y los ejes
-    ax.set_title('SISMO', 
-             pad = 20, 
-             fontdict={'fontsize':16, 'color': '#4873ab'})
-    longitud=0
-    latitud=0
-    profundidad=0
-    magnitud=0
-    rms='Intento fallido'
-    for i in range(2,ext):
-        if procesamiento[i][2]=="Intento fallido:  No hay convergencia":
-            continue
-        longitud=float(procesamiento[i][5])
-        latitud=float(procesamiento[i][4])
-        profundidad=float(procesamiento[i][2])
-        magnitud=float(procesamiento[i][3])
-        rms=procesamiento[i][6]
-        if i==ext-1:
-            ax.scatter(longitud,latitud,color='yellow',linewidths = 2, marker ="o",edgecolor ="red",s = 100)
-        else:
-            ax.scatter(longitud,latitud,color='black',s = 40)
-    point = Point(longitud, latitud)
-    in_gdf_1 = gdf_1.contains(point).values[0]
-    in_gdf_2 = gdf_2.contains(point).values[0]
-    ax.set_xlabel('Longitud')
-    ax.set_ylabel('Latitud')
-    ax.text(-81,-4.5,"Latitud: "+str(latitud),fontsize=8,color='black')
-    ax.text(-81,-4.6,"Longitud: "+str(longitud),fontsize=8,color='black')
-    ax.text(-81,-4.7,"Profundidad: "+str(profundidad),fontsize=8,color='black')
-    ax.text(-81,-4.8,"Magnitud: "+str(magnitud),fontsize=8,color='black')
-    ax.text(-81,-4.9,"rms "+rms,fontsize=8,color='black')
-
-    gdf_1.boundary.plot(ax=ax, color='blue')
-    gdf_2.boundary.plot(ax=ax, color='green')
-
-    mapa_ec.plot(ax=ax,alpha=0.3,color="white",edgecolor="black",linewidth=0.4)
-    plt.interactive(True)
-    return (in_gdf_1,in_gdf_2)
+        return bandera
 
 def graficar_catalogo_gis(catalogo):
 

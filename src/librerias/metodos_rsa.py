@@ -19,51 +19,26 @@ if ruta_librerias not in sys.path:
 
 import re
 import csv
-from PyQt5.QtWidgets import (QMessageBox,QGraphicsScene)
-from PyQt5.QtCore import QDate,QDateTime
-from PyQt5.QtWidgets import QGraphicsScene, QGraphicsView
+from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtCore import QDate
 import matplotlib
 matplotlib.use('Qt5Agg')  # Asegúrate de que esto está antes de importar matplotlib.pyplot
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator    
-from matplotlib.widgets import Cursor, Button
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.ticker import MultipleLocator
-from time import sleep
 import subprocess
-
 from obspy import UTCDateTime, read, Trace, Stream
 from datetime import datetime, timedelta
-from reportlab.graphics.charts.linecharts import HorizontalLineChart
-#from reportlab.graphics.shapes import *
-from reportlab.lib.colors import *
-from reportlab.lib import colors
-from reportlab.pdfgen import canvas
-from reportlab.graphics import shapes
-from reportlab.graphics.charts.linecharts import HorizontalLineChart
-from reportlab.graphics.shapes import Drawing, Rect
-from reportlab.graphics.charts.barcharts import VerticalBarChart
-from reportlab.lib.pagesizes import letter, A4
 import sys
-from pathlib import Path
-from PyQt5.QtCore import QDate,QDateTime,Qt
 import os
-import re
 import xml.etree.ElementTree as ET
 import struct
 import copy
 import numpy as np
 import scipy.signal as signal
-from scipy import integrate  
-from scipy.signal import hilbert, chirp
-from datetime import date,datetime, timedelta
+from datetime import date
 import calendar
-
-from obspy import read
-import tkinter as tk
 import shutil
-from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,denegar_escritura,habilitar_escritura,revisar_csv,VentanaProgreso
+from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,VentanaProgreso
 import pandas as pd
 
 
@@ -467,48 +442,6 @@ def conversion_mseed(canal_np, hab_canal, nombre_canal, fecha_, directorio):
     return trCanal
 
 
-
-
-
-def conversion_mseed__(canal_np,hab_canal,nombre_canal,fecha_,directorio,trCanal_prev=None):
-    #Canal_np es ela arreglo numpy donde está el registro continuo por estación
-    #hab_canal es un vector donde están los canales habilitados del registro continuo de los 16 manejados en el sistema analógico
-    #nombe_canal, vector con valores string de 4 caracteres para el nombre de cada uno de los canales
-    #fecha_ variable generada desde el programa con la fecha    
-    #directorio de los archvios mseed, registros o events
-    trCanal = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
-    anio=fecha_.year
-    mes=fecha_.month
-    dia=fecha_.day
-    horas=fecha_.hour
-    minutos=fecha_.minute
-    segundos=fecha_.second
-    if canal_np.dtype != np.int32:
-        canal_np = canal_np.astype(np.int32, copy=False)
-    if trCanal_prev is None:
-        trCanal_prev = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
-
-
-    for i in range(0, 16):
-         if hab_canal[i]!="0":
-            # Nombre del archivo en funcion del tiempo de inicio
-            hora_string=fecha_.strftime('%y%m%d_%H%M%S')
-            #hora_string=fecha_[1][0]+fecha_[1][1]+fecha_[1][2]+'_'+fecha_[1][3]+fecha_[1][4]+fecha_[1][5]        
-            fileName = directorio+"/"+nombre_canal[i]+'_20'+hora_string#fileName = directorio+nombre_canal[i]+'.UC.Z..20'+hora_string
-    # Una vez que se tiene los datos, llama al metodo para obtener la traza
-    # Todos los parametros que recibe se detallan en el metodo (mas abajo)
-            trazaCH1 = obtenerTraza(nombre_canal[i],1,canal_np[i],(anio), mes, dia, horas, minutos, segundos, 0)
-    # Crea un objeto Stream con la traza
-            stData = Stream(traces=[trazaCH1])
-    # Si se desea varias trazas, esto seria para cuando se tiene 3 canales
-    # stData = Stream(traces=[trazaCH1, trazaCH2, trazaCH3])
-    # Guarda todas las trazas en un archivo en formato miniseed con codificacion
-    # STEIM1 para disminuir el tamaño del archivo
-            nombreMseed = fileName + ".mseed"
-            stData.write(nombreMseed, format = 'MSEED', encoding = 'STEIM1', reclen = 512)
-            trCanal[i]=stData
-    return(trCanal)#en trCanal es un arrglo donde se encuentra todos los cananles en mseed.
-
 #############################################################################################
 #  Método que lee linea por línea el contenido de los archivos diarios generados, tanto los archivo del catalog como los de reportes y los resumenes
 def lectura_resumen(archivo):#Depurado
@@ -531,8 +464,6 @@ def loc_cabecera(archivo_abrir):
     configuracion=[]
     numero_segundo=0
     contador=0
-    dato_salida=""
-    salida=0
     #Ubica la posición de la cabecera en el registro continuo, sea de un sismo o del registro continuo.
     #global archivo_abrir
     while bandera_1:
@@ -859,83 +790,6 @@ def convertir_lista(lista):
     return nueva_lista
 
 
-def plot_streams(stream1, stream2):
-    root = tk.Tk()
-    root.title("Ajuste de tiempo del Obsidian")
-    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
-
-    # Graficar el primer stream
-    texto=stream1.stats.station
-    ax1.plot(stream1.times(), stream1.data, 'k')
-    ax1.set_ylabel(texto)
-
-    # Graficar el segundo stream
-    texto=stream2.stats.station
-    ax2.plot(stream2.times(), stream2.data, 'r')
-    ax2.set_ylabel(texto)
-    ax2.set_xlabel('Tiempo (s)')
-
-    # Configurar límites de los ejes
-    ax1.set_ylim(min(stream1.data), max(stream1.data))
-    ax2.set_ylim(min(stream2.data), max(stream2.data))
-
-    # Crear cursores en los gráficos
-    cursor1 = Cursor(ax1, useblit=True, color='blue', linewidth=1)
-    cursor2 = Cursor(ax2, useblit=True, color='green', linewidth=1)
-
-    # Variable para almacenar la línea de marcado
-    last_line1 = None
-    last_line2 = None
-
-    # Lista para almacenar las referencias de tiempo
-    references = [0,0]
-
-    # Función para actualizar la posición de los cursores y mostrar los valores
-    def update_cursor(event):
-        nonlocal last_line1, last_line2
-
-        if event.inaxes == ax1:
-            if last_line1:
-                last_line1.remove()
-            last_line1 = ax1.axvline(x=event.xdata, color='blue', linewidth=1)
-            reference = event.xdata
-            references[0]=reference
-        elif event.inaxes == ax2:
-            if last_line2:
-                last_line2.remove()
-            last_line2 = ax2.axvline(x=event.xdata, color='green', linewidth=1)
-            reference = event.xdata
-            references[1]=reference
-        fig.canvas.draw()
-
-    # Función para cerrar la ventana de plot
-    def close_plot(event):
-        plt.close(fig)
-
-    # Agregar botón para cerrar el plot
-    button_ax = fig.add_axes([0.9, 0.9, 0.1, 0.1])
-    close_button = Button(button_ax, 'Cerrar')
-    close_button.on_clicked(close_plot)
-
-    # Crear el lienzo de la figura y agregarlo a la ventana de Tkinter
-    canvas = FigureCanvasTkAgg(fig, master=root)
-    canvas.draw()
-    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-    # Agregar barra de herramientas de navegación
-    toolbar = NavigationToolbar2Tk(canvas, root)
-    toolbar.update()
-    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-    # Conectar la función de actualización al evento 'button_press_event'
-    fig.canvas.mpl_connect('button_press_event', update_cursor)
-
-    # Mostrar la figura
-    tk.mainloop()
-
-    return (references[0]-references[1])
-
-
 def codigos(opcion,archivo_abrir):
         def entero():
             dato_salida=str(struct.unpack("<H", archivo_abrir.read(2))[0])
@@ -1021,9 +875,8 @@ def lectura_archivo(archivo):
     return []
 
 def escritura_archivo(archivo, valores):
-    from PyQt5.QtWidgets import QMessageBox
-
     try:
+        os.makedirs(os.path.dirname(archivo), exist_ok=True)
         with open(archivo, 'w', encoding='utf-8') as file:
             for sublist in valores:
                 if sublist != []:
@@ -1034,30 +887,16 @@ def escritura_archivo(archivo, valores):
     except Exception as e:
         mensaje = f"No se pudo escribir en el archivo:\n{archivo}\n\nEs posible que esté abierto en otro programa como Excel.\n\nDetalles: {str(e)}"
         print(mensaje)
-        QMessageBox.warning(None, "Error al escribir archivo", mensaje)
 
-
-def copiar_archivos__(archivos_origen, archivos_destino):
-    for i in range(7):
-        try:
-            cola = os.path.basename(archivos_origen[i])        # longitud real, con sufijo si existe
-            archivo_dest = archivos_destino[i][:-len(cola)] + cola
-            os.makedirs(os.path.dirname(archivo_dest), exist_ok=True)
-            shutil.copyfile(archivos_origen[i], archivo_dest)
-        except FileNotFoundError:
-            print("Archivo no encontrado:", archivos_origen[i])
-            pass
 
 
 def copiar_archivos(archivos_origen, archivos_destino):
     lista=(17,17,12,11,10,10,10)
     for i in range(0,7):
         try:
-            print(archivos_origen[i], archivos_destino[i])
             archivo_dest=archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:]
             shutil.copyfile(archivos_origen[i],archivo_dest)
         except FileNotFoundError:
-            print("Archivo no encontrado:",archivos_origen[i])
             pass
 
 
@@ -1316,104 +1155,12 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
     existe = {etq: os.path.isfile(ruta) for etq, ruta in zip(etiquetas, rutas)}
     faltantes = [etq for etq, ok in existe.items() if not ok]
 
-    # Resumen en consola (sin romper compatibilidad)
-    print(">>> RESUMEN FASTHYPO")
-    for etq, ruta in zip(etiquetas, rutas):
-        print(f"  {etq:<6} {'OK ' if existe[etq] else 'NO '}  ->  {ruta}")
-    if faltantes:
-        print("FALTAN:", ", ".join(faltantes))
-    else:
-        print("Todos los archivos requeridos están presentes.")
-
     # ------------------------------------------------------------------ #
     # 8 · Retorno
     # ------------------------------------------------------------------ #
     if retornar_validaciones:
         return rutas, existe, faltantes
     return rutas
-
-
-def archivos_fast__(evento, dir_trabajo, usuario):
-    """
-    Devuelve las rutas:
-        [ .sis, .fas, .rsa, Phase, .L, .P, .S ]
-
-    ─ Host    (usuario == '') → .sis/.fas con AAAA
-    ─ Virtual (usuario != '') → .sis/.fas con AA  (se recortan los dos primeros dígitos)
-
-    Formatos FASTHYPO (todos con año AA):
-        · MMDDhhmm.rsa
-        · PhaseDDh.hmm
-        · MMDDhh.mm[L|P|S]
-
-    Si el .rsa exacto no existe se suma 1 minuto y ese minuto “ajustado” se
-    reutiliza en Phase y L/P/S.
-    """
-
-    # ------------------------------------------------------------------ #
-    # 1 · Carpetas base
-    # ------------------------------------------------------------------ #
-    print("",evento)
-    info = obtener_directorios(evento)
-    dir_dia  = os.path.join(dir_trabajo, info['Directorio_dia'])
-    dir_fast = os.path.join(dir_trabajo, info['Directorio_fastHypo'])
-
-    if usuario:
-        csv_path = os.path.join(ruta_datos, "responsables.csv")
-        for fila in lectura_archivo(csv_path):
-            if fila[0].strip() == usuario.strip():
-                dir_dia, dir_fast = fila[1], fila[2]
-                break
-
-    # ------------------------------------------------------------------ #
-    # 2 · Despiece de nombre base
-    # ------------------------------------------------------------------ #
-    base = evento[:-4]                             # quita '.sis'
-    if len(base) == 13:                            # AAMMDD_hhmmss
-        yy, mm, dd = 20 + int(base[:2]), base[2:4], base[4:6]
-        hh, minu, ss = base[7:9], base[9:11], base[11:13]
-        sisfas_base  = base                        # ya en AA
-    else:                                          # AAAAMMDD_hhmmss
-        yy, mm, dd = int(base[:4]), base[4:6], base[6:8]
-        hh, minu, ss = base[9:11], base[11:13], base[13:15]
-        sisfas_base  = base if usuario == '' else base[2:]  # recorta '20' sólo para virtual
-    # ------------------------------------------------------------------ #
-    # 3 · .sis / .fas
-    # ------------------------------------------------------------------ #
-    archivo_sis = os.path.join(dir_dia, f"{sisfas_base}.sis")
-    archivo_fas = os.path.join(dir_dia, f"{sisfas_base}.fas")
-
-    # ------------------------------------------------------------------ #
-    # 4 · .rsa  (intento minuto real)
-    # ------------------------------------------------------------------ #
-    rsa_nom = f"{mm}{dd}{hh}{minu}.rsa"
-    archivo_rsa = os.path.join(dir_fast, rsa_nom)
-
-    # ------------------------------------------------------------------ #
-    # 5 · Redondeo (+1 min) si falta el .rsa
-    # ------------------------------------------------------------------ #
-    if not os.path.exists(archivo_rsa):
-        dt = datetime(yy, int(mm), int(dd), int(hh), int(minu), int(ss)) + timedelta(minutes=1)
-        mm, dd, hh, minu = dt.strftime("%m %d %H %M").split()
-        rsa_nom = f"{mm}{dd}{hh}{minu}.rsa"
-        archivo_rsa = os.path.join(dir_fast, rsa_nom)
-
-    # ------------------------------------------------------------------ #
-    # 6 · Phase  y  L / P / S (mismo minuto usado en .rsa)
-    # ------------------------------------------------------------------ #
-    phase_nom = f"Phase{dd}{hh[0]}.{hh[1]}{minu}"
-    archivo_phase = os.path.join(dir_fast, phase_nom)
-
-    base_lp = f"{mm}{dd}{hh}.{minu}"
-    archivo_L = os.path.join(dir_fast, base_lp + 'L')
-    archivo_P = os.path.join(dir_fast, base_lp + 'P')
-    archivo_S = os.path.join(dir_fast, base_lp + 'S')
-
-    # ------------------------------------------------------------------ #
-    print(archivo_sis, archivo_fas, archivo_rsa,
-            archivo_phase, archivo_L, archivo_P, archivo_S)
-    return [archivo_sis, archivo_fas, archivo_rsa,
-            archivo_phase, archivo_L, archivo_P, archivo_S]
 
 
 def guardar_informacion_diaria(archivo,directorio_trabajo,catalogo_anterior,eventos):
@@ -1676,9 +1423,6 @@ def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
     print(archivos_fast)
     return archivos_fast
 
-        
- 
-
 
 def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaciones_eventos,hab_grafico,bandera_marcas,pagina,filtros_estaciones,estaciones_eventos_total,bandera_todos):
     #stLeido es la traza donde se encuetra el mseed de la estaciòn
@@ -1872,109 +1616,6 @@ def extraer_dia(archivo, responsable, bandera_todo):
 
 
 
-def extraer_dia__(archivo,responsable,bandera_todo):
-            directorios=obtener_directorios(archivo)
-            nombre_archivo=directorios["archivo_auxiliar"]
-            eventos_auxiliar=lectura_archivo(nombre_archivo)
-            if os.path.exists(nombre_archivo):
-                pass
-            else:
-                nombre_archivo=directorios["archivo_csv"]
-            lista_eventos=lectura_archivo(nombre_archivo)
-            archivo_guardar=directorios["archivo_tiempos"]
-            if os.path.exists(archivo_guardar):
-                datos_tiempo=lectura_archivo(archivo_guardar)
-            else:
-                datos_tiempo=[["RSA","12H","","","","","","","",""],["RSA","18H","","","","","","","",""],["RSA","24H","","","","","","","",""]]
-                escritura_archivo(archivo_guardar, datos_tiempo)
-            if True:
-                cont_sismo=[0,0,0]
-                cont_indefinido=[0,0,0]
-                cont_FC=[0,0,0]
-                cont_FF=[0,0,0]
-                cont_ruido=[0,0,0]
-                cont_local=[0,0,0]
-                cont_tele=[0,0,0]
-                hora_=[12,18,24]
-                for evento_ in lista_eventos:
-                    h=int(evento_[1][9:11])
-                    if h<12:
-                        if evento_[2] == 'SISMO':
-                            cont_sismo[0]=cont_sismo[0]+1
-                        elif evento_[2] == 'FF':
-                            cont_FF[0]=cont_FF[0]+1
-                        elif evento_[2] == 'FC':
-                            cont_FC[0]=cont_FC[0]+1
-                        elif evento_[2] == 'INDEFINIDO':
-                            cont_indefinido[0]=cont_indefinido[0]+1
-                        elif evento_[2] == 'TELESISMO':
-                            cont_tele[0]=cont_tele[0]+1
-                        elif evento_[2] == 'Evento_local' or evento_[2] == 'CONTROL':
-                            cont_local[0]=cont_local[0]+1
-                        else:
-                            cont_ruido[0]=cont_ruido[0]+1
-                    elif h<18 and h>11:
-                        if evento_[2] == 'SISMO':
-                            cont_sismo[1]=cont_sismo[1]+1
-                        elif evento_[2] == 'FF':
-                            cont_FF[1]=cont_FF[1]+1
-                        elif evento_[2] == 'FC':
-                            cont_FC[1]=cont_FC[1]+1
-                        elif evento_[2] == 'INDEFINIDO':
-                            cont_indefinido[1]=cont_indefinido[1]+1
-                        elif evento_[2] == 'TELESISMO':
-                            cont_tele[1]=cont_tele[1]+1
-                        elif evento_[2] == 'Evento_local'or evento_[2] == 'CONTROL':
-                            cont_local[1]=cont_local[1]+1
-                        else:
-                            cont_ruido[1]=cont_ruido[1]+1
-                    else:
-                        if evento_[2] == 'SISMO':
-                            cont_sismo[2]=cont_sismo[2]+1
-                        elif evento_[2] == 'FF':
-                            cont_FF[2]=cont_FF[2]+1
-                        elif evento_[2] == 'FC':
-                            cont_FC[2]=cont_FC[2]+1
-                        elif evento_[2] == 'INDEFINIDO':
-                            cont_indefinido[2]=cont_indefinido[2]+1
-                        elif evento_[2] == 'TELESISMO':
-                            cont_tele[2]=cont_tele[2]+1
-                        elif evento_[2] == 'Evento_local'or evento_[2] == 'CONTROL':
-                            cont_local[2]=cont_local[2]+1
-                        else:
-                            cont_ruido[2]=cont_ruido[2]+1
-            for i in (0,1,2):
-                total=cont_sismo[i]+cont_FF[i]+cont_FC[i]+cont_indefinido[i]+cont_tele[i]+cont_local[i]+cont_ruido[i]
-                if(total!=0 and datos_tiempo[i][2]==""):
-                    datos_tiempo[i][0]=responsable
-                    datos_tiempo[i][1]=str(hora_[i])+"H"
-                    datos_tiempo[i][2]="0"
-                if datos_tiempo[i][2]!="":
-                    datos_tiempo[i][2]=str(total)
-                    datos_tiempo[i][3]=str(cont_sismo[i])
-                    datos_tiempo[i][4]=str(cont_FF[i])
-                    datos_tiempo[i][5]=str(cont_FC[i])
-                    datos_tiempo[i][6]=str(cont_indefinido[i])
-                    datos_tiempo[i][7]=str(cont_tele[i])
-                    datos_tiempo[i][8]=str(cont_local[i])
-                    datos_tiempo[i][9]=str(cont_ruido[i])
-            escritura_archivo(archivo_guardar, datos_tiempo)
-            eventos=lectura_archivo(directorios['archivo_csv'])
-            maximo=len(eventos)
-            ventana = VentanaProgreso("Extrayendo eventos...", maximo)
-            if bandera_todo:
-                eventos=[]
-            solo_eventos = [fila[1] for fila in eventos]
-            for i,evento_auxiliar in enumerate(eventos_auxiliar):
-                ventana.actualizar(i + 1)
-                evento=extraccion(evento_auxiliar,solo_eventos,archivo,False)
-                if evento!=None:
-                    eventos.append(evento)
-            eventos=ordenar_y_eliminar_duplicados(eventos,1,False)
-            escritura_archivo(directorios['archivo_csv'],eventos)
-            ventana.cerrar()
-
-
 def extraccion(evento_auxiliar, solo_eventos, archivo, bandera_forzar):
     """
     evento_auxiliar : línea del AAMMDD_aux.csv 
@@ -2002,7 +1643,7 @@ def extraccion(evento_auxiliar, solo_eventos, archivo, bandera_forzar):
 
     # Rango de tiempo inválido
     if t_inicio > t_final:
-        QMessageBox.about(None, "Advertencia", "Hora incorrecta: Tiempo de inicio mayor a final")
+        print("Advertencia:\n", "Hora incorrecta: Tiempo de inicio mayor a final")
         return
 
     # Evitar reprocesar eventos ya presentes
@@ -2244,10 +1885,6 @@ def espectro_respuesta(acelerograma, dt,factor,directorio):
     damp=0.05   #damp (float): Amortiguamiento adimensional. Default: 0.05 (5%).
     Tmin=0.02   #Tmin (float): Periodo mínimo para el espectro (s). Default: 0.02.
     Tmax=4.0    #Tmax (float): Periodo máximo para el espectro (s). Default: 4.0.
-
-
-
-    
     Ax_g = acelerograma * factor/980.  # Suponemos que el factor convierte a m/s²
 
     # Convertir a fuerza externa
@@ -2433,22 +2070,53 @@ def cargar_dia(directorios):
             eventos_reporte.append(evento_grabar)
             eventos.append(evento_individual)
             canales_eventos_dia.append(canales_evento)
+
+
+    # Regenerar catálogo solo con eventos de otras redes (Id termina en != '00') manteniendo la cabecera 'Id'
     if os.path.exists(directorios['archivo_catalogo']):
-            catalogo_existente=lectura_archivo(directorios['archivo_catalogo'])
-            if catalogo_existente!=None:
+            catalogo_existente = lectura_archivo(directorios['archivo_catalogo'])
+            print("Catálogo existente leído:\n", catalogo_existente)
+
+            if catalogo_existente is not None:
+                # 1) Determinar y conservar una única cabecera 'Id'
+                cabecera = None
+                if catalogo and catalogo[0] and catalogo[0][0] == 'Id':
+                    cabecera = catalogo[0]
+                else:
+                    for fila in catalogo_existente:
+                        if fila and fila[0] == 'Id':
+                            cabecera = fila
+                            break
+
+                # 2) Construir el nuevo catálogo con solo otras redes
+                nuevo_catalogo = []
+                if cabecera:
+                    nuevo_catalogo.append(cabecera)
+
+                # 2.a) Desde el archivo existente
                 for evento_existente in catalogo_existente:
-                    if evento_existente[0]=='Id':
+                    if not evento_existente:
                         continue
-                    if evento_existente[0][-2:]!='00':
-                        for n_evento,evento in enumerate(catalogo):
-                            if evento==[]:
-                                continue
-                            if evento[0]=='Id':
-                                continue
-                            if int(evento_existente[0])<int(evento[0]):
-                                catalogo.insert(n_evento,evento_existente)
-                                break
-                catalogo=ordenar_y_eliminar_duplicados(catalogo,0)
+                    if evento_existente[0] == 'Id':
+                        continue
+                    if evento_existente[0][-2:] != '00':   # IGEPN (..01), USGS (..02) u otras no-RSA
+                        nuevo_catalogo.append(evento_existente)
+
+                # 2.b) (Opcional) Incluir candidatos de la variable `catalogo` actual si los hubiera
+                for evento in catalogo:
+                    if not evento:
+                        continue
+                    if evento[0] == 'Id':
+                        continue
+                    if evento[0][-2:] != '00':
+                        nuevo_catalogo.append(evento)
+
+                # 3) Ordenar y eliminar duplicados por columna 0 (Id)
+                catalogo = ordenar_y_eliminar_duplicados(nuevo_catalogo, 0)
+
+    print("Catálogo de otras redes regenerado:\n", catalogo)
+
+
     indice_responsables=[0,0,0]
     cont_sismo=[0,0,0]
     cont_indefinido=[0,0,0]
@@ -2704,9 +2372,6 @@ def incrementar_catalogo_eventos(directorio_trabajo,eventos,eventos_catalogo):
                 eventos_catalogo.insert(i,aux)
                 break
     return eventos_catalogo
-
-
-
 
 
 def obtener_datos_reporte(fecha_ini, fecha_fin, directorio_trabajo, mapa_="Ecuador"):
@@ -3082,52 +2747,6 @@ def referencia_directorio_completa(archivo) -> str:
 
 
 
-
-
-
-def referencia_directorio_completa__(archivo):
-    archivo_base = Path(archivo).name      # Esto aísla el nombre del archivo
-    extension = Path(archivo).suffix  # Esto obtiene la extensión (incluye el punto .)
-    if extension=='.sis':
-        archivo_base=archivo_base[:8]+'000000'
-    elif extension=='.csv':
-        archivo_base=archivo_base[:8]+'000000'
-    elif extension=='.mseed':
-        archivo_base=archivo_base[4:12]+'000000'        
-    elif extension=='.pdf':
-        archivo_base=archivo_base[:8]+'000000'
-    else:
-        pass
-    directorio_trabajo=extraer_hasta_directorio(archivo, 'DIA')
-    ruta_archivo = os.path.join(directorio_trabajo, archivo_base)
-    return ruta_archivo
-
-
-def ejecutar_kw2v1(ruta_evt, usar_interactivo=False):
-    ruta_evt = Path(ruta_evt)
-    if not ruta_evt.exists():
-        raise FileNotFoundError(f"No se encontró el archivo: {ruta_evt}")
-    
-    comando = ["O:\\KINETRICS\\KW2V1.EXE", str(ruta_evt.name)]
-    if usar_interactivo:
-        comando.append("-S")  # modo de entrada de parámetros
-
-    proceso = subprocess.run(
-        comando,
-        cwd=ruta_evt.parent,  # Directorio de trabajo donde está el EVT
-        capture_output=True,
-        text=True,
-        shell=True
-    )
-
-    print("Salida estándar:\n", proceso.stdout)
-    print("Errores:\n", proceso.stderr)
-    if proceso.returncode == 0:
-        print("Conversión exitosa.")
-    else:
-        print(f"Error al ejecutar KW2V1. Código: {proceso.returncode}")
-        
-        
 def extraer_kinemetrics_evt(ruta_shd_txt):
     """
     Extrae metadatos de un archivo EVT convertido a texto (.SHD)
@@ -3230,7 +2849,3 @@ def ejecutar_en_vm(evt_path,virtual_path):
             print(e)
             return None
 
-def diagnostico_memoria(etiqueta=''):
-    proceso = psutil.Process(os.getpid())
-    uso = proceso.memory_info().rss / 1024 / 1024  # MB
-    print(f"[{etiqueta}] Uso de memoria: {uso:.2f} MB")

@@ -87,7 +87,7 @@ class Reporte_diario(QMainWindow):
         self.archivo, self.directorio_trabajo, self.responsable, self.periodo=archivo, directorio_trabajo, responsable, periodo
         
         self.eventos_reporte=[[0,"Fecha; Hora (UTC)","Evento","Magn.","Prof.(km)","Lat.","Long.","Ubicación"]]
-        self.catalogo=[["Id","año","mes","día","hora","min","seg","lat","long","prof","rms","e-x","e-y","e-0","e-z","Mag","Tipo Mag","Fuente","ruta","Ubicación"]]
+        #self.catalogo=[["Id","año","mes","día","hora","min","seg","lat","long","prof","rms","e-x","e-y","e-0","e-z","Mag","Tipo Mag","Fuente","ruta","Ubicación"]]
         self.eventos=[]
         self.evento_canales=[]
         #self.setupUi(self)# Método Constructor de la ventana
@@ -136,7 +136,7 @@ class Reporte_diario(QMainWindow):
         manteniendo únicamente el directorio de trabajo. No modifica el estado visual de la interfaz.
         """
         self.eventos_reporte = [["0", "Fecha; Hora (UTC)", "Evento", "Magn.", "Prof.(km)", "Lat.", "Long.", "Ubicación"]]
-        self.catalogo = [["Id", "año", "mes", "día", "hora", "min", "seg", "lat", "long", "prof", "rms", "e-x", "e-y", "e-0", "e-z", "Mag", "Tipo Mag", "Fuente", "ruta", "Ubicación"]]
+        #self.catalogo = [["Id", "año", "mes", "día", "hora", "min", "seg", "lat", "long", "prof", "rms", "e-x", "e-y", "e-0", "e-z", "Mag", "Tipo Mag", "Fuente", "ruta", "Ubicación"]]
         self.eventos = []
         self.vector = []
         self.evento_canales = []
@@ -156,7 +156,7 @@ class Reporte_diario(QMainWindow):
 
     def iniciar_variables(self):
         self.eventos_reporte=[['0',"Fecha; Hora (UTC)","Evento","Magn.","Prof.(km)","Lat.","Long.","Ubicación"]]
-        self.catalogo=[["Id","año","mes","día","hora","min","seg","lat","long","prof","rms","e-x","e-y","e-0","e-z","Mag","Tipo Mag","Fuente","ruta","Ubicación"]]
+        #self.catalogo=[["Id","año","mes","día","hora","min","seg","lat","long","prof","rms","e-x","e-y","e-0","e-z","Mag","Tipo Mag","Fuente","ruta","Ubicación"]]
         self.eventos=[]
         self.vector=[]
         self.evento_canales=[]
@@ -186,6 +186,7 @@ class Reporte_diario(QMainWindow):
         self.eventos_reporte,self.catalogo,self.eventos, \
         self.vector,self.evento_canales, \
         self.root,self.responsables,self.resumen=cargar_dia(self.directorios)
+        print("Catalogo luego de cargar día:\n",self.catalogo)
         self.Btn_graficar.setEnabled(False)
         self.Btn_pagina.setEnabled(False)
         self.cmbx_evento.setEnabled(False)

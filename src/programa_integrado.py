@@ -30,7 +30,7 @@ from PyQt5 import QtWidgets
 from subprogramas.fases import VentanaPrincipal as FasesVentana
 from subprogramas.extraer_integrado import Extraer_evento
 from subprogramas.marcar_eventos import Marcar_evento
-from subprogramas.procesamiento_integrado import Procesar_evento,verificar_drives_virtuales,FileMonitor,cargar_combo_eventos,activar_hilo
+from subprogramas.procesamiento_integrado import Procesar_evento
 from subprogramas.reporte_diario import Reporte_diario
 from subprogramas.reporte_acumulado import Reporte_periodo
 from subprogramas.inicio import Inicio_proceso
@@ -92,7 +92,6 @@ class VentanaPrincipal(QMainWindow):
         self.periodo = periodo
 
 
-
     def cargar_widget_inicializacion(self, widget):
         """Carga específicamente el widget de inicialización"""
         # Limpiar widget anterior
@@ -109,8 +108,6 @@ class VentanaPrincipal(QMainWindow):
 
     def completar_inicializacion(self, archivo, directorio_trabajo, responsable, periodo):
         """Se ejecuta cuando la inicialización es exitosa"""
-        print("=== COMPLETANDO INICIALIZACIÓN ===")
-        
         # 1. Guardar datos de inicialización
         self.archivo = archivo
         self.directorio_trabajo = directorio_trabajo
@@ -125,8 +122,6 @@ class VentanaPrincipal(QMainWindow):
         
         # 4. Configurar estado post-inicialización
         self.establecer_estado_trabajo()
-        
-        print("Inicialización completada exitosamente")
 
     def cancelar_inicializacion(self):
         """Se ejecuta si la inicialización se cancela"""
@@ -158,14 +153,10 @@ class VentanaPrincipal(QMainWindow):
         """Establece el estado base para trabajar con menús"""
         # Widget central vacío pero funcional
         self.setCentralWidget(QWidget(self))
-        
         # Habilitar menús de trabajo
         self.habilitar_menus()
-        
         # Título con información del día inicializado
         self.actualizar_titulo('PROCESAMIENTO INTEGRADO', True)
-        
-        print("Estado de trabajo establecido - Menús disponibles")
 
     def cargar_widget_menu(self, widget, titulo, mostrar_detalles=True):
         """Método específico para cargar widgets de menús después de inicialización"""
@@ -173,8 +164,6 @@ class VentanaPrincipal(QMainWindow):
             QMessageBox.warning(self, 'Advertencia', 
                               'Debe completar la inicialización del día primero.')
             return False
-        
-        print(f"=== CARGANDO MENÚ: {widget.__class__.__name__} ===")
         
         # 1. Limpiar widget anterior
         self.limpiar_widget_actual()
@@ -192,16 +181,11 @@ class VentanaPrincipal(QMainWindow):
         
         # 5. Conectar señal de cierre - MÉTODO DIRECTO
         def on_widget_closed():
-            print(f"DEBUG: Widget {widget.__class__.__name__} se está cerrando")
             QTimer.singleShot(0, self.volver_estado_trabajo)
-        
         widget.destroyed.connect(on_widget_closed)
         
         if hasattr(widget, 'cerrado'):
-            print(f"DEBUG: Conectando señal 'cerrado' de {widget.__class__.__name__}")
             widget.cerrado.connect(on_widget_closed)
-        
-        print(f"Menú {widget.__class__.__name__} cargado exitosamente")
         return True
 
     def limpiar_widget_actual(self):
@@ -226,13 +210,10 @@ class VentanaPrincipal(QMainWindow):
 
     def notificar_cierre_subprograma(self):
         """Método que los subprogramas pueden llamar directamente para notificar su cierre"""
-        print("DEBUG: notificar_cierre_subprograma llamado directamente")
         QTimer.singleShot(0, self.volver_estado_trabajo)
 
     def volver_estado_trabajo(self):
         """Regresa al estado de trabajo después de cerrar un menú - RELANZA ESTADO COMPLETO"""
-        print("=== REGRESANDO A ESTADO DE TRABAJO - RELANZANDO ESTADO ===")
-        
         # Limpiar referencia del widget
         self.widget_activo = None
         
@@ -241,9 +222,7 @@ class VentanaPrincipal(QMainWindow):
         
         # RELANZAR COMPLETAMENTE EL ESTADO DE TRABAJO
         if self.datos_inicializados:
-            print("RELANZANDO establecer_estado_trabajo()...")
             self.establecer_estado_trabajo()  # Esto ejecuta todo el proceso completo
-            print("ESTADO DE TRABAJO COMPLETAMENTE RELANZADO")
         else:
             self.configurar_estado_inicial()
             
@@ -253,8 +232,6 @@ class VentanaPrincipal(QMainWindow):
 
     def limpiar_estado_completo(self):
         """Limpia completamente el estado de la aplicación"""
-        print("Limpiando estado completo...")
-        
         # Limpiar widget actual
         self.limpiar_widget_actual()
         
@@ -307,7 +284,6 @@ class VentanaPrincipal(QMainWindow):
             self.close()
         else:
             # Estado trabajando: volver al estado inicial
-            print("=== SALIENDO A MENÚ INICIO ===")
             self.limpiar_estado_completo()
             self.configurar_estado_inicial()
 
@@ -453,8 +429,6 @@ class VentanaPrincipal(QMainWindow):
 
     def inicializar_dia(self):
         """Proceso de inicialización que establece el estado base para todos los menús"""
-        print("=== INICIANDO INICIALIZACIÓN DE DÍA ===")
-        
         # 1. Limpiar estado anterior completamente
         self.limpiar_estado_completo()
         
@@ -471,8 +445,6 @@ class VentanaPrincipal(QMainWindow):
         
         # 4. Cargar widget de inicialización
         self.cargar_widget_inicializacion(self.inicio_proceso)
-        
-        print("Widget de inicialización cargado")
 
 
     ##########################################################################################

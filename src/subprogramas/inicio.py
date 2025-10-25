@@ -25,7 +25,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
                              QLabel, QMessageBox, QCheckBox)
 from PyQt5 import uic
 from PyQt5 import QtWidgets,QtCore
-from metodos_rsa import (lectura_archivo, diagnostico_memoria)
+from metodos_rsa import (lectura_archivo)
 
 from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
 

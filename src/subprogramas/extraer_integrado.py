@@ -25,8 +25,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
                              QLabel, QMessageBox, QCheckBox)
 from PyQt5 import uic
 from metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,lectura_archivo,
-                         escritura_archivo,revisar_csv,filtro_evento,extraccion,
-                         ordenar_y_eliminar_duplicados,extraer_dia)
+                         escritura_archivo,filtro_evento,extraer_dia)
 
 from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios,VentanaProgreso
 import struct
