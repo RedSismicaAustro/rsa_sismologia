@@ -141,6 +141,8 @@ def catalogo_gis_(catalogo,indice):
 
 
 
+
+
 def proceso_gis(widget, procesamiento, archivo_estaciones):
     ax = widget.figure.add_subplot(111)
     widget.figure.clf()
@@ -196,32 +198,14 @@ class widget_grafico_mpl(QWidget):
         super().__init__(parent)
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
-        # Crea un Axes persistente para dibujar siempre sobre él
-        self.ax = self.figure.add_subplot(111)
-
+        
         layout = QVBoxLayout()
         layout.addWidget(self.canvas)
-        layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
     def plot(self, procesamiento, archivo_estaciones):
-        # Limpia el axes embebido (no crees figuras nuevas)
-        self.ax.clear()
+        return proceso_gis(self, procesamiento, archivo_estaciones)
 
-        # Llama a tu pipeline GIS pasando SIEMPRE el axes embebido
-        # Ajusta 'proceso_gis' para que acepte 'ax' y dibuje TODO sobre él.
-        bandera = proceso_gis(
-            procesamiento=procesamiento,
-            archivo_estaciones=archivo_estaciones,
-            ax=self.ax
-        )
-
-        # Ajustes visuales opcionales
-        self.figure.tight_layout()
-        # Refresca el canvas embebido (no usar plt.show())
-        self.canvas.draw_idle()
-
-        return bandera
 
 def graficar_catalogo_gis(catalogo):
 
