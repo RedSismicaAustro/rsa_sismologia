@@ -1391,11 +1391,9 @@ def guardar_intento(archivo,directorio,responsables,procesamiento):
 
 
 def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
-    print("Evento procesar:",evento_procesar)
     contador = 0
     sufijo = ['', 'a', 'b', 'c']
     clave_minuto = Path(evento_procesar).stem.replace('_', '')[:12]
-    print("Clave minuto:",clave_minuto)
     for evento in eventos:
         tipo_evento = evento[2]
         if tipo_evento != 'SISMO':
@@ -1420,7 +1418,6 @@ def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
     for i in range(3, 7):
         if archivos_fast[i]:
             archivos_fast[i] = archivos_fast[i] + suf
-    print(archivos_fast)
     return archivos_fast
 
 
@@ -2014,7 +2011,6 @@ def cargar_dia(directorios):
     eventos=[]
     vector=[]
     canales_eventos_dia=[]
-
     contador_n_canales=[[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0]]#Tupla que contiene el número de estaciones por evento sísmico.
     root = ET.Element("sismo")
     lista_eventos=lectura_archivo(directorios['archivo_csv'])
@@ -2070,29 +2066,13 @@ def cargar_dia(directorios):
             eventos_reporte.append(evento_grabar)
             eventos.append(evento_individual)
             canales_eventos_dia.append(canales_evento)
-
-
+    print('Catalogo extraido:')
     # Regenerar catálogo solo con eventos de otras redes (Id termina en != '00') manteniendo la cabecera 'Id'
     if os.path.exists(directorios['archivo_catalogo']):
             catalogo_existente = lectura_archivo(directorios['archivo_catalogo'])
             print("Catálogo existente leído:\n", catalogo_existente)
 
             if catalogo_existente is not None:
-                # 1) Determinar y conservar una única cabecera 'Id'
-                cabecera = None
-                if catalogo and catalogo[0] and catalogo[0][0] == 'Id':
-                    cabecera = catalogo[0]
-                else:
-                    for fila in catalogo_existente:
-                        if fila and fila[0] == 'Id':
-                            cabecera = fila
-                            break
-
-                # 2) Construir el nuevo catálogo con solo otras redes
-                nuevo_catalogo = []
-                if cabecera:
-                    nuevo_catalogo.append(cabecera)
-
                 # 2.a) Desde el archivo existente
                 for evento_existente in catalogo_existente:
                     if not evento_existente:
@@ -2100,23 +2080,12 @@ def cargar_dia(directorios):
                     if evento_existente[0] == 'Id':
                         continue
                     if evento_existente[0][-2:] != '00':   # IGEPN (..01), USGS (..02) u otras no-RSA
-                        nuevo_catalogo.append(evento_existente)
+                        catalogo.append(evento_existente)
 
-                # 2.b) (Opcional) Incluir candidatos de la variable `catalogo` actual si los hubiera
-                for evento in catalogo:
-                    if not evento:
-                        continue
-                    if evento[0] == 'Id':
-                        continue
-                    if evento[0][-2:] != '00':
-                        nuevo_catalogo.append(evento)
 
-                # 3) Ordenar y eliminar duplicados por columna 0 (Id)
-                catalogo = ordenar_y_eliminar_duplicados(nuevo_catalogo, 0)
+                catalogo = ordenar_y_eliminar_duplicados(catalogo, 0)
 
     print("Catálogo de otras redes regenerado:\n", catalogo)
-
-
     indice_responsables=[0,0,0]
     cont_sismo=[0,0,0]
     cont_indefinido=[0,0,0]
@@ -2176,18 +2145,15 @@ def cargar_dia(directorios):
             indice_responsables[0]=0#ind_0=0
             indice_responsables[1]=2#ind_1=2
             indice_responsables[2]=5#ind_2=5
-
     variable_responsables=[["RESPONSABLE","HORA","TOT.","SIS.","FF","FC","IND.","TEL.","Local_CONTROL.","Ruido","3 est","4 est","5 est","6 est","7 est","8 est"]]
-
     for i in range (0,3):
         total=cont_sismo[i]+cont_FF[i]+cont_FC[i]+cont_indefinido[i]+cont_tele[i]+cont_local[i]+cont_ruido[i]
-        print(total)
         if(total!=0):
             aux=[responsables[indice_responsables[i]][0],hora_[i],total,cont_sismo[i],cont_FF[i],cont_FC[i],cont_indefinido[i],cont_tele[i],cont_local[i],cont_ruido[i]]
             aux=aux+contador_n_canales[i]
             variable_responsables.append(aux)
     resumen=[["SISMO","FF","FC","TELESISMOS","Local_CONTROL","INDEFINIDO","Ruido"],[sum(cont_sismo),sum(cont_FF),sum(cont_FC),sum(cont_tele),sum(cont_local),sum(cont_indefinido),sum(cont_ruido)]]
-    print(variable_responsables)
+    print("Catálogo :\n", catalogo)
     return eventos_reporte,catalogo,eventos,vector,canales_eventos_dia,root,variable_responsables,resumen
 
 def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,magnitud_,tipo_magnitud,texto,texto2,evento_reporte_escogido,indice,indice_local):

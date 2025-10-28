@@ -531,12 +531,9 @@ class Procesar_evento(QMainWindow):
         elif self.radioButton_revision.isChecked():
             # En modo revisión: permitir al usuario marcar/desmarcar detalles
             self.checkBox_detalles.setEnabled(True)
-
         # Si no desea detalles, no hay nada que hacer
         if not self.checkBox_detalles.isChecked():
             self.close()
-            
-
         # --- 2) Preparación de banderas (conserva tu lógica) ---
         banderas = [0, 0, 0, 0]
         if self.horario == '00:00 - 12:00':
@@ -545,7 +542,6 @@ class Procesar_evento(QMainWindow):
             banderas[3] = 2
         else:
             banderas[3] = 3
-
         # --- 3) Rutas y fecha ---
         archivo_reporte_temporal = os.path.join(
             self.directorios['Directorio_base'],
@@ -553,21 +549,15 @@ class Procesar_evento(QMainWindow):
         )
         nombre = Path(self.archivo).stem  # AAAAMMDD_hhmmss
         fecha = QDate(int(nombre[0:4]), int(nombre[4:6]), int(nombre[6:8]))
-
         # --- 4) Cargar datos del día y preparar arbol XML ---
         self.eventos_reporte, self.catalogo, self.eventos, \
         self.vector, self.evento_canales, \
         self.root, self.responsables, self.resumen = cargar_dia(self.directorios)
-
         escritura_archivo(self.directorios['archivo_responsables'], self.responsables)
         tree = ET.ElementTree(self.root)
         self.estaciones_eventos = []
-
-
-
         # --- 6) Control por bandera de revisión ---
         if not self.revision_procesamiento:
- 
             # --- 5) Generar el PDF temporal SIEMPRE que detalles esté marcado ---
             reporte_resumen(
                 archivo_reporte_temporal, "Reporte temporal",
@@ -584,7 +574,6 @@ class Procesar_evento(QMainWindow):
                 1
                 )
             os.startfile(archivo_reporte_temporal)            
-  
     # Primera pasada: activar bandera, avisar y NO cerrar
             self.revision_procesamiento = True
             # Mensaje MUY notorio en el label con ruta del archivo

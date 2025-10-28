@@ -24,7 +24,7 @@ import os
 import sys
 import re
 from pathlib import Path
-from datetime import datetime
+
 
 # ==== Rutas base del proyecto =================================================
 def extraer_hasta_directorio(ruta_completa, nombre_directorio):
@@ -45,14 +45,14 @@ if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
 # ==== Librerías del proyecto / terceros ======================================
-from metodos_rsa import imprimir_plt, obtenerTraza, lectura_archivo, escritura_archivo
+from metodos_rsa import obtenerTraza, lectura_archivo, escritura_archivo
 from metodos_gestion import parametros_estaciones, obtener_directorios
 
 import numpy as np
 import obspy
-from obspy import read, Stream
+from obspy import  Stream
 from PyQt5 import uic, QtWidgets
-from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtCore import QDate, QCoreApplication
 import matplotlib
 matplotlib.use('Agg')

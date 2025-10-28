@@ -30,9 +30,8 @@ from metodos_reportes_individuales import generar_reporte_sismo,generar_reporte_
 import csv
 import matplotlib.pyplot as plt
 import numpy as np
-from PyQt5 import uic, QtWidgets,QtCore#Importamos módulo uic y Qtwidgets
-from PyQt5.QtWidgets import (QMainWindow,QMessageBox,QDialog,QFileDialog,QLabel,QCheckBox,QComboBox,QLineEdit,QSpinBox,QPushButton)
-from datetime import datetime 
+from PyQt5 import uic
+from PyQt5.QtWidgets import (QMainWindow,QMessageBox,QDialog,QLabel,QCheckBox,QComboBox,QLineEdit,QSpinBox,QPushButton)
 from PyQt5.QtCore import QDate
 import xml.etree.ElementTree as ET
 from PyQt5.QtCore import pyqtSignal
@@ -79,20 +78,12 @@ class Reporte_diario(QMainWindow):
         ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", 'reporte.ui')
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui, self)
-
-        #QtWidgets.QMainWindow.__init__(self)#Constructor
-        #Ui_MainWindow.__init__(self)#Constructor
         self.visor = Figure(figsize=(8, 4), dpi=100)
         self.canvas = FigureCanvas(self.visor)
         self.archivo, self.directorio_trabajo, self.responsable, self.periodo=archivo, directorio_trabajo, responsable, periodo
-        
         self.eventos_reporte=[[0,"Fecha; Hora (UTC)","Evento","Magn.","Prof.(km)","Lat.","Long.","Ubicación"]]
-        #self.catalogo=[["Id","año","mes","día","hora","min","seg","lat","long","prof","rms","e-x","e-y","e-0","e-z","Mag","Tipo Mag","Fuente","ruta","Ubicación"]]
         self.eventos=[]
         self.evento_canales=[]
-        #self.setupUi(self)# Método Constructor de la ventana
-        
-
         self.Btn_Salir.clicked.connect(self.Salir_)
         self.Btn_guardar.clicked.connect(self.Guardar_)
         self.Btn_modificar.clicked.connect(self.Modificar_)
@@ -111,7 +102,6 @@ class Reporte_diario(QMainWindow):
         self.cmbx_red.addItems(lista_filtros)
         lista_filtros = [" ","M", "MLv", "Md","Mc","Mw","Mb"]
         self.cmbx_tipo_mag.addItems(lista_filtros)       
-        self.calendarWidget.clicked[QtCore.QDate].connect(self.showDate)
         self.Lbl_directorio.setText(self.directorio_trabajo)
         self.parametros=parametros_estaciones()#(nombre_canal_total_,nombre_canal,tipo_canal_,n_canales_,hab_canal)
         self.numero_canal_=self.parametros['NUM_ESTACION']
@@ -169,7 +159,6 @@ class Reporte_diario(QMainWindow):
         self.indice=0
 
     def showDate(self, date):
-        print("Cambio de dia")
         self.reiniciar_estado_dia()
         self.bandera_evento=1
         self.date=date
@@ -186,7 +175,6 @@ class Reporte_diario(QMainWindow):
         self.eventos_reporte,self.catalogo,self.eventos, \
         self.vector,self.evento_canales, \
         self.root,self.responsables,self.resumen=cargar_dia(self.directorios)
-        print("Catalogo luego de cargar día:\n",self.catalogo)
         self.Btn_graficar.setEnabled(False)
         self.Btn_pagina.setEnabled(False)
         self.cmbx_evento.setEnabled(False)
@@ -310,7 +298,6 @@ class Reporte_diario(QMainWindow):
         tipo_magnitud=self.cmbx_tipo_mag.currentText()
         texto=self.textEdit.toPlainText()
         texto2=self.textEdit_2.toPlainText()
-        print(texto,texto2)
         self.catalogo,self.eventos_reporte=insertar_evento_otras_redes(
             self.catalogo,
             self.indice_catalogo,
@@ -336,7 +323,6 @@ class Reporte_diario(QMainWindow):
         self.Btn_generar.setEnabled(True)
 
     def Generar_reporte_sismo(self):
-        print(self.archivo_reporte)
         generar_reporte_sismo(self.catalogo, self.evento_escogido, self.canales, self.trCanal, self.archivo_reporte,self.directorio_trabajo)
     
     def Graficar_(self):
@@ -400,18 +386,12 @@ class Reporte_diario(QMainWindow):
         """
         Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza.
         """
-        print("Saliendo de Reporte diario - closeEvent ejecutado")
-    
         # Limpiar estado antes de emitir señal
         self.limpiar_estado()
-        
         # Emitir señal una sola vez
         self.cerrado.emit()
-    
         # Aceptar el evento de cierre
         event.accept()
-    
-        print("closeEvent completado - señal cerrado emitida")
 
 
 class estaciones_(QDialog):
@@ -426,12 +406,10 @@ class estaciones_(QDialog):
         self.hab_canal=self.parametros['HAB_CANAL']
         self.setFixedSize(410, 420)
         QDialog.__init__(self)
-
         # Cargar la interfaz desde el archivo .ui directamente en esta instancia
         ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", "estaciones.ui")
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui, self)
-
         self.ck_box_disp_canal={}
         self.ck_box_hab_canal={}
         self.ck_box_comentario={}
