@@ -59,6 +59,249 @@ NUMERO_ESTACIONES=101
 IDX_LONGITUD_MINIMA,IDX_LATITUD_MINIMA,IDX_LONGITUD_MAXIMA,IDX_LATITUD_MAXIMA=0,1,2,3
 IDX_POSICION_X,IDX_POSICION_Y,IDX_ANCHO,IDX_ALTO,=0,1,2,3
 
+# =============================================================================
+# MODOS DE IMPRESIÓN (Contrato oficial de la librería)
+# -----------------------------------------------------------------------------
+# M1: PROCESAMIENTO_DIARIO_COMPLETO (post-período)
+#     Incluye: SISMO, FF, FC e INDEFINIDOS.
+#     Presentación: con extras técnicos (zoom, zoom+filtro, líneas P/S/coda, RMS/Responsable).
+#     Estaciones: todas con mseed disponible.
+#     Cobertura/estaciones (polígonos/listados): SÍ.
+#     Detalle (imprimir_catalogo): SÍ.
+#
+# M2: PROCESAMIENTO_DIARIO
+#     Incluye: SISMO, FF, FC.
+#     Presentación: con extras técnicos.
+#     Estaciones: todas con mseed disponible (o política si así se fija para M2).
+#     Cobertura/estaciones: SÍ.
+#     Detalle: SÍ.
+#
+# M3: OFICIAL_DETALLADO
+#     Incluye: SISMO + (FF/FC) que consten en el catálogo oficial.
+#     Presentación: SIN extras técnicos (limpio; sin zoom ni líneas P/S/coda).
+#     Estaciones: política estricta (marcar_impresiones con estaciones_informe/tipo/zona).
+#     Cobertura/estaciones: NO.
+#     Detalle: SÍ. Si la máscara queda vacía → emitir “ficha de constancia” del evento.
+#
+# M4: OFICIAL_RESUMEN
+#     Solo portada/resumen (mapa + eventos + promedios + leyenda).
+#     No hay detalle ni acelerogramas ni extras técnicos.
+#     Termina tras la portada.
+# -----------------------------------------------------------------------------
+# NOTA: `mapa_` queda exclusivamente para cartografía (región/fondo). NO activa comportamientos.
+#       `bandera_relleno` es puramente estética del mapa (relleno/contorno) e INDEPENDIENTE del modo.
+# =============================================================================
+
+
+# =============================================================================
+# TABLA DE VERDAD (Modos → Banderas derivadas)
+# -----------------------------------------------------------------------------
+# Leyenda:
+#   S = Sí / activo / aplica
+#   N = No / inactivo / no aplica
+#   (cat) = condicionado a “consta en catálogo oficial”
+#
+# Bandera / Control                     |  M1  |  M2  |  M3             |  M4
+# ------------------------------------- | ---- | ---- | ---------------- | ----
+# imprimir_detalle (llamar catálogo)    |  S   |  S   |  S               |  N
+# incluir_indefinidos                   |  S   |  N   |  N               |  N
+# incluir_ff_fc                         |  S   |  S   |  S (cat)         |  S (irrelevante; no hay detalle)
+# extras_tecnicos (zoom/P-S/coda/RMS)   |  S   |  S   |  N               |  N
+# politica_estaciones (máscara)         |  TODAS mseed | TODAS mseed (*) | POLÍTICA estricta | N/A
+# mostrar_cobertura_y_estaciones        |  S   |  S   |  N               |  N
+# ficha_sin_traza (si máscara=0)        |  Opc |  Rec |  Obligatoria     |  N/A
+# acelerogramas_on                      |  S   |  S   |  S               |  N
+# bandera_reporte (formato institucional)| N   |  N   |  S               |  S
+# bandera_firma                         |  N   |  N   |  S               |  S
+# bandera_dia (compatibilidad)          |  S   |  S   |  S               |  N
+#
+# (*) Para M2 puedes fijar POLÍTICA en lugar de TODAS mseed si lo deseas, pero debe ser estable.
+# -----------------------------------------------------------------------------
+# Parámetros que NO dependen del modo:
+#   - bandera_relleno  → estilo de círculos del mapa (relleno/contorno).
+#   - mapa_            → cartografía/región (Austro, Ecuador, Facultad...).
+#   - bandera_primera_hoja → control interno por evento/página para portada técnica si hay índice/intentós.
+#   - detalle          → matiz de verbosidad; no enciende extras por sí solo.
+# =============================================================================
+
+
+# =============================================================================
+# DÓNDE SE CONSUME CADA BANDERA (para ubicarse rápido)
+# -----------------------------------------------------------------------------
+# reporte_resumen():
+#   - imprimir_detalle (M1–M3 S / M4 N) → decide llamar o no a imprimir_catalogo()
+#   - bandera_reporte / bandera_firma (M3–M4 S) → plantillas institucionales si aplica
+#   - bandera_dia (compat) → derivada del modo
+#   - bandera_relleno → pasa a dibujo_sismos_ (independiente del modo)
+#
+# imprimir_catalogo():
+#   - Filtro de catálogo por modo:
+#       M1: SISMO/FF/FC/INDEF
+#       M2: SISMO/FF/FC
+#       M3–M4: SISMO + (FF/FC) que consten en catálogo oficial
+#   - politica_estaciones:
+#       M1–M2: TODAS mseed (o POLÍTICA en M2 si así se fija)
+#       M3: POLÍTICA estricta (marcar_impresiones)
+#   - ficha_sin_traza:
+#       Si máscara=0 y M3 → emitir constancia del evento (no desaparecer del PDF)
+#   - acelerogramas_on:
+#       M1–M3 S (si tipo_canal==ACELEROGRAFICO y máscara=1); M4 N
+#
+# hoja_seniales_():
+#   - extras_tecnicos:
+#       M1–M2 S → dibuja columnas de zoom/zoom+filtro, líneas P/S/coda y cabecera técnica (RMS/Responsable)
+#       M3–M4 N → salida limpia, sin extras
+#   - incluir_indefinidos:
+#       M1 S → además de SISMO/FF/FC, permitir INDEFINIDOS
+#       M2–M4 N → solo SISMO/FF/FC
+#   - portada_condicional (se mantiene igual):
+#       si bandera_primera_hoja y (índice real o intentos en disco) → impresion_reporte_sismo()
+# =============================================================================
+
+# =========================
+# Modos de reporte (contrato unificado)
+# =========================
+MODO_PROCESAMIENTO_DIARIO_COMPLETO = 1   # M1: post-período; SISMO/FF/FC/INDEF; extras ON; todas_mseed
+MODO_PROCESAMIENTO_DIARIO          = 2   # M2: diario; SISMO/FF/FC; extras ON; todas_mseed (o política si decides)
+MODO_OFICIAL_DETALLADO             = 3   # M3: oficial con detalle; SISMO + FF/FC (si constan en catálogo); extras OFF; política
+MODO_OFICIAL_RESUMEN               = 4   # M4: oficial solo resumen (1 hoja); extras OFF; sin detalle
+
+# Nuevos modos de “solo resúmenes” con formato particular (cartografía distinta; sin detalle)
+MODO_OFICIAL_RESUMEN_FACULTAD      = 5   # M5: solo resumen con plantilla/tipo de mapa de Facultad
+MODO_OFICIAL_RESUMEN_GADS          = 6   # M6: solo resumen con plantilla/tipo de mapa para GADs
+
+def derivar_banderas_desde_modo(modo_reporte: int) -> dict:
+    """
+    Devuelve un diccionario de banderas derivadas del modo.
+    No toca 'bandera_relleno' (estética del mapa) ni 'mapa_' (cartografía).
+    Para M5/M6, el 'mapa_' se fija fuera: M5→mapa_=2 (Facultad), M6→mapa_=4 (GADs).
+    """
+    # Valores base conservadores
+    band = {
+        'imprimir_detalle': True,            # ¿se llama a imprimir_catalogo?
+        'incluir_indefinidos': False,        # permitir INDEFINIDOS en señales
+        'incluir_ff_fc': True,               # FF/FC permitidos (en M3 condicionado “aguas arriba” por catálogo)
+        'extras_tecnicos': False,            # zoom, zoom+filtro, líneas P/S/coda, RMS/Responsable
+        'politica_estaciones': 'politica',   # 'todas_mseed' | 'politica'
+        'mostrar_cobertura_y_estaciones': False,
+        'ficha_sin_traza': 'no_aplica',      # 'obligatoria' | 'recomendable' | 'opcional' | 'no_aplica'
+        'acelerogramas_on': True,
+        'bandera_reporte': False,            # metadatos de “reporte institucional”
+        'bandera_firma': False,              # metadatos de “con firma”
+        'bandera_dia': True,                 # compatibilidad con lógica previa
+    }
+
+    if modo_reporte == MODO_PROCESAMIENTO_DIARIO_COMPLETO:  # M1
+        band.update({
+            'imprimir_detalle': True,
+            'incluir_indefinidos': True,
+            'incluir_ff_fc': True,
+            'extras_tecnicos': True,
+            'politica_estaciones': 'todas_mseed',
+            'mostrar_cobertura_y_estaciones': True,
+            'ficha_sin_traza': 'opcional',
+            'acelerogramas_on': True,
+            'bandera_reporte': False,
+            'bandera_firma': False,
+            'bandera_dia': True,
+        })
+
+    elif modo_reporte == MODO_PROCESAMIENTO_DIARIO:         # M2
+        band.update({
+            'imprimir_detalle': True,
+            'incluir_indefinidos': False,
+            'incluir_ff_fc': True,
+            'extras_tecnicos': True,
+            'politica_estaciones': 'todas_mseed',  # si prefieres política, cámbialo aquí y queda fijo
+            'mostrar_cobertura_y_estaciones': True,
+            'ficha_sin_traza': 'recomendable',
+            'acelerogramas_on': True,
+            'bandera_reporte': False,
+            'bandera_firma': False,
+            'bandera_dia': True,
+        })
+
+    elif modo_reporte == MODO_OFICIAL_DETALLADO:            # M3
+        band.update({
+            'imprimir_detalle': True,
+            'incluir_indefinidos': False,
+            'incluir_ff_fc': True,          # “si constan en catálogo” debe controlarse al preparar el catálogo
+            'extras_tecnicos': False,
+            'politica_estaciones': 'politica',
+            'mostrar_cobertura_y_estaciones': False,
+            'ficha_sin_traza': 'obligatoria',
+            'acelerogramas_on': True,
+            'bandera_reporte': True,
+            'bandera_firma': True,
+            'bandera_dia': True,
+        })
+
+    elif modo_reporte == MODO_OFICIAL_RESUMEN:              # M4
+        band.update({
+            'imprimir_detalle': False,      # clave: no se llama a imprimir_catalogo()
+            'incluir_indefinidos': False,
+            'incluir_ff_fc': True,          # irrelevante porque no hay detalle
+            'extras_tecnicos': False,
+            'politica_estaciones': 'politica',
+            'mostrar_cobertura_y_estaciones': False,
+            'ficha_sin_traza': 'no_aplica',
+            'acelerogramas_on': False,
+            'bandera_reporte': True,
+            'bandera_firma': True,
+            'bandera_dia': False,           # refleja “solo resumen”
+        })
+
+    elif modo_reporte == MODO_OFICIAL_RESUMEN_FACULTAD:     # M5 (solo resumen, plantilla Facultad)
+        band.update({
+            'imprimir_detalle': False,      # igual que M4
+            'incluir_indefinidos': False,
+            'incluir_ff_fc': True,          # irrelevante sin detalle
+            'extras_tecnicos': False,
+            'politica_estaciones': 'politica',
+            'mostrar_cobertura_y_estaciones': False,
+            'ficha_sin_traza': 'no_aplica',
+            'acelerogramas_on': False,
+            'bandera_reporte': True,
+            'bandera_firma': True,
+            'bandera_dia': False,
+            # Nota: fijar fuera mapa_ = 2 (plantilla Facultad)
+        })
+
+    elif modo_reporte == MODO_OFICIAL_RESUMEN_GADS:         # M6 (solo resumen, plantilla GADs)
+        band.update({
+            'imprimir_detalle': False,      # igual que M4/M5
+            'incluir_indefinidos': False,
+            'incluir_ff_fc': True,          # irrelevante sin detalle
+            'extras_tecnicos': False,
+            'politica_estaciones': 'politica',
+            'mostrar_cobertura_y_estaciones': False,
+            'ficha_sin_traza': 'no_aplica',
+            'acelerogramas_on': False,
+            'bandera_reporte': True,
+            'bandera_firma': True,
+            'bandera_dia': False,
+            # Nota: fijar fuera mapa_ = 4 (plantilla GADs)
+        })
+
+    return band
+
+
+# (Opcional) Helper para recordar el mapa sugerido por modo de “solo resumen”.
+# Úsalo donde prepares la portada (no dentro de derivar_banderas...).
+def sugerir_mapa_por_modo(modo_reporte: int, mapa_actual: int) -> int:
+    """
+    Devuelve el mapa sugerido sin forzar si no corresponde.
+    - M5 → 2 (Facultad)
+    - M6 → 4 (GADs)
+    - Otros modos → respeta 'mapa_actual'
+    """
+    if modo_reporte == MODO_OFICIAL_RESUMEN_FACULTAD:
+        return 2
+    if modo_reporte == MODO_OFICIAL_RESUMEN_GADS:
+        return 4
+    return mapa_actual
+
+
 def marcar_tiempo(lienzo,x_,y_,tiempo_inicio,ancho,duracion,catNames):
     membrete=0
     intervalo=ancho/duracion   #Escala en el gráfico.
