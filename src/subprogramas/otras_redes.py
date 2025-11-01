@@ -24,7 +24,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 from metodos_rsa import leer_mseed,grafico_evento_int,calidad_estacion,cargar_evento,cargar_dia,escritura_archivo,lectura_archivo
 from metodos_rsa import insertar_evento_otras_redes,Guardar_dia,ordenar_y_eliminar_duplicados
-from metodos_graficos_rsa import reporte_resumen
+from metodos_graficos_rsa import reporte_resumen_modos
 from metodos_gestion import parametros_estaciones,obtener_directorios
 from metodos_reportes_individuales import generar_reporte_sismo,generar_reporte_acelerograma
 import csv

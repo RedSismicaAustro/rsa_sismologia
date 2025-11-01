@@ -59,248 +59,16 @@ NUMERO_ESTACIONES=101
 IDX_LONGITUD_MINIMA,IDX_LATITUD_MINIMA,IDX_LONGITUD_MAXIMA,IDX_LATITUD_MAXIMA=0,1,2,3
 IDX_POSICION_X,IDX_POSICION_Y,IDX_ANCHO,IDX_ALTO,=0,1,2,3
 
-# =============================================================================
-# MODOS DE IMPRESIÓN (Contrato oficial de la librería)
-# -----------------------------------------------------------------------------
-# M1: PROCESAMIENTO_DIARIO_COMPLETO (post-período)
-#     Incluye: SISMO, FF, FC e INDEFINIDOS.
-#     Presentación: con extras técnicos (zoom, zoom+filtro, líneas P/S/coda, RMS/Responsable).
-#     Estaciones: todas con mseed disponible.
-#     Cobertura/estaciones (polígonos/listados): SÍ.
-#     Detalle (imprimir_catalogo): SÍ.
-#
-# M2: PROCESAMIENTO_DIARIO
-#     Incluye: SISMO, FF, FC.
-#     Presentación: con extras técnicos.
-#     Estaciones: todas con mseed disponible (o política si así se fija para M2).
-#     Cobertura/estaciones: SÍ.
-#     Detalle: SÍ.
-#
-# M3: OFICIAL_DETALLADO
-#     Incluye: SISMO + (FF/FC) que consten en el catálogo oficial.
-#     Presentación: SIN extras técnicos (limpio; sin zoom ni líneas P/S/coda).
-#     Estaciones: política estricta (marcar_impresiones con estaciones_informe/tipo/zona).
-#     Cobertura/estaciones: NO.
-#     Detalle: SÍ. Si la máscara queda vacía → emitir “ficha de constancia” del evento.
-#
-# M4: OFICIAL_RESUMEN
-#     Solo portada/resumen (mapa + eventos + promedios + leyenda).
-#     No hay detalle ni acelerogramas ni extras técnicos.
-#     Termina tras la portada.
-# -----------------------------------------------------------------------------
-# NOTA: `mapa_` queda exclusivamente para cartografía (región/fondo). NO activa comportamientos.
-#       `bandera_relleno` es puramente estética del mapa (relleno/contorno) e INDEPENDIENTE del modo.
-# =============================================================================
-
-
-# =============================================================================
-# TABLA DE VERDAD (Modos → Banderas derivadas)
-# -----------------------------------------------------------------------------
-# Leyenda:
-#   S = Sí / activo / aplica
-#   N = No / inactivo / no aplica
-#   (cat) = condicionado a “consta en catálogo oficial”
-#
-# Bandera / Control                     |  M1  |  M2  |  M3             |  M4
-# ------------------------------------- | ---- | ---- | ---------------- | ----
-# imprimir_detalle (llamar catálogo)    |  S   |  S   |  S               |  N
-# incluir_indefinidos                   |  S   |  N   |  N               |  N
-# incluir_ff_fc                         |  S   |  S   |  S (cat)         |  S (irrelevante; no hay detalle)
-# extras_tecnicos (zoom/P-S/coda/RMS)   |  S   |  S   |  N               |  N
-# politica_estaciones (máscara)         |  TODAS mseed | TODAS mseed (*) | POLÍTICA estricta | N/A
-# mostrar_cobertura_y_estaciones        |  S   |  S   |  N               |  N
-# ficha_sin_traza (si máscara=0)        |  Opc |  Rec |  Obligatoria     |  N/A
-# acelerogramas_on                      |  S   |  S   |  S               |  N
-# bandera_reporte (formato institucional)| N   |  N   |  S               |  S
-# bandera_firma                         |  N   |  N   |  S               |  S
-# bandera_dia (compatibilidad)          |  S   |  S   |  S               |  N
-#
-# (*) Para M2 puedes fijar POLÍTICA en lugar de TODAS mseed si lo deseas, pero debe ser estable.
-# -----------------------------------------------------------------------------
-# Parámetros que NO dependen del modo:
-#   - bandera_relleno  → estilo de círculos del mapa (relleno/contorno).
-#   - mapa_            → cartografía/región (Austro, Ecuador, Facultad...).
-#   - bandera_primera_hoja → control interno por evento/página para portada técnica si hay índice/intentós.
-#   - detalle          → matiz de verbosidad; no enciende extras por sí solo.
-# =============================================================================
-
-
-# =============================================================================
-# DÓNDE SE CONSUME CADA BANDERA (para ubicarse rápido)
-# -----------------------------------------------------------------------------
-# reporte_resumen():
-#   - imprimir_detalle (M1–M3 S / M4 N) → decide llamar o no a imprimir_catalogo()
-#   - bandera_reporte / bandera_firma (M3–M4 S) → plantillas institucionales si aplica
-#   - bandera_dia (compat) → derivada del modo
-#   - bandera_relleno → pasa a dibujo_sismos_ (independiente del modo)
-#
-# imprimir_catalogo():
-#   - Filtro de catálogo por modo:
-#       M1: SISMO/FF/FC/INDEF
-#       M2: SISMO/FF/FC
-#       M3–M4: SISMO + (FF/FC) que consten en catálogo oficial
-#   - politica_estaciones:
-#       M1–M2: TODAS mseed (o POLÍTICA en M2 si así se fija)
-#       M3: POLÍTICA estricta (marcar_impresiones)
-#   - ficha_sin_traza:
-#       Si máscara=0 y M3 → emitir constancia del evento (no desaparecer del PDF)
-#   - acelerogramas_on:
-#       M1–M3 S (si tipo_canal==ACELEROGRAFICO y máscara=1); M4 N
-#
-# hoja_seniales_():
-#   - extras_tecnicos:
-#       M1–M2 S → dibuja columnas de zoom/zoom+filtro, líneas P/S/coda y cabecera técnica (RMS/Responsable)
-#       M3–M4 N → salida limpia, sin extras
-#   - incluir_indefinidos:
-#       M1 S → además de SISMO/FF/FC, permitir INDEFINIDOS
-#       M2–M4 N → solo SISMO/FF/FC
-#   - portada_condicional (se mantiene igual):
-#       si bandera_primera_hoja y (índice real o intentos en disco) → impresion_reporte_sismo()
-# =============================================================================
-
 # =========================
-# Modos de reporte (contrato unificado)
+#  MODOS DE REPORTE (1–7)
 # =========================
-MODO_PROCESAMIENTO_DIARIO_COMPLETO = 1   # M1: post-período; SISMO/FF/FC/INDEF; extras ON; todas_mseed
-MODO_PROCESAMIENTO_DIARIO          = 2   # M2: diario; SISMO/FF/FC; extras ON; todas_mseed (o política si decides)
-MODO_OFICIAL_DETALLADO             = 3   # M3: oficial con detalle; SISMO + FF/FC (si constan en catálogo); extras OFF; política
-MODO_OFICIAL_RESUMEN               = 4   # M4: oficial solo resumen (1 hoja); extras OFF; sin detalle
-
-# Nuevos modos de “solo resúmenes” con formato particular (cartografía distinta; sin detalle)
-MODO_OFICIAL_RESUMEN_FACULTAD      = 5   # M5: solo resumen con plantilla/tipo de mapa de Facultad
-MODO_OFICIAL_RESUMEN_GADS          = 6   # M6: solo resumen con plantilla/tipo de mapa para GADs
-
-def derivar_banderas_desde_modo(modo_reporte: int) -> dict:
-    """
-    Devuelve un diccionario de banderas derivadas del modo.
-    No toca 'bandera_relleno' (estética del mapa) ni 'mapa_' (cartografía).
-    Para M5/M6, el 'mapa_' se fija fuera: M5→mapa_=2 (Facultad), M6→mapa_=4 (GADs).
-    """
-    # Valores base conservadores
-    band = {
-        'imprimir_detalle': True,            # ¿se llama a imprimir_catalogo?
-        'incluir_indefinidos': False,        # permitir INDEFINIDOS en señales
-        'incluir_ff_fc': True,               # FF/FC permitidos (en M3 condicionado “aguas arriba” por catálogo)
-        'extras_tecnicos': False,            # zoom, zoom+filtro, líneas P/S/coda, RMS/Responsable
-        'politica_estaciones': 'politica',   # 'todas_mseed' | 'politica'
-        'mostrar_cobertura_y_estaciones': False,
-        'ficha_sin_traza': 'no_aplica',      # 'obligatoria' | 'recomendable' | 'opcional' | 'no_aplica'
-        'acelerogramas_on': True,
-        'bandera_reporte': False,            # metadatos de “reporte institucional”
-        'bandera_firma': False,              # metadatos de “con firma”
-        'bandera_dia': True,                 # compatibilidad con lógica previa
-    }
-
-    if modo_reporte == MODO_PROCESAMIENTO_DIARIO_COMPLETO:  # M1
-        band.update({
-            'imprimir_detalle': True,
-            'incluir_indefinidos': True,
-            'incluir_ff_fc': True,
-            'extras_tecnicos': True,
-            'politica_estaciones': 'todas_mseed',
-            'mostrar_cobertura_y_estaciones': True,
-            'ficha_sin_traza': 'opcional',
-            'acelerogramas_on': True,
-            'bandera_reporte': False,
-            'bandera_firma': False,
-            'bandera_dia': True,
-        })
-
-    elif modo_reporte == MODO_PROCESAMIENTO_DIARIO:         # M2
-        band.update({
-            'imprimir_detalle': True,
-            'incluir_indefinidos': False,
-            'incluir_ff_fc': True,
-            'extras_tecnicos': True,
-            'politica_estaciones': 'todas_mseed',  # si prefieres política, cámbialo aquí y queda fijo
-            'mostrar_cobertura_y_estaciones': True,
-            'ficha_sin_traza': 'recomendable',
-            'acelerogramas_on': True,
-            'bandera_reporte': False,
-            'bandera_firma': False,
-            'bandera_dia': True,
-        })
-
-    elif modo_reporte == MODO_OFICIAL_DETALLADO:            # M3
-        band.update({
-            'imprimir_detalle': True,
-            'incluir_indefinidos': False,
-            'incluir_ff_fc': True,          # “si constan en catálogo” debe controlarse al preparar el catálogo
-            'extras_tecnicos': False,
-            'politica_estaciones': 'politica',
-            'mostrar_cobertura_y_estaciones': False,
-            'ficha_sin_traza': 'obligatoria',
-            'acelerogramas_on': True,
-            'bandera_reporte': True,
-            'bandera_firma': True,
-            'bandera_dia': True,
-        })
-
-    elif modo_reporte == MODO_OFICIAL_RESUMEN:              # M4
-        band.update({
-            'imprimir_detalle': False,      # clave: no se llama a imprimir_catalogo()
-            'incluir_indefinidos': False,
-            'incluir_ff_fc': True,          # irrelevante porque no hay detalle
-            'extras_tecnicos': False,
-            'politica_estaciones': 'politica',
-            'mostrar_cobertura_y_estaciones': False,
-            'ficha_sin_traza': 'no_aplica',
-            'acelerogramas_on': False,
-            'bandera_reporte': True,
-            'bandera_firma': True,
-            'bandera_dia': False,           # refleja “solo resumen”
-        })
-
-    elif modo_reporte == MODO_OFICIAL_RESUMEN_FACULTAD:     # M5 (solo resumen, plantilla Facultad)
-        band.update({
-            'imprimir_detalle': False,      # igual que M4
-            'incluir_indefinidos': False,
-            'incluir_ff_fc': True,          # irrelevante sin detalle
-            'extras_tecnicos': False,
-            'politica_estaciones': 'politica',
-            'mostrar_cobertura_y_estaciones': False,
-            'ficha_sin_traza': 'no_aplica',
-            'acelerogramas_on': False,
-            'bandera_reporte': True,
-            'bandera_firma': True,
-            'bandera_dia': False,
-            # Nota: fijar fuera mapa_ = 2 (plantilla Facultad)
-        })
-
-    elif modo_reporte == MODO_OFICIAL_RESUMEN_GADS:         # M6 (solo resumen, plantilla GADs)
-        band.update({
-            'imprimir_detalle': False,      # igual que M4/M5
-            'incluir_indefinidos': False,
-            'incluir_ff_fc': True,          # irrelevante sin detalle
-            'extras_tecnicos': False,
-            'politica_estaciones': 'politica',
-            'mostrar_cobertura_y_estaciones': False,
-            'ficha_sin_traza': 'no_aplica',
-            'acelerogramas_on': False,
-            'bandera_reporte': True,
-            'bandera_firma': True,
-            'bandera_dia': False,
-            # Nota: fijar fuera mapa_ = 4 (plantilla GADs)
-        })
-
-    return band
-
-
-# (Opcional) Helper para recordar el mapa sugerido por modo de “solo resumen”.
-# Úsalo donde prepares la portada (no dentro de derivar_banderas...).
-def sugerir_mapa_por_modo(modo_reporte: int, mapa_actual: int) -> int:
-    """
-    Devuelve el mapa sugerido sin forzar si no corresponde.
-    - M5 → 2 (Facultad)
-    - M6 → 4 (GADs)
-    - Otros modos → respeta 'mapa_actual'
-    """
-    if modo_reporte == MODO_OFICIAL_RESUMEN_FACULTAD:
-        return 2
-    if modo_reporte == MODO_OFICIAL_RESUMEN_GADS:
-        return 4
-    return mapa_actual
-
+MODO_PERIODO_FRANJAS          = 1   # M1 – Período por franjas (00–12, 12–18, 18–24) – Control interno
+MODO_DIARIO_REVISION          = 2   # M2 – Diario de revisión (día/ad-hoc) con detalle y dummies locales
+MODO_OFICIAL_DETALLADO        = 3   # M3 – Oficial detallado (solo catálogo) + página/resumen de responsables
+MODO_OFICIAL_RESUMEN          = 4   # M4 – Oficial resumen (solo catálogo, sin detalle)
+MODO_FACULTAD_RESUMEN         = 5   # M5 – Institucional resumen (Facultad/redes), sin detalle
+MODO_INSTITUCIONAL_DETALLADO  = 6   # M6 – Institucional detallado (solo catálogo), sin extras ni responsables
+MODO_INSTITUCIONAL_RESUMEN    = 7   # M7 – Institucional, sin detalle
 
 def marcar_tiempo(lienzo,x_,y_,tiempo_inicio,ancho,duracion,catNames):
     membrete=0
@@ -654,6 +422,7 @@ def formato(marca_agua,tamanio_hoja,titulo, subtitulo,formato_,lienzo):
     alto=marca_agua[3]
     PAGE_WIDTH  = defaultPageSize[0]#PAGE_WIDTH  = tamanio_hoja[0]#595.2755#
     PAGE_HEIGHT = defaultPageSize[1]# PAGE_HEIGHT = tamanio_hoja[1]#841.8897#
+    ######Reporte sísmico
     if formato_==0:
         canvas.Canvas.setPageSize(lienzo, A4)
         lienzo.drawImage(cabecera, 56, 780, 500, 50)# posx, posy, ancho, alto
@@ -665,6 +434,7 @@ def formato(marca_agua,tamanio_hoja,titulo, subtitulo,formato_,lienzo):
         lienzo.setFont('Helvetica', 10)
         text_width = stringWidth(subtitulo,'Helvetica', 10)
         lienzo.drawString((PAGE_WIDTH - text_width) / 2.0,745,subtitulo)
+    ######Reporte acelerografico
     elif formato_==1:
         canvas.Canvas.setPageSize(lienzo, (landscape(A4)))
         lienzo.drawImage(cabecera_1, 56, 530,750, 50)# posx, posy, ancho, alto
@@ -676,6 +446,7 @@ def formato(marca_agua,tamanio_hoja,titulo, subtitulo,formato_,lienzo):
         lienzo.setFont('Helvetica', 11)
         text_width = stringWidth(subtitulo,'Helvetica', 11)
         lienzo.drawString((PAGE_HEIGHT - text_width) / 2.0,495,subtitulo)
+    ######Reporte facultad
     else:
         canvas.Canvas.setPageSize(lienzo, A4)
         lienzo.drawImage(cabecera, 61, 744, 474, 43)# posx, posy, ancho, alto
@@ -1799,7 +1570,7 @@ import os
 
 
 
-def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen,mapa_,detalle,banderas,estaciones,directorio,arbol,resumen_responsables,eventos,bandera_relleno):
+def reporte_resumen__(archivo_pdf, subtitulo_reporte,fecha_ini,fecha_fin, catalogo,resumen,mapa_,tipo_mapa,banderas,estaciones,directorio,arbol,resumen_responsables,eventos,bandera_relleno):
     # Mètodo que genera el reporte de resumen en pdf, pudiendo ser de un día o un período entero sin restricción del tiempo
     #
     #
@@ -1821,21 +1592,22 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
     #                el sigueintes  es:
     #               [0 0 2...6]  donde los dos primeros valores son 0 y los sigueintes son el numero total de eventos procesados por día.
     # mapa_----------Varible para escoger el mapa dado por el archivo mapa.csv
-    # detalle -------Tipo de mapa    0, 1 y 2 con basico, intermnedio y detallado respectivamente
+    # tipo_mapa -------Tipo de mapa    0, 1 y 2 con basico, intermnedio y detallado respectivamente
     # banderas-------
-    #                bandera_dia---variable booleanaque habilita o deshabilita el cuadro resumen, permite usar el mismo método para hacer el reporte diario o el de período 
-    #                              en el reporte   0  no aparecen el cuadro reesumen ni las horas  1 aparece todo
-    #                bandera_reporte
-    #                bandera_firma
+    #                es_periodo     ---     bandera que habilita o deshabilita el cuadro resumen, permite usar el mismo método para hacer el reporte diario o el de período 
+    #                                       en el reporte   0  no aparecen el cuadro reesumen ni las horas  1 aparece todo
+    #                con_detalles   ---     bandera que permite la impresion de los detalles de los reportes. ()
+    #                bandera_firma  ---     bandera que habilita o no la impresion para la firma (Nombre del responsable)
     #                
     # estaciones---- estaciones involucradas en le reporte diario, si es período este tiene valor de 0
     # directorio---- direcorio base donde se tomará la información de los días del reporte, usado en periodo.
     # arbol--------- base de datos en xml del periodo de reporte
     # resumen_responsables----
     # eventos        Todos los eventos generados en el día.
+    # bandera_relleno Permite el rellono o no de los circulos de los eventos para cierto tipo de reportes.
 
-    bandera_dia=banderas[0]
-    bandera_reporte=banderas[1]
+    es_periodo=banderas[0]
+    con_detalles=banderas[1]
     bandera_firma=banderas[2]
     raiz=arbol.getroot()
     datos_estaciones=parametros_estaciones()
@@ -1862,49 +1634,38 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
     ancho=400
     alto=400
     tamanio=(xpos,ypos,ancho,alto)
-    datos=mapa_configuracion(mapa_,detalle)
-    mapa_despliegue=datos[0]
-    coordenadas=datos[1]##Longitud mínima, Latitud mínima, Longitud máxima, Latitud máxima
-    salto=datos[2]
-    estaciones_informe=datos[4]
-    titulo_hoja=datos[3]
+    datos_mapa=mapa_configuracion(mapa_,tipo_mapa)
+    mapa_despliegue=datos_mapa[0]
+    coordenadas=datos_mapa[1]##Longitud mínima, Latitud mínima, Longitud máxima, Latitud máxima
+    salto=datos_mapa[2]
+    estaciones_informe=datos_mapa[4]
     bandera_marca=1 #1 imprima marcas, 0 no imprima marcas
-    titulo="SISMICIDAD REGIONAL REGISTRADA"
+    titulo_reporte="SISMICIDAD REGIONAL REGISTRADA"
     tamanio_hoja=A4
     maximos_reporte=[]
     lienzo = canvas.Canvas(archivo_pdf,pagesize=A4)
     if not(mapa_==2 or mapa_==4):
-        lienzo=formato(marca_agua,tamanio_hoja,titulo,subtitulo,0,lienzo)
+        tipo_formato=0
         pos_x=55
         pos_y=234
 
     else:
         tamanio=(81,216,432,432)#xpos,ypos,ancho,alto
         marca_agua=(261, 66, 79, 36)#xpos,ypos,ancho,alto
-        lienzo=formato(marca_agua,tamanio_hoja,titulo,subtitulo,2,lienzo)
+        tipo_formato=2
         pos_x=85
         pos_y=109
+    lienzo=formato(marca_agua,tamanio_hoja,titulo_reporte,subtitulo_reporte,tipo_formato,lienzo)
     lienzo=mapa(lienzo,mapa_despliegue,tamanio,coordenadas,salto,bandera_marca)
-    lienzo=dibujo_sismos_(lienzo,vector,coordenadas,tamanio,mapa_,bandera_dia,bandera_relleno)
+    lienzo=dibujo_sismos_(lienzo,vector,coordenadas,tamanio,mapa_,es_periodo,bandera_relleno)
     ubicacion_caja=(pos_x,pos_y)
-    lienzo=caja_simbologia(lienzo,resumen,vector,ubicacion_caja,mapa_,bandera_dia,bandera_relleno)
-
-        
-    ####################################################################
+    lienzo=caja_simbologia(lienzo,resumen,vector,ubicacion_caja,mapa_,es_periodo,bandera_relleno)
     ####################################################################
     #        REPORTE DE PERIODO
     ####################################################################
-    ####################################################################
-
-    ####################################################################
-    ####### MAPA RESUMEN
-    ####################################################################
-        ################################################################
-        ##### REPORTE DE PERIODO
-        ################################################################
-    if bandera_dia:
+    if es_periodo:
         #Impresión del resumen diario de eventos procesados a travez de un chart de barras.
-        lienzo=estadistica_(lienzo,resumen,fecha_ini,mapa_,bandera_dia)
+        lienzo=estadistica_(lienzo,resumen,fecha_ini,mapa_,es_periodo)
         ####################################################
         ####SOLO PARA CONTROL INTENO mapa_=1
         ####################################################
@@ -1917,7 +1678,7 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
             ##################################################################
             ####INCREMENTO DEL CALATOLO PARA EVENTOS PROCESADOS SIN EXITO.
             ##################################################################
-            if bandera_reporte:
+            if con_detalles:
                 for evento_dia in eventos:
                     directorios=obtener_directorios(evento_dia[1])
                     archivo_procesamiento=directorio+directorios['archivo_procesamiento']
@@ -1957,7 +1718,8 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
                 contador2=0
                 if contador1==1:
                     lienzo.showPage()
-                    lienzo=formato(marca_agua,tamanio_hoja,titulo_hoja,subtitulo,0,lienzo)#0 Portrait  1 Landscape
+                    titulo_reporte=datos_mapa[3]
+                    lienzo=formato(marca_agua,tamanio_hoja,titulo_reporte,subtitulo_reporte,0,lienzo)#0 Portrait  1 Landscape
                     lienzo.setFont('Helvetica', 7)
                 if  evento_catalogo[IDX_MAGNITUD]!= 'Mag':
                     if  float(evento_catalogo[IDX_MAGNITUD])>4:
@@ -1975,50 +1737,16 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
                             texto=texto+evento_catalogo[i+1]
                         lienzo.drawString(localizacion[contador2],740-contador1*8,texto)
                     contador2=contador2+1
-            archivo_revision=archivo_pdf[:-8]+'revision.csv'
-            aux='Tarea 1: Aplicar filtros'
-
-            #####################################################################
-            # Generacion del archivo de revisón con los reponsables
-            #####################################################################
             
-            lista_eventos_revision=[['Tarea 1: Aplicar filtros'],['Tarea 2: Cambiar parámeros de filtros'],
-                                    ['Tarea 3: Muy ruidosa para marcar fases'],['Tarea 4: Tiempos de coda similares o iguales en estaciones muy distintas.'],
-                                    ['Tarea 5: Muy ruidosa para marcar tiempos de coda'],['Tarea 6: Señal aportante no considerada'],
-                                    ['Tarea 7: Tiempo de coda mal marcada'],['Tarea 8: Fase mal marcada'],['Tarea 9: Otra'],
-                                     ['Evento','Responsable','Tarea','Especificacion(8: Otra)','Causas','Resuelto','Detalle resolución']]
-            for evento_catalogo in catalogo:
-                aux=[]
-                if evento_catalogo==[]:
-                    continue
-                if evento_catalogo[0][-1] !='0':
-                    continue
-                evento_sismico=evento_catalogo[IDX_EVENTO]
-                aux.append(evento_sismico)
-                hora_evento=int(evento_sismico[-10:-4])
-                indice_hora=int(hora_evento/60000)
-                if indice_hora==0:
-                    indice_hora=1
-                archivo=os.path.join(directorio,evento_sismico.replace('_', '')[:-4])
-                directorios=obtener_directorios(archivo)
-                archivo_responsable=directorios['archivo_responsables']
-                responsables_dia=lectura_archivo(archivo_responsable)
-
-                # Validar antes de usar
-                if not responsables_dia or not isinstance(responsables_dia, list) or indice_hora >= len(responsables_dia):
-                    aux.append("RSA")  
-                else:
-                    aux.append(responsables_dia[indice_hora][0])
-
-                lista_eventos_revision.append(aux)
-            escritura_archivo(archivo_revision,lista_eventos_revision)
+        ####### Cambio de página del resumen de eventos.
             if contador1>50:
                 lienzo.showPage()
-                lienzo=formato(marca_agua,tamanio_hoja,titulo_hoja,subtitulo,0,lienzo)#0 Portrait  1 Landscape
+                lienzo=formato(marca_agua,tamanio_hoja,titulo_reporte,subtitulo_reporte,0,lienzo)#0 Portrait  1 Landscape
                 contador1=0
             lienzo.setFont('Helvetica', 10)
             x=100
             y=740-(contador1+20)*8
+        ####### Firma.
             if bandera_firma:
                 lienzo.drawString(x,y,"Ing. Remigio Guevara ")
             lienzo.drawString(x,y-10,"Red Sísmica del Austro")
@@ -2026,18 +1754,14 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
         ####################################################################
         ####### DETALLE DE EVENTOS
         ####################################################################
-        if bandera_reporte and not(mapa_==2 or mapa_==4):  #Esta bandera habilita o no el detalle del reporte, está en el IDE del program reporte eventos.
-            print("Se imprime detalle de reporte")
-
-            maximos_reporte=imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_canal,mapa_,raiz,detalle)
+        if con_detalles and not(mapa_==2 or mapa_==4):  #Esta bandera habilita o no el detalle del reporte, está en el IDE del program reporte eventos.
+            maximos_reporte=imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_canal,mapa_,raiz,tipo_mapa)
         else:
-            print("No se imprime detalle de reporte")
-
+            pass
         ####################################################################
         #########   REPORTE DIARIO
         ####################################################################
     else:   
-        print("Reporte diario")
         archivo=referencia_directorio_completa(archivo_pdf)
         directorios=obtener_directorios(archivo)
         #Impresión del resumen dea actividades por responsable de procesamiento.
@@ -2073,7 +1797,7 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
 
         for evento_dia in eventos:
             aux=[]
-            if evento_dia[2]=='FF' or evento_dia[2]=='FC':
+            if evento_dia[2]=='FF' or evento_dia[2]=='FC' or evento_dia[2]=='INDEFINIDO':
                 aux=['00000000000000', '2025', '1', '1', '0', '0', '0', '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z', '0', ' ', 'No procesado', evento_dia[1],' , , ']
 
             # PATCH mínimo: incluir TODAS las filas del catálogo con el mismo IDX_EVENTO (RSA primero)
@@ -2088,11 +1812,480 @@ def reporte_resumen(archivo_pdf, subtitulo,fecha_ini,fecha_fin, catalogo,resumen
             else:
                 if aux!=[]:
                     catalogo_dia.append(aux)
-
-        print("Es solo reporte diario!!!!!!!!")
         lienzo.showPage()
-        maximos_reporte=imprimir_catalogo(catalogo_dia,arbol,lienzo,directorio,estaciones_informe,tipo_canal,mapa_,raiz,detalle)
+        maximos_reporte=imprimir_catalogo(catalogo_dia,arbol,lienzo,directorio,estaciones_informe,tipo_canal,mapa_,raiz,tipo_mapa)
     lienzo.save()
     return maximos_reporte
+
+
+
+
+# =============================================================================
+# Derivación de banderas por modo
+#  - Diferencias clave solicitadas:
+#    * M3 (Oficial detallado): extras_técnicos = True, cobertura/estaciones = True
+#      y **AHORA incluye resumen/página de responsables**.
+#    * M6 (Institucional detallado): SIN extras y **SIN responsables**.
+# =============================================================================
+def derivar_banderas_desde_modo(modo_reporte: int) -> dict:
+    """
+    Devuelve un diccionario de banderas operativas derivadas del modo.
+    NO incluye 'bandera_firma' ni 'bandera_relleno' (se pasan desde fuera).
+    """
+    banderas = {
+        'es_periodo': True,                        # Período vs Diario
+        'imprimir_detalle': True,                  # Hojas de señales
+        'mostrar_tabla_resumen': True,             # Tabla con listado de eventos
+        'incluir_indefinidos': False,              # Solo M1
+        'solo_catalogo_oficial': False,            # True en M3/M6
+        'extras_tecnicos': False,                  # Zoom + líneas P/S/coda + RMS/Responsable
+        'mostrar_cobertura_y_estaciones': False,   # Encabezados de cobertura y lista de estaciones
+        'insertar_no_procesado': False,            # Solo M1 inserta dummies al catálogo maestro
+        'es_institucional': False,                 # Layout compacto institucional (M5/M6)
+        'incluir_responsables': False,             # Página y resumen de responsables (M1 y M3)
+    }
+
+    if modo_reporte == MODO_PERIODO_FRANJAS:  # M1
+        banderas.update({
+            'es_periodo': True,
+            'imprimir_detalle': True,
+            'mostrar_tabla_resumen': True,
+            'incluir_indefinidos': True,
+            'solo_catalogo_oficial': False,
+            'extras_tecnicos': True,
+            'mostrar_cobertura_y_estaciones': True,
+            'insertar_no_procesado': True,
+            'es_institucional': False,
+            'incluir_responsables': True,    # ← Sí muestra responsables
+        })
+
+    elif modo_reporte == MODO_DIARIO_REVISION:  # M2
+        banderas.update({
+            'es_periodo': False,
+            'imprimir_detalle': True,
+            'mostrar_tabla_resumen': True,
+            'incluir_indefinidos': False,
+            'solo_catalogo_oficial': False,
+            'extras_tecnicos': True,
+            'mostrar_cobertura_y_estaciones': True,
+            'insertar_no_procesado': False,   # dummies solo locales (no al catálogo maestro)
+            'es_institucional': False,
+            'incluir_responsables': False,
+        })
+
+    elif modo_reporte == MODO_OFICIAL_DETALLADO:  # M3 (AJUSTADO)
+        banderas.update({
+            'es_periodo': True,
+            'imprimir_detalle': True,
+            'mostrar_tabla_resumen': True,
+            'incluir_indefinidos': False,
+            'solo_catalogo_oficial': True,       # Solo eventos presentes en catálogo
+            'extras_tecnicos': True,             # ← Sí extras en oficial detallado
+            'mostrar_cobertura_y_estaciones': True,
+            'insertar_no_procesado': False,
+            'es_institucional': False,
+            'incluir_responsables': True,        # ← **Sí** muestra responsables (diferencia con M6)
+        })
+
+    elif modo_reporte == MODO_OFICIAL_RESUMEN:  # M4
+        banderas.update({
+            'es_periodo': True,
+            'imprimir_detalle': False,
+            'mostrar_tabla_resumen': True,
+            'incluir_indefinidos': False,
+            'solo_catalogo_oficial': True,   # Consistencia, aunque sin detalle
+            'extras_tecnicos': False,
+            'mostrar_cobertura_y_estaciones': False,
+            'insertar_no_procesado': False,
+            'es_institucional': False,
+            'incluir_responsables': False,
+        })
+
+    elif modo_reporte == MODO_FACULTAD_RESUMEN:  # M5 (Institucional resumen)
+        banderas.update({
+            'es_periodo': True,
+            'imprimir_detalle': False,        # Resumen sin detalle
+            'mostrar_tabla_resumen': True,
+            'incluir_indefinidos': False,
+            'solo_catalogo_oficial': True,
+            'extras_tecnicos': False,
+            'mostrar_cobertura_y_estaciones': False,
+            'insertar_no_procesado': False,
+            'es_institucional': True,         # Layout institucional
+            'incluir_responsables': False,
+        })
+
+    elif modo_reporte == MODO_INSTITUCIONAL_DETALLADO:  # M6
+        banderas.update({
+            'es_periodo': True,
+            'imprimir_detalle': True,
+            'mostrar_tabla_resumen': True,
+            'incluir_indefinidos': False,
+            'solo_catalogo_oficial': True,
+            'extras_tecnicos': False,           # Institucional SIN extras
+            'mostrar_cobertura_y_estaciones': False,
+            'insertar_no_procesado': False,
+            'es_institucional': True,
+            'incluir_responsables': False,      # ← **NO** muestra responsables (diferencia con M3)
+        })
+
+    elif modo_reporte == MODO_INSTITUCIONAL_RESUMEN:  # M7
+        banderas.update({
+            'es_periodo': True,
+            'imprimir_detalle': False,        # Solo resumen
+            'mostrar_tabla_resumen': True,
+            'incluir_indefinidos': False,
+            'solo_catalogo_oficial': True,
+            'extras_tecnicos': False,
+            'mostrar_cobertura_y_estaciones': False,
+            'insertar_no_procesado': False,
+            'es_institucional': False,        # Layout general; el estilo “difuso” lo aplica tipo_mapa
+            'incluir_responsables': False,
+        })
+
+    return banderas
+
+
+# ============================================================
+# 2) Layout compacto vs general (solo posiciones y tamaños)
+# ============================================================
+def normalizar_layout_por_institucional(es_institucional: bool) -> dict:
+    """
+    Define posiciones físicas para el mapa, marca de agua y caja de simbología.
+    No toca coordenadas de AOI ni estilo (eso viene de mapa_configuracion).
+    """
+    if not es_institucional:
+        # Layout GENERAL (el que usas cuando antes mapa_ != 2/4)
+        return {
+            'tipo_formato': 0,
+            'tamanio': (90, 325, 400, 400),       # xpos, ypos, ancho, alto
+            'marca_agua': (200, 100, 200, 95),    # xpos, ypos, ancho, alto
+            'pos_caja': (55, 234),                # leyenda/simbología
+        }
+    else:
+        # Layout INSTITUCIONAL (el que usabas para 2/4)
+        return {
+            'tipo_formato': 2,
+            'tamanio': (81, 216, 432, 432),
+            'marca_agua': (261, 66, 79, 36),
+            'pos_caja': (85, 109),
+        }
+
+
+# ======================================================================================
+# 3) Auxiliar: limpiar catálogo para oficiales (excluir dummies "No procesado" del M1)
+# ======================================================================================
+def _filtrar_catalogo_oficial_sin_dummies(catalogo: list) -> list:
+    """
+    Devuelve el catálogo sin filas dummy 'No procesado' (id '00000000000000').
+    Asume cabecera en catalogo[0].
+    """
+    if not catalogo:
+        return catalogo
+    filtrado = [catalogo[0]]
+    for fila in catalogo[1:]:
+        if not fila:
+            continue
+        # En tu dummy: fila[0] = '00000000000000'
+        if str(fila[0]).strip() == '00000000000000':
+            continue
+        filtrado.append(fila)
+    return filtrado
+
+
+# ======================================================================================
+# 4) Auxiliar: construir catalogo_dia (M2) con dummies locales si corresponde
+# ======================================================================================
+def _construir_catalogo_diario_para_detalle(catalogo: list, eventos: list) -> list:
+    """
+    Reproduce tu lógica: para cada 'evento_dia' arma las coincidencias en el catálogo,
+    priorizando RSA. Si no hay coincidencias y el evento es FF/FC/INDEFINIDO, agrega dummy local.
+    """
+    catalogo_dia = []
+    if not catalogo or not eventos:
+        return catalogo_dia
+
+    # Indices usados repetidamente
+    # Asumo constantes ya definidas en tu módulo:
+    # IDX_EVENTO, IDX_FUENTE
+    for evento_dia in eventos:
+        if not evento_dia or len(evento_dia) < 3:
+            continue
+
+        evento_id = evento_dia[1]
+        tipo_ev   = evento_dia[2]
+        dummy = []
+        if tipo_ev in ('FF', 'FC', 'INDEFINIDO'):
+            # dummy local (NO contamina el catálogo maestro)
+            dummy = ['00000000000000', '2025', '1', '1', '0', '0', '0',
+                     '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z',
+                     '0', ' ', 'No procesado', evento_id, ' , , ']
+
+        coincidencias = []
+        for fila in catalogo:
+            if fila and fila[IDX_EVENTO] == evento_id:
+                coincidencias.append(fila)
+
+        if coincidencias:
+            # Prioriza RSA primero, luego otras redes
+            coincidencias.sort(key=lambda f: 0 if f[IDX_FUENTE] == 'RSA' else 1)
+            catalogo_dia.extend(coincidencias)
+        else:
+            if dummy:
+                catalogo_dia.append(dummy)
+
+    return catalogo_dia
+
+
+# ==========================================================================================
+# 5) NUEVA FUNCIÓN: reporte_resumen_modos (núcleo gobernado por 'modo_reporte')
+#    - Reemplaza a tu 'reporte_resumen' actual (puedes renombrarla si lo prefieres).
+#    - Firma explícita con 'modo_reporte', 'bandera_firma' y 'bandera_relleno' externos.
+# ==========================================================================================
+
+def reporte_resumen_modos(
+    archivo_pdf: str,
+    subtitulo_reporte: str,
+    fecha_ini, fecha_fin,
+    catalogo: list,
+    resumen: list,
+    mapa_: int,
+    tipo_mapa: int,
+    modo_reporte: int,
+    estaciones,                      # se respeta tu firma
+    directorio: str,
+    arbol,                           # XML ElementTree
+    resumen_responsables: list,
+    eventos: list,
+    bandera_firma: bool,
+    bandera_relleno: bool,
+):
+    """
+    Genera el PDF de resumen controlado por 'modo_reporte' (1..6).
+    - 'bandera_firma' y 'bandera_relleno' son EXTERNAS (no se derivan del modo).
+    - 'mapa_' y 'tipo_mapa' gobiernan SOLO cartografía/estilo (AOI, difuso, etc.)
+    """
+    print("archivo_pdf:",archivo_pdf,
+          "\nSubtitulo:",subtitulo_reporte,
+          "\nInicio:",fecha_ini,
+          "\nFin:",fecha_fin,
+          "\nMapa:",mapa_,
+          "\nTipo_mapa:",tipo_mapa,
+          "\nModo:",modo_reporte,
+          "\nResumen:",resumen_responsables,
+          "\nFirma:",bandera_firma,
+          "\nRelleno:",bandera_relleno)
+    # -------- Derivar banderas por modo (contenido y flujo) ----------
+    banderas = derivar_banderas_desde_modo(modo_reporte)
+
+    # -------- Mapas/estilo desde tu generador ------------------------
+    # (coordenadas, salto, estaciones_informe, titulo_hoja, estilo marcador…)
+    datos_mapa       = mapa_configuracion(mapa_, tipo_mapa)
+    mapa_despliegue  = datos_mapa[0]
+    coordenadas      = datos_mapa[1]
+    salto            = datos_mapa[2]
+    titulo_hoja      = datos_mapa[3]
+    estaciones_info  = datos_mapa[4]
+
+    # -------- Layout físico (general vs institucional) ---------------
+    layout = normalizar_layout_por_institucional(banderas['es_institucional'])
+    tipo_formato = layout['tipo_formato']
+    tamanio      = layout['tamanio']
+    marca_agua   = layout['marca_agua']
+    pos_x, pos_y = layout['pos_caja']
+
+    # --------- Preparación básica de sismos (vector de puntos) -------
+    # vector = [lat, long, -prof, mag, bandera_red(0 RSA,1 otra), ruta]
+    vector = []
+    if catalogo:
+        for i in range(1, len(catalogo)):
+            fila = catalogo[i]
+            if not fila:
+                continue
+            try:
+                x = float(fila[IDX_LATITUD])
+                y = float(fila[IDX_LONGITUD])
+                p = -1.0 * float(fila[IDX_PROFUNDIDAD])
+                mag = float(fila[IDX_MAGNITUD])
+            except Exception:
+                continue
+            ruta = fila[IDX_EVENTO]
+            bandera_red = 0 if fila[IDX_FUENTE] == "RSA" else 1
+            vector.append([x, y, p, mag, bandera_red, ruta])
+
+    # --------- Lienzo ------------------------------------------------
+    lienzo = canvas.Canvas(archivo_pdf, pagesize=A4)
+    titulo_portada = "SISMICIDAD REGIONAL REGISTRADA"
+
+    # --------- Portada (formato + mapa + puntos + caja) --------------
+    lienzo = formato(marca_agua, A4, titulo_portada, subtitulo_reporte, tipo_formato, lienzo)
+    lienzo = mapa(lienzo, mapa_despliegue, tamanio, coordenadas, salto, 1)
+    # NOTA: estilo difuso/círculo lo resuelve internamente tu generador con 'tipo_mapa'
+    lienzo = dibujo_sismos_(lienzo, vector, coordenadas, tamanio, mapa_, banderas['es_periodo'], bandera_relleno)
+    lienzo = caja_simbologia(lienzo, resumen, vector, (pos_x, pos_y), mapa_, banderas['es_periodo'], bandera_relleno)
+
+    # =======================================================
+    #      RAMA PERÍODO  vs  RAMA DIARIO (band['es_periodo'])
+    # =======================================================
+    if banderas['es_periodo']:
+        # ---- Estadística período (gráfico de barras) ----
+        lienzo = estadistica_(lienzo, resumen, fecha_ini, mapa_, banderas['es_periodo'])
+
+        # ---- Control interno (solo M1): responsables + inserción 'No procesado' ----
+        if banderas['insertar_no_procesado']:
+            lienzo.showPage()
+            lienzo = responsables_tiempos_(lienzo, resumen_responsables)
+
+            # Repetimos tu lógica de inserción “No procesado” en catálogo (solo si hay detalle)
+            if banderas['imprimir_detalle'] and eventos:
+                for evento_dia in eventos:
+                    directorios = obtener_directorios(evento_dia[1])
+                    archivo_proc = os.path.join(directorio, directorios['archivo_procesamiento'])
+                    if os.path.exists(archivo_proc):
+                        lectura = lectura_archivo(archivo_proc)
+                        if len(lectura) == 1:
+                            continue
+                        evento_buscado = int(evento_dia[1].replace('_', '')[:-4])
+                        dummy = ['00000000000000', '2025', '1', '1', '0', '0', '0',
+                                 '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z',
+                                 '0', ' ', 'No procesado', evento_dia[1], ' , , ']
+                        # Insertar en orden
+                        for i in range(1, len(catalogo)):
+                            if int(catalogo[i][IDX_EVENTO].replace('_', '')[:-4]) >= evento_buscado:
+                                if int(catalogo[i][IDX_EVENTO].replace('_', '')[:-4]) > evento_buscado:
+                                    catalogo.insert(i, dummy)
+                                break
+
+        # ---- Tabla resumen de eventos (si aplica) ----
+        if banderas['mostrar_tabla_resumen']:
+            contador_linea = 0
+            loc_centrada = (73, 107, 122, 140, 153, 171, 190, 220, 245, 271, 295, 320, 360)
+            localizacion = (46, 105, 126, 142, 158, 173, 188, 212, 239, 268, 293, 322, 350)
+            marca_agua_tabla = (120, 450, 400, 200)
+
+            for evento_catalogo in catalogo:
+                if not evento_catalogo:
+                    continue
+                if evento_catalogo[19] == ' ':
+                    continue
+                if contador_linea == 80:
+                    contador_linea = 0
+                contador_linea += 1
+                contador_col = 0
+                if contador_linea == 1:
+                    lienzo.showPage()
+                    lienzo = formato(marca_agua_tabla, A4, titulo_hoja, subtitulo_reporte, 0, lienzo)
+                    lienzo.setFont('Helvetica', 7)
+                if evento_catalogo[IDX_MAGNITUD] != 'Mag':
+                    try:
+                        lienzo.setFillColor(colors.blue if float(evento_catalogo[IDX_MAGNITUD]) > 4 else colors.black)
+                    except Exception:
+                        lienzo.setFillColor(colors.black)
+
+                for i_idx in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 17, 19):
+                    texto = evento_catalogo[i_idx]
+                    if contador_linea == 1:
+                        lienzo.drawString(loc_centrada[contador_col], 740 - contador_linea * 8, catalogo[0][i_idx])
+                    else:
+                        if 5 < contador_col < 9:
+                            try:
+                                texto = str(round(float(texto), 2))
+                            except Exception:
+                                pass
+                        if contador_col == 10:
+                            texto = texto + evento_catalogo[i_idx + 1]
+                        lienzo.drawString(localizacion[contador_col], 740 - contador_linea * 8, texto)
+                    contador_col += 1
+
+            # Firma institucional: solo efectiva en M5/M6 y si la bandera externa viene activa
+            if contador_linea > 50:
+                lienzo.showPage()
+                lienzo = formato(marca_agua_tabla, A4, titulo_hoja, subtitulo_reporte, 0, lienzo)
+                contador_linea = 0
+            lienzo.setFont('Helvetica', 10)
+            x = 100
+            y = 740 - (contador_linea + 20) * 8
+            if (modo_reporte in (MODO_FACULTAD_RESUMEN, MODO_INSTITUCIONAL_DETALLADO)) and bandera_firma:
+                lienzo.drawString(x, y, "Ing. Remigio Guevara ")
+            lienzo.drawString(x, y - 10, "Red Sísmica del Austro")
+
+        lienzo.showPage()
+
+        # ---- DETALLE (si aplica) ----
+        if banderas['imprimir_detalle']:
+            # Para oficiales (M3/M6) excluye dummies "No procesado"
+            catalogo_para_detalle = (
+                _filtrar_catalogo_oficial_sin_dummies(catalogo)
+                if banderas['solo_catalogo_oficial'] else catalogo
+            )
+            # Para ocultar extras en oficiales, pasamos mapa_ "neutro" a hoja_seniales_
+            mapa_para_detalle = mapa_ if banderas['extras_tecnicos'] else 0
+            maximos_reporte = imprimir_catalogo(
+                catalogo_para_detalle, arbol, lienzo, directorio,
+                estaciones_info, parametros_estaciones()['SENSOR'],
+                mapa_para_detalle, arbol.getroot(), tipo_mapa
+            )
+        else:
+            maximos_reporte = []
+
+    else:
+        # ==========================
+        #        RAMA DIARIO (M2)
+        # ==========================
+        archivo = referencia_directorio_completa(archivo_pdf)
+        directorios = obtener_directorios(archivo)
+
+        # Resumen de responsables (tu bloque actual)
+        dibujo_chart = Drawing(400, 200)
+        dibujo_chart.add(String(180, 155, 'Resumen de tiempos responsables:', fontSize=14))
+        lista_resp = lectura_archivo(directorios['archivo_responsables'])
+        aux = len(lista_resp) if lista_resp else 0
+        reportes_sismos = num_reportes(directorios['Directorio_reportes'])
+        reportes_acelerogramas = num_reportes(directorios['Directorio_acelerogramas'])
+        revision = (360, 180, 180)
+        for i in range(0, aux):
+            eventos_reportados = reportes_sismos[i-1] + reportes_acelerogramas[i-1]
+            vector_r = lista_resp[i]
+            if i != 0:
+                formula = (revision[i-1] + int(vector_r[2]) * 60 + int(vector_r[10]) * 300 +
+                           int(vector_r[11]) * 600 + int(vector_r[12]) * 1200 + eventos_reportados * 300) / 60
+            vector_r = lista_resp[i][0:9]
+            if i == 0:
+                vector_r.append("REP.")
+                vector_r.append("t (min)")
+            else:
+                vector_r.append(str(eventos_reportados))
+                vector_r.append(str(formula))
+            for j in range(0, len(vector_r)):
+                x_coor = 105 + j * 40
+                y_coor = 135 - i * 12
+                if j == 0:
+                    x_coor = 45
+                dibujo_chart.add(String(x_coor, y_coor, vector_r[j], fontSize=12))
+        dibujo_chart.drawOn(lienzo, 15, 56)
+
+        # Catálogo del día con dummies locales (NO contaminan catálogo maestro)
+        catalogo_dia = _construir_catalogo_diario_para_detalle(catalogo, eventos)
+
+        lienzo.showPage()
+        # En M2 sí queremos extras → mapa_ intacto
+        maximos_reporte = imprimir_catalogo(
+            catalogo_dia, arbol, lienzo, directorio,
+            estaciones_info, parametros_estaciones()['SENSOR'],
+            mapa_, arbol.getroot(), tipo_mapa
+        )
+
+    lienzo.save()
+    return maximos_reporte
+
+
+
+
+
+
+
+
+
+
 
 

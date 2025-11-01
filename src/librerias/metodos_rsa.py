@@ -2066,12 +2066,9 @@ def cargar_dia(directorios):
             eventos_reporte.append(evento_grabar)
             eventos.append(evento_individual)
             canales_eventos_dia.append(canales_evento)
-    print('Catalogo extraido:')
     # Regenerar catálogo solo con eventos de otras redes (Id termina en != '00') manteniendo la cabecera 'Id'
     if os.path.exists(directorios['archivo_catalogo']):
             catalogo_existente = lectura_archivo(directorios['archivo_catalogo'])
-            print("Catálogo existente leído:\n", catalogo_existente)
-
             if catalogo_existente is not None:
                 # 2.a) Desde el archivo existente
                 for evento_existente in catalogo_existente:
@@ -2081,11 +2078,7 @@ def cargar_dia(directorios):
                         continue
                     if evento_existente[0][-2:] != '00':   # IGEPN (..01), USGS (..02) u otras no-RSA
                         catalogo.append(evento_existente)
-
-
                 catalogo = ordenar_y_eliminar_duplicados(catalogo, 0)
-
-    print("Catálogo de otras redes regenerado:\n", catalogo)
     indice_responsables=[0,0,0]
     cont_sismo=[0,0,0]
     cont_indefinido=[0,0,0]
@@ -2153,7 +2146,6 @@ def cargar_dia(directorios):
             aux=aux+contador_n_canales[i]
             variable_responsables.append(aux)
     resumen=[["SISMO","FF","FC","TELESISMOS","Local_CONTROL","INDEFINIDO","Ruido"],[sum(cont_sismo),sum(cont_FF),sum(cont_FC),sum(cont_tele),sum(cont_local),sum(cont_indefinido),sum(cont_ruido)]]
-    print("Catálogo :\n", catalogo)
     return eventos_reporte,catalogo,eventos,vector,canales_eventos_dia,root,variable_responsables,resumen
 
 def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,magnitud_,tipo_magnitud,texto,texto2,evento_reporte_escogido,indice,indice_local):
@@ -2174,7 +2166,6 @@ def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,ma
             QMessageBox.information(None, "Error", '¡Falta información del sismo!')
             return  
     lectura=extraccion_dato(texto,"\n")
-    print(lectura)
     if(red_==1):#Cuando la red es IGEPN
         try:
             indice_utc = lectura.index('Tiempo UTC:')

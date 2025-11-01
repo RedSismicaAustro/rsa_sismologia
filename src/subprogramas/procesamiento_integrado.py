@@ -37,7 +37,19 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import pyqtSignal
 import xml.etree.ElementTree as ET
-from metodos_graficos_rsa import reporte_resumen
+from metodos_graficos_rsa import reporte_resumen_modos
+
+
+# =========================
+#  MODOS DE REPORTE (1–7)
+# =========================
+MODO_PERIODO_FRANJAS          = 1   # M1 – Período por franjas (00–12, 12–18, 18–24) – Control interno
+MODO_DIARIO_REVISION          = 2   # M2 – Diario de revisión (día/ad-hoc) con detalle y dummies locales
+MODO_OFICIAL_DETALLADO        = 3   # M3 – Oficial detallado (solo catálogo) + página/resumen de responsables
+MODO_OFICIAL_RESUMEN          = 4   # M4 – Oficial resumen (solo catálogo, sin detalle)
+MODO_FACULTAD_RESUMEN         = 5   # M5 – Facultad resumen (Facultad/redes), sin detalle
+MODO_INSTITUCIONAL_DETALLADO  = 6   # M6 – Institucional detallado (solo catálogo), sin extras ni responsables
+MODO_INSTITUCIONAL_RESUMEN    = 7   # M7 – Institucional, sin detalle
 
 def activar_hilo(self):
     """
@@ -559,19 +571,28 @@ class Procesar_evento(QMainWindow):
         # --- 6) Control por bandera de revisión ---
         if not self.revision_procesamiento:
             # --- 5) Generar el PDF temporal SIEMPRE que detalles esté marcado ---
-            reporte_resumen(
-                archivo_reporte_temporal, "Reporte temporal",
+            subtitulo_reporte="Reporte temporal"
+            mapa_resumen=1
+            tipo_mapa=0
+            resumen_responsables=0
+            bandera_relleno=True
+            modo_reporte=MODO_PERIODO_FRANJAS
+            bandera_firma=False
+            reporte_resumen_modos(
+                archivo_reporte_temporal,subtitulo_reporte,
                 fecha, fecha,
                 self.catalogo, self.resumen,
-                1,
-                0,
+                mapa_resumen,
+                tipo_mapa,
                 banderas,
                 self.estaciones_eventos,
                 self.directorio_trabajo,
                 tree,
-                0,
+                resumen_responsables,
                 self.eventos_reporte,
-                1
+                bandera_relleno,
+                modo_reporte,
+                bandera_firma
                 )
             os.startfile(archivo_reporte_temporal)            
     # Primera pasada: activar bandera, avisar y NO cerrar
