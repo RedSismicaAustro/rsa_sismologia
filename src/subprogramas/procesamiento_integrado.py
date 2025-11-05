@@ -398,7 +398,6 @@ class Procesar_evento(QMainWindow):
         escritura_archivo(self.directorios['archivo_catalogo'],self.catalogo)
 
     def preparar_evento(self, text):
-        print("Preparar evento:",self.cmbx_eventos.currentText())
         self.evento_procesar=''
         for i,evento in enumerate(self.eventos):
             if evento[1]==self.cmbx_eventos.currentText():
@@ -407,6 +406,7 @@ class Procesar_evento(QMainWindow):
                 self.parametro=evento[0]+"  "+evento[1]+"  "+evento[2]
                 break
         aux=int(self.evento_procesar[1][-10:-4])
+
         if aux<120000:
             indice_hora=1
         elif aux<180000:
@@ -557,7 +557,7 @@ class Procesar_evento(QMainWindow):
         # --- 3) Rutas y fecha ---
         archivo_reporte_temporal = os.path.join(
             self.directorios['Directorio_base'],
-            Path(self.archivo).name + '_' + self.horario[:2] + '_' + self.responsable + '.pdf'
+            Path(self.archivo).name[:-6] + '_' + self.horario[:2]+ '_' + self.horario[8:10]+ '_' + self.responsable + '.pdf'
         )
         nombre = Path(self.archivo).stem  # AAAAMMDD_hhmmss
         fecha = QDate(int(nombre[0:4]), int(nombre[4:6]), int(nombre[6:8]))
@@ -579,21 +579,24 @@ class Procesar_evento(QMainWindow):
             modo_reporte=MODO_PERIODO_FRANJAS
             bandera_firma=False
             reporte_resumen_modos(
-                archivo_reporte_temporal,subtitulo_reporte,
-                fecha, fecha,
-                self.catalogo, self.resumen,
+                archivo_reporte_temporal,
+                subtitulo_reporte,
+                fecha, 
+                fecha,
+                self.catalogo, 
+                self.resumen,
                 mapa_resumen,
                 tipo_mapa,
-                banderas,
+                modo_reporte,
                 self.estaciones_eventos,
                 self.directorio_trabajo,
                 tree,
                 resumen_responsables,
                 self.eventos_reporte,
-                bandera_relleno,
-                modo_reporte,
-                bandera_firma
+                bandera_firma,
+                bandera_relleno
                 )
+
             os.startfile(archivo_reporte_temporal)            
     # Primera pasada: activar bandera, avisar y NO cerrar
             self.revision_procesamiento = True

@@ -307,7 +307,6 @@ class Extraer_evento(QMainWindow):
                         stream.copy() if isinstance(stream, Stream) else []
                         for stream in self.lectura_mseed_dia
                         ]
-
         self.tiempo = obtencion_hora(self.archivo)
         hora=self.tiempo.hour
         minuto=self.tiempo.minute
@@ -507,88 +506,6 @@ class Extraer_evento(QMainWindow):
     def verificar_estaciones(self):
         estaciones_(self.hab_grafico,self.estaciones_eventos,self.filtros_estaciones,self).exec_()
         
-    def Salir___(self):
-        message_box = QMessageBox(
-            QMessageBox.Question,
-            "¡Importante!",
-            "  ¿Guardar informe?\nSolo guardar definitivo\n  de 12H, 18H o 24H",
-            QMessageBox.Yes | QMessageBox.No ,
-            self.window()
-        )
-        result = message_box.exec_()
-        if result == QMessageBox.Yes:
-            extraer_dia(self.archivo,self.responsable,False)
-        self.close()
-
-
-    def visor_limpiar_completo__(self):
-        """Antes de cada gráfico nuevo"""
-        self.visor.clear()
-        self.visor.clf()
-        # AGREGAAR ESTO:
-        import matplotlib.pyplot as plt
-        plt.close(self.visor)  # Liberar figura de matplotlib completamente
-
-
-    def visor_limpiar_completo___(self):
-        """Limpieza completa antes de cada gráfico nuevo"""
-        if hasattr(self, 'visor') and self.visor:
-            # Limpiar todos los axes
-            for ax in self.visor.get_axes():
-                ax.clear()
-        
-            # Limpiar la figura completa
-            self.visor.clear()
-            self.visor.clf()
-        
-            # Liberar de matplotlib completamente
-            import matplotlib.pyplot as plt
-            plt.close(self.visor)
-        
-            # Forzar actualización del canvas
-            if hasattr(self, 'canvas') and self.canvas:
-                self.canvas.draw_idle()
-
-
-    def limpiar_estado__(self):
-        """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""
-        try:
-            # Limpiar streams primero (más pesados)
-            if hasattr(self, 'trCanal') and self.trCanal:
-                for stream in self.trCanal:
-                    if isinstance(stream, Stream):
-                        try:
-                            stream.clear()
-                        except:
-                            pass
-                    del stream
-                self.trCanal.clear()
-                del self.trCanal
-            
-            if hasattr(self, 'canvas'):
-                self.canvas.deleteLater()
-                self.canvas = None
-            if hasattr(self, 'visor'):
-                self.visor.clf()
-                self.visor = None
-            # Limpieza de listas, buffers o datos
-            if hasattr(self, 'stLeido'):
-                del self.stLeido
-            if hasattr(self, 'lista_eventos'):
-                self.lista_eventos.clear()
-        except Exception as e:
-            print(f"Error en limpieza de Extraer_evento: {e}")
-
-
-    def closeEvent__(self, event):
-        """
-        Emite la señal de cerrado para notificar a la ventana principal y realiza limpieza si es necesario.
-        """
-        print("Saliendo de Extraer eventos")
-        self.limpiar_estado()
-        self.cerrado.emit()
-        QTimer.singleShot(0, self.cerrado.emit)
-
     def limpiar_estado_completo(self):
         """
         Limpia completamente todos los recursos antes de cerrar la ventana.
@@ -922,25 +839,6 @@ class Extraer_evento(QMainWindow):
     def closeEvent(self, event):
         """Método que reemplaza al original - llama al closeEvent mejorado"""
         return self.closeEvent_mejorado(event)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 class estaciones_(QDialog):
 

@@ -353,7 +353,7 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
     puntero_guardado = 0
 
     id_evt_bin = extraer_id_evento_desde_ruta_local(archivo_binario)
-
+    id_dia_bin = (id_evt_bin or "")[:8]
     filas = []
     if os.path.exists(archivo_analogico):
         try:
@@ -364,12 +364,17 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
     if not filas or len(filas) < 2:
         fila_sel = [id_evt_bin or archivo_binario, '0', '00000', '0']
         referencias = [['Archivo', 'puntero', 'segundo_m', 'contador_s'], fila_sel]
+
     else:
         fila = filas[-1]
         id_evt_csv = extraer_id_evento_desde_ruta_local(fila[0]) if len(fila) > 0 else ""
-        fila_sel = fila if id_evt_csv == id_evt_bin or id_evt_csv else fila
+        id_dia_csv = (id_evt_csv or "")[:8]
+        # Solo reanudar si es el MISMO DÍA; si no, arrancar desde cero (puntero = '0')
+        if id_evt_csv and id_dia_csv == id_dia_bin:
+            fila_sel = fila
+        else:
+            fila_sel = [id_evt_bin or archivo_binario, '0', '00000', '0']
         referencias = [['Archivo', 'puntero', 'segundo_m', 'contador_s'], fila_sel]
-
     try:
         puntero_guardado = int(referencias[1][1])
     except Exception:

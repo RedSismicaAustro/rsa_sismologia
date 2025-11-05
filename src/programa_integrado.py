@@ -23,10 +23,9 @@ import os
 import sys
 import matplotlib
 matplotlib.use('Qt5Agg')
-from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMessageBox, QToolBar, QLabel, QVBoxLayout, QWidget,QGridLayout,QComboBox,QFileDialog,QPushButton
-from PyQt5.QtGui import QIcon, QPainter, QPixmap, QFont, QColor, QBrush
-from PyQt5.QtCore import Qt, QTimer, QDateTime,QTime
-from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMessageBox, QToolBar, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtGui import QIcon, QPainter, QPixmap, QFont
+from PyQt5.QtCore import Qt, QTimer
 from subprogramas.fases import VentanaPrincipal as FasesVentana
 from subprogramas.extraer_integrado import Extraer_evento
 from subprogramas.marcar_eventos import Marcar_evento
@@ -35,12 +34,8 @@ from subprogramas.reporte_diario import Reporte_diario
 from subprogramas.reporte_acumulado import Reporte_periodo
 from subprogramas.inicio import Inicio_proceso
 from subprogramas.otras_redes import Otras_redes
-from datetime import datetime, timedelta
-from metodos_rsa import lectura_archivo,extraer_dia
-from metodos_gestion import obtener_directorios
-import subprocess
-import csv
-
+from datetime import datetime
+from metodos_rsa import extraer_dia
 
 
 class VentanaPrincipal(QMainWindow):

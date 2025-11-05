@@ -345,6 +345,8 @@ def obtener_directorios(ruta_archivo: str) -> dict:
     archivo_marcas          = directorio_base / f"{prefijo_fecha}000000_marcas.json"
     archivo_auxiliar        = directorio_base / f"{prefijo_fecha}_aux.csv"
     archivo_proc            = directorio_procesamiento / f"{prefijo_fecha}_{hora}{minuto}{segundo}_proc.csv"
+    archivo_analogico       = directorio_base / f"{prefijo_fecha}_analogico.csv"
+    archivo_digital         = directorio_base / f"{prefijo_fecha}_digital.csv"
     archivo_referencia      = timestamp_largo if usar_4digitos else timestamp_corto
 
     # ---------------------------- salida ----------------------------------- #
@@ -373,6 +375,8 @@ def obtener_directorios(ruta_archivo: str) -> dict:
         "archivo_procesamiento":        str(archivo_proc),
         "archivo_comportamiento":       str(archivo_comportamiento),
         "archivo_reporte_dia":          str(archivo_reporte_dia),
+        "archivo_analogico":            str(archivo_analogico),
+        "archivo_digital":              str(archivo_digital),
         "anio":                         str(anio_largo)
     }
 

@@ -1493,9 +1493,9 @@ def extraer_dia(archivo, responsable, bandera_todo):
         datos_tiempo = lectura_archivo(archivo_guardar)
     else:
         datos_tiempo = [
-            ["RSA", "12H", "", "", "", "", "", "", "", ""],
-            ["RSA", "18H", "", "", "", "", "", "", "", ""],
-            ["RSA", "24H", "", "", "", "", "", "", "", ""],
+            ["RSA", "12H", "0", "0", "0", "0", "0", "0", "0", "0"],
+            ["RSA", "18H", "0", "0", "0", "0", "0", "0", "0", "0"],
+            ["RSA", "24H", "0", "0", "0", "0", "0", "0", "0", "0"],
         ]
         escritura_archivo(archivo_guardar, datos_tiempo)
 
@@ -1559,7 +1559,7 @@ def extraer_dia(archivo, responsable, bandera_todo):
         )
 
         # Si hay eventos en el tramo y la fila está vacía, completar responsable y etiqueta de tramo
-        if total != 0 and datos_tiempo[i][2] == "":
+        if total != 0 and datos_tiempo[i][2] == "0":
             datos_tiempo[i][0] = responsable
             datos_tiempo[i][1] = f"{etiquetas_tramo[i]}H"
 
