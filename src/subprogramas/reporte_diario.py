@@ -224,7 +224,6 @@ class Reporte_diario(QMainWindow):
         mapa_=1
         tipo_mapa=0
         modo_reporte=MODO_DIARIO_REVISION
-        resumen_responsables=0
         bandera_firma=False
         bandera_relleno=True
         reporte_resumen_modos(
@@ -240,7 +239,7 @@ class Reporte_diario(QMainWindow):
             self.estaciones_eventos,
             self.directorio_trabajo,
             tree,
-            resumen_responsables,
+            self.responsables,
             self.eventos_reporte,
             bandera_firma,
             bandera_relleno)

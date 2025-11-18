@@ -144,13 +144,11 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
         pass
 
     # ------------------- Cargar analogico.csv (REANUDACIÓN) -------------- #
-    archivo_analogico = os.path.join(directorio_trabajo, "analogico.csv")
+    archivo_analogico = directorios['archivo_analogico']
     referencias = [['Archivo', 'puntero', 'segundo_m', 'contador_s']]
     contador_segundos = 0
     puntero_guardado = 0
-
     id_evt_bin = extraer_id_evento_desde_ruta(archivo_binario)
-
     filas = []
     if os.path.exists(archivo_analogico):
         try:
@@ -624,6 +622,13 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.directorio_reportes=self.directorios_['Directorio_reportes']
         self.directorio_acel=self.directorios_['Directorio_acelerogramas']
         self.estaciones=self.directorios_['archivo_estaciones']
+        self.archivo_analogico = self.directorios_['archivo_analogico']
+        print(self.archivo_analogico)
+        if not os.path.exists(self.archivo_analogico):
+            escritura_archivo(self.archivo_analogico, [['Archivo','puntero','segundo_m','contador_s'], ['','0','00000','0']])
+
+        
+        
         self.fecha_=obtencion_hora(self.archivo) #En la variable fecha_, como tupla se tiene (año, mes, dia, hora , minuto, segundo, y valor ensegundos) y (strin¿gs respectivos)
         hora_string=self.fecha_.strftime('%Y%m%d_%H%M%S')
         if os.path.exists(self.estaciones):

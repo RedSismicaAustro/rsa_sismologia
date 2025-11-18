@@ -2,9 +2,6 @@
 PROCESAMIENTO SISMICO – Programa unificado (Automático + Acelerógrafos)
 
 Fases encadenadas en una sola corrida:
-1) Analógico (Automático): reanuda binario con analogico.csv, une al MSEED diario y genera PNG.
-2) Digital (Acelerógrafos): recorre estaciones habilitadas, detecta MSEED del día, une SIEMPRE lo nuevo,
-   actualiza digital.csv (multiestación) y genera PNG.
 
 Reglas operativas:
 - OBSID es una estación más. Sin tratamiento especial.
@@ -166,7 +163,7 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
     except Exception:
         pass
 
-    archivo_analogico = os.path.join(directorio_trabajo, "analogico.csv")
+    archivo_analogico = directorios['archivo_analogico']
     referencias = [['Archivo', 'puntero', 'segundo_m', 'contador_s']]
     contador_segundos = 0
     puntero_guardado = 0
@@ -565,6 +562,12 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 Path(ruta).mkdir(parents=True, exist_ok=True)
             except FileExistsError:
                 pass
+
+        self.archivo_analogico = self.directorios_['archivo_analogico']
+        if not os.path.exists(self.archivo_analogico):
+            escritura_archivo(self.archivo_analogico, [['Archivo', 'puntero', 'segundo_m', 'contador_s'],
+                                           ['','0','00000','0']])
+
 
         # Mensaje de archivos mseed (tu estilo)
         mensaje = ""

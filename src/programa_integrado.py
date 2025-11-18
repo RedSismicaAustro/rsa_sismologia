@@ -625,21 +625,12 @@ class VentanaPrincipal(QMainWindow):
             True
         )
 
-
-
-
     ##########################################################################################
     #  Menú seis: Ayuda
     ##########################################################################################
 
     def acerca_de(self):
         QMessageBox.information(self, 'Acerca de', 'Esta es una aplicación de ejemplo de PyQt5.')
-
-
-
-
-
-
 
     ##########################################################################################
     #  Metodos de estado de menús

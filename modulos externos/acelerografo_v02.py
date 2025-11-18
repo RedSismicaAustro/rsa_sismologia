@@ -240,7 +240,8 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         dia_yyyymmdd = self.date.toString('yyyyMMdd')          # 8 dígitos
         archivo_evento = dia_yyyymmdd + "_000000"              # AAAAMMDD_000000 (esta cadena va en digital.csv)
 
-        archivo_digital = os.path.join(self.directorio_trabajo, "digital.csv")  # CONTROL MULTIESTACIÓN
+        archivo_digital = self.directorios_['archivo_digital']  # CONTROL MULTIESTACIÓN por día
+
 
         # ==============================
         # Cargar/controlar digital.csv
@@ -253,29 +254,6 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         # Normalizar cabecera
         if not filas_ctrl or len(filas_ctrl) == 0 or filas_ctrl[0][0] != 'Archivo':
             filas_ctrl = [['Archivo', 'Estacion', 'mseeds']]
-
-        # Si el archivo tiene filas de datos y el primer dato no corresponde al día actual,
-        # entonces REINICIAR TODO (nuevo día → empezar de cero) y avisar.
-        reinicio_por_dia = False
-        indice_primera_fila_valida = None
-        for idx in range(1, len(filas_ctrl)):
-            if len(filas_ctrl[idx]) >= 2:
-                indice_primera_fila_valida = idx
-                break
-        if indice_primera_fila_valida is not None:
-            archivo_en_control = filas_ctrl[indice_primera_fila_valida][0]
-            if archivo_en_control != archivo_evento:
-                reinicio_por_dia = True
-                filas_ctrl = [['Archivo', 'Estacion', 'mseeds']]
-                try:
-                    QMessageBox.information(
-                        self, "Información",
-                        f"El día analizado ({archivo_evento}) no coincide con el registrado previamente "
-                        f"({archivo_en_control}).\nSe reinicia el control y se reconstruirá la unión del día."
-                    )
-                except Exception:
-                    pass
-                print(f"[INFO] Reinicio de control: {archivo_en_control} → {archivo_evento}")
 
         # ==============================
         # Procesar estaciones habilitadas
@@ -359,21 +337,8 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             archivo_unido = os.path.join(self.directorio_registros, f"{estacion}_{archivo_evento}.mseed")
             nombrepng = os.path.join(self.directorio, f"{estacion}_{archivo_evento}.png")
 
-            # Si el control se reinició por día, reconstruimos **desde cero**:
-            # - Eliminamos unido previo del día (si existe) para evitar arrastres
-            # - Usamos TODOS los detectados del día (no solo "nuevos")
-            if reinicio_por_dia:
-                try:
-                    if os.path.exists(archivo_unido):
-                        os.remove(archivo_unido)
-                        print(f"[INFO] Eliminado unido previo para reconstrucción: {archivo_unido}")
-                except Exception as e:
-                    print(f"[ADVERTENCIA] No se pudo eliminar unido previo {archivo_unido}: {e}")
-
-                rutas_a_unir = [mapa_rutas[b] for b in detectados_base if b in mapa_rutas]
-            else:
-                # Día consistente → seguimos incremental: unido existente + NUEVOS
-                rutas_a_unir = list(nuevos_rutas)
+            # Unión incremental del mismo día
+            rutas_a_unir = list(nuevos_rutas)
 
             # Ordenar las rutas a unir por starttime real (mejora de coherencia temporal)
             if rutas_a_unir:
@@ -390,8 +355,8 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             else:
                 ordenados = []
 
-            # Cargar base (solo si NO estamos reconstruyendo desde cero y existe el unido)
-            if not reinicio_por_dia and os.path.exists(archivo_unido):
+            # Cargar base (solo si existe el unido)
+            if os.path.exists(archivo_unido):
                 try:
                     st_base = obspy.read(archivo_unido)
                 except Exception as e:
@@ -422,11 +387,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             # ==============================
             # ACTUALIZAR FILA de esta estación en control (sin duplicados)
             # ==============================
-            if reinicio_por_dia:
-                # En reconstrucción, lo razonable es que queden TODOS los detectados del día
-                totales = detectados_base
-            else:
-                totales = previos + [m for m in nuevos_base]
+            totales = previos + [m for m in nuevos_base]
 
             # Deduplicar preservando orden
             totales = list(dict.fromkeys(totales))
@@ -496,6 +457,10 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             except Exception as e:
                 print(f"[ADVERTENCIA] No se pudo crear {ruta}: {e}")
 
+        # Crear archivo digital diario si no existe
+        archivo_digital = self.directorios_['archivo_digital']
+        if not os.path.exists(archivo_digital):
+            escritura_archivo(archivo_digital, [['Archivo', 'Estacion', 'mseeds']])
 
 # =============================================================================
 # Main

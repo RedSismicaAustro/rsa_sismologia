@@ -546,14 +546,7 @@ class Procesar_evento(QMainWindow):
         # Si no desea detalles, no hay nada que hacer
         if not self.checkBox_detalles.isChecked():
             self.close()
-        # --- 2) Preparación de banderas (conserva tu lógica) ---
-        banderas = [0, 0, 0, 0]
-        if self.horario == '00:00 - 12:00':
-            banderas[3] = 1
-        elif self.horario == '12:00 - 18:00':
-            banderas[3] = 2
-        else:
-            banderas[3] = 3
+
         # --- 3) Rutas y fecha ---
         archivo_reporte_temporal = os.path.join(
             self.directorios['Directorio_base'],
@@ -568,6 +561,16 @@ class Procesar_evento(QMainWindow):
         escritura_archivo(self.directorios['archivo_responsables'], self.responsables)
         tree = ET.ElementTree(self.root)
         self.estaciones_eventos = []
+
+        # --- 2) Preparación de banderas (conserva tu lógica) ---
+        resumen_responsables=self.responsables[0]
+        if self.horario == '00:00 - 12:00':
+            resumen_responsables.append(self.responsables[1])
+        elif self.horario == '12:00 - 18:00':
+            resumen_responsables.append(self.responsables[2])
+        else:
+            resumen_responsables.append(self.responsables[3])
+
         # --- 6) Control por bandera de revisión ---
         if not self.revision_procesamiento:
             # --- 5) Generar el PDF temporal SIEMPRE que detalles esté marcado ---

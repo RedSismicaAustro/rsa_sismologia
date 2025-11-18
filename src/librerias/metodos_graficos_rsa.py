@@ -66,7 +66,7 @@ MODO_PERIODO_FRANJAS          = 1   # M1 – Período por franjas (00–12, 12�
 MODO_DIARIO_REVISION          = 2   # M2 – Diario de revisión (día/ad-hoc) con detalle y dummies locales
 MODO_OFICIAL_DETALLADO        = 3   # M3 – Oficial detallado (solo catálogo) + página/resumen de responsables
 MODO_OFICIAL_RESUMEN          = 4   # M4 – Oficial resumen (solo catálogo, sin detalle)
-MODO_FACULTAD_RESUMEN         = 5   # M5 – Institucional resumen (Facultad/redes), sin detalle
+MODO_FACULTAD_RESUMEN         = 5   # M5 – Facultad/resumen (redes sociales), sin detalle
 MODO_INSTITUCIONAL_DETALLADO  = 6   # M6 – Institucional detallado (solo catálogo), sin extras ni responsables
 MODO_INSTITUCIONAL_RESUMEN    = 7   # M7 – Institucional, sin detalle
 
@@ -140,7 +140,7 @@ def encontrar_cadena(lista, cadena):
 
 
 
-def responsables_tiempos_(lienzo,resumen_responsables):
+def responsables_tiempos___(lienzo,resumen_responsables):
     print("resumen_responsables",resumen_responsables)
             
     dibujo_chart = Drawing(400, 200)
@@ -151,49 +151,187 @@ def responsables_tiempos_(lienzo,resumen_responsables):
     resumen=[]
     resumen.append(['RESPONSABLE','HORA','TOT.','SIS.','FF','FC','Loc.','TEL.','IND.','Ruido','3 est','4 est','5 est','6 est','7 est','8 est'])#['RESPONSABLE','HORA','TOTAL','SISMOS','FF','FC','TEL.','Loc.','IND.','Ruido','3 est','4 est','5 est','6 est','7 est','8 est']
     for responsable in lista_responsables:
-                acumulado_responsable=[]
-                for res_responsable in resumen_responsables:
-                    if res_responsable[0]==responsable:
-                        if acumulado_responsable==[]:
-                            acumulado_responsable=res_responsable
-                            if res_responsable[1]=='12H':
-                                acumulado_responsable[1]='360'
-                            else:
-                                acumulado_responsable[1]='180'
-                        else:
-                            for i in range (1,len(acumulado_responsable)):
-                                if i==1:
-                                    if res_responsable[i]=='12H':
-                                        acumulado_responsable[i]=str(int(acumulado_responsable[i])+360)
-                                    else:
-                                        acumulado_responsable[i]=str(int(acumulado_responsable[i])+180)
-                                else:
-                                    acumulado_responsable[i]=str(int(acumulado_responsable[i])+int(res_responsable[i]))
+        acumulado_responsable=[]
+        for res_responsable in resumen_responsables:
+            if res_responsable[0]==responsable:
                 if acumulado_responsable==[]:
-                    acumulado_responsable=[responsable,'0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0']
-                resumen.append(acumulado_responsable)
+                    acumulado_responsable=res_responsable
+                    if res_responsable[1]=='12H':
+                        acumulado_responsable[1]='360'
+                    else:
+                        acumulado_responsable[1]='180'
+                else:
+                    for i in range (1,len(acumulado_responsable)):
+                        if i==1:
+                            if res_responsable[i]=='12H':
+                                acumulado_responsable[i]=str(int(acumulado_responsable[i])+360)
+                            else:
+                                acumulado_responsable[i]=str(int(acumulado_responsable[i])+180)
+                        else:
+                            acumulado_responsable[i]=str(int(acumulado_responsable[i])+int(res_responsable[i]))
+        if acumulado_responsable==[]:
+            acumulado_responsable=[responsable,'0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0']
+        resumen.append(acumulado_responsable)
     dibujo_chart.add(String(180,155,'Resumen de tiempos invertidos:',fontSize=14))
     lista_resp=resumen
     aux=len(lista_resp)
     for i in range(0,aux):
-                vector=lista_resp[i]
-                if i!=0:
-                    formula=round((int(vector[1])+int(vector[2])*60+int(vector[10])*300+int(vector[11])*600+int(vector[12])*1200)/3600,2)
-                    formula=str(formula)
-                vector=lista_resp[i][0:9]
-                if i==0:
-                    vector.append('T(horas)')
-                else:
-                    vector.append(formula)
-                for j in range(0,len(vector)):
-                    x_coor=105+j*40
-                    y_coor=135-i*12
-                    if j==0:
-                        x_coor=45
-                    if j!=1:
-                        dibujo_chart.add(String(x_coor,y_coor,vector[j],fontSize=12))
+        vector=lista_resp[i]
+        if i!=0:
+            formula=round((int(vector[1])+int(vector[2])*60+int(vector[10])*300+int(vector[11])*600+int(vector[12])*1200)/3600,2)
+            formula=str(formula)
+        vector=lista_resp[i][0:9]
+        if i==0:
+            vector.append('T(horas)')
+        else:
+            vector.append(formula)
+        for j in range(0,len(vector)):
+            x_coor=105+j*40
+            y_coor=135-i*12
+            if j==0:
+                x_coor=45
+            if j!=1:
+                dibujo_chart.add(String(x_coor,y_coor,vector[j],fontSize=12))
     dibujo_chart.drawOn(lienzo, 15,400)
     return lienzo
+
+def responsables_tiempos_(lienzo, resumen_responsables, modo_reporte):
+    """
+    Renderiza el cuadro de tiempos por responsable según el modo:
+
+      - M1 (1) / M2 (2): por cortes 12H/18H/24H, muestra T(min) por fila.
+      - M3 (3) / M4 (4): agregado por responsable, muestra T(horas).
+      - M5 (5) / M6 (6) / M7 (7): no imprime nada.
+
+    Estructura esperada en 'resumen_responsables' (una fila por responsable y corte):
+      [RESP, CORTE(12H|18H|24H), TOT, SIS, FF, FC, Loc, TEL, IND, Ruido, c3, c4, c5, c6, c7, c8]
+    """
+
+    # ===== Robustez de entrada =====
+    try:
+        _ = iter(resumen_responsables)
+    except Exception:
+        return lienzo
+    if not resumen_responsables:
+        return lienzo
+
+    # Modos institucionales no imprimen tiempos
+    if modo_reporte in (5, 6, 7):
+        return lienzo
+
+    # Import local para mantener dependencias contenidas
+    from reportlab.graphics.shapes import Drawing, String
+
+    # ===== Único helper: minutos de trabajo a partir de contadores =====
+    def calcular_minutos(valores_):
+        """
+        Política histórica (conservadora):
+          T(min) = TOT*60 + c3*300 + c4*600 + c5*1200
+        Índices dentro de valores_ (long. 14 esperada):
+          0:TOT, 1:SIS, 2:FF, 3:FC, 4:Loc, 5:TEL, 6:IND, 7:Ruido, 8:c3, 9:c4, 10:c5, 11:c6, 12:c7, 13:c8
+        """
+        try:
+            tot = int(valores_[0])
+            c3  = int(valores_[8])  if len(valores_) > 8  else 0
+            c4  = int(valores_[9])  if len(valores_) > 9  else 0
+            c5  = int(valores_[10]) if len(valores_) > 10 else 0
+        except Exception:
+            return 0
+        return tot*1 + c3*5 + c4*10 + c5*20
+
+    # ===== Normalización mínima de filas a 16 columnas =====
+    filas_norm = []
+    for fila in resumen_responsables:
+        base = list(fila)[:16] + ['0'] * max(0, 16 - len(fila))
+        nombre = str(base[0]) if base[0] is not None else ''
+        corte  = str(base[1]).upper() if isinstance(base[1], str) else str(base[1])
+        # vectores numéricos (conversión segura a int)
+        vals = []
+        for v in base[2:16]:
+            try:
+                vals.append(int(v))
+            except Exception:
+                vals.append(0)
+        filas_norm.append((nombre, corte, vals))  # (RESP, CORTE, [14 valores])
+
+    # ===== M1/M2: por cortes 12H/18H/24H, en minutos =====
+    if modo_reporte in (1, 2):
+        # Orden 12H→18H→24H
+        orden_corte = {'12H': 0, '18H': 1, '24H': 2}
+        filas_norm.sort(key=lambda r: (r[0], orden_corte.get(r[1], 99)))
+
+        dibujo = Drawing(460, 180)
+        dibujo.add(String(160, 155, 'Resumen de tiempos responsables:', fontSize=14))
+
+        cabecera = ['RESPONSABLE', 'HORA', 'TOT.', 'SIS.', 'FF', 'FC', 'Loc.', 'TEL.', 'IND.', 'T(min)']
+        xcols    = [45, 140, 205, 245, 275, 305, 335, 365, 395, 430]
+        for j, txt in enumerate(cabecera):
+            dibujo.add(String(xcols[j], 140, txt, fontSize=12))
+
+        y = 128
+        for nombre, corte, vals in filas_norm:
+            tmin = calcular_minutos(vals)
+            datos = [nombre, corte, vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], round(tmin, 1)]
+            for j, item in enumerate(datos):
+                dibujo.add(String(xcols[j], y, str(item), fontSize=12))
+            y -= 12
+            # Paginación simple
+            if y < 20:
+                dibujo.drawOn(lienzo, 15, 56)
+                lienzo.showPage()
+                dibujo = Drawing(460, 180)
+                dibujo.add(String(160, 155, 'Resumen de tiempos responsables:', fontSize=14))
+                for j, txt in enumerate(cabecera):
+                    dibujo.add(String(xcols[j], 140, txt, fontSize=12))
+                y = 128
+
+        dibujo.drawOn(lienzo, 15, 56)
+        return lienzo
+
+    # ===== M3/M4: agregado por responsable, en horas =====
+    if modo_reporte in (3, 4):
+        # Agregar por responsable
+        acumulado_por_resp = {}  # resp -> ([sumas 14], minutos_totales)
+        for nombre, corte, vals in filas_norm:
+            tmin = calcular_minutos(vals)
+            if nombre not in acumulado_por_resp:
+                acumulado_por_resp[nombre] = ([0]*14, 0)
+            sumas, tprev = acumulado_por_resp[nombre]
+            acumulado_por_resp[nombre] = ([s+a for s, a in zip(sumas, vals)], tprev + tmin)
+
+        dibujo = Drawing(520, 200)
+        dibujo.add(String(160, 175, 'Resumen de tiempos invertidos:', fontSize=14))
+
+        cabecera = ['RESPONSABLE', 'TOT.', 'SIS.', 'FF', 'FC', 'Loc.', 'TEL.', 'IND.', 'T(horas)']
+        xcols    = [45, 205, 245, 275, 305, 335, 365, 395, 455]
+        for j, txt in enumerate(cabecera):
+            dibujo.add(String(xcols[j], 160, txt, fontSize=12))
+
+        y = 148
+        for nombre in sorted(acumulado_por_resp.keys()):
+            vals_sum, tmin = acumulado_por_resp[nombre]
+            thoras = round(tmin / 60.0, 2)
+            datos = [nombre, vals_sum[0], vals_sum[1], vals_sum[2], vals_sum[3], vals_sum[4], vals_sum[5], vals_sum[6], thoras]
+            for j, item in enumerate(datos):
+                dibujo.add(String(xcols[j], y, str(item), fontSize=12))
+            y -= 12
+            # Paginación simple
+            if y < 20:
+                dibujo.drawOn(lienzo, 15, 400)
+                lienzo.showPage()
+                dibujo = Drawing(520, 200)
+                dibujo.add(String(160, 175, 'Resumen de tiempos invertidos:', fontSize=14))
+                for j, txt in enumerate(cabecera):
+                    dibujo.add(String(xcols[j], 160, txt, fontSize=12))
+                y = 148
+
+        dibujo.drawOn(lienzo, 15, 400)
+        return lienzo
+
+    # Cualquier otro caso: no imprime
+    return lienzo
+
+
 
 def estadistica_(lienzo,resumen,fecha_ini,mapa_,bandera_dia):
         #Impresión del resumen diario de eventos procesados a travez de un chart de barras.
@@ -1614,7 +1752,7 @@ def derivar_banderas_desde_modo(modo_reporte: int) -> dict:
             'mostrar_cobertura_y_estaciones': True,
             'insertar_no_procesado': False,   # dummies solo locales (no al catálogo maestro)
             'es_institucional': False,
-            'incluir_responsables': False,
+            'incluir_responsables': True,
         })
 
     elif modo_reporte == MODO_OFICIAL_DETALLADO:  # M3 (AJUSTADO)
@@ -1642,7 +1780,7 @@ def derivar_banderas_desde_modo(modo_reporte: int) -> dict:
             'mostrar_cobertura_y_estaciones': False,
             'insertar_no_procesado': False,
             'es_institucional': False,
-            'incluir_responsables': False,
+            'incluir_responsables': True,
         })
 
     elif modo_reporte == MODO_FACULTAD_RESUMEN:  # M5 (Institucional resumen)
@@ -1683,7 +1821,7 @@ def derivar_banderas_desde_modo(modo_reporte: int) -> dict:
             'extras_tecnicos': False,
             'mostrar_cobertura_y_estaciones': False,
             'insertar_no_procesado': False,
-            'es_institucional': False,        # Layout general; el estilo “difuso” lo aplica tipo_mapa
+            'es_institucional': True,        # ← usar layout institucional en M7
             'incluir_responsables': False,
         })
 
@@ -1839,9 +1977,6 @@ def reporte_resumen_modos(
     # eventos        Todos los eventos generados en el día.
     # bandera_relleno Permite el rellono o no de los circulos de los eventos para cierto tipo de reportes.
 
-
-
-
     """
     Genera el PDF de resumen controlado por 'modo_reporte' (1..6).
     - 'bandera_firma' y 'bandera_relleno' son EXTERNAS (no se derivan del modo).
@@ -1913,34 +2048,33 @@ def reporte_resumen_modos(
         # ---- Estadística período (gráfico de barras) ----
         lienzo = estadistica_(lienzo, resumen, fecha_ini, mapa_, banderas['es_periodo'])
 
-        # ---- Control interno (solo M1): responsables + inserción 'No procesado' ----
-        if banderas['insertar_no_procesado']:
+        # ---- Página/resumen de responsables (M1, M3, M4) ----
+        if banderas['incluir_responsables']:
             lienzo.showPage()
-            lienzo = responsables_tiempos_(lienzo, resumen_responsables)
+            lienzo = responsables_tiempos_(lienzo, resumen_responsables,modo_reporte)
 
-            # Repetimos tu lógica de inserción “No procesado” en catálogo (solo si hay detalle)
-            if banderas['imprimir_detalle'] and eventos:
-                for evento_dia in eventos:
-                    directorios = obtener_directorios(evento_dia[1])
-                    archivo_proc = os.path.join(directorio, directorios['archivo_procesamiento'])
-                    if os.path.exists(archivo_proc):
-                        lectura = lectura_archivo(archivo_proc)
-                        if len(lectura) == 1:
-                            continue
-                        evento_buscado = int(evento_dia[1].replace('_', '')[:-4])
-                        dummy = ['00000000000000', '2025', '1', '1', '0', '0', '0',
-                                 '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z',
-                                 '0', ' ', 'No procesado', evento_dia[1], ' , , ']
-                        # Insertar en orden
-                        for i in range(1, len(catalogo)):
-                            if int(catalogo[i][IDX_EVENTO].replace('_', '')[:-4]) >= evento_buscado:
-                                if int(catalogo[i][IDX_EVENTO].replace('_', '')[:-4]) > evento_buscado:
-                                    catalogo.insert(i, dummy)
-                                break
+        # ---- Inserción de 'No procesado' SOLO para M1 (control interno) ----
+        if banderas['insertar_no_procesado'] and banderas['imprimir_detalle'] and eventos:
+            for evento_dia in eventos:
+                directorios = obtener_directorios(evento_dia[1])
+                archivo_proc = os.path.join(directorio, directorios['archivo_procesamiento'])
+                if os.path.exists(archivo_proc):
+                    lectura = lectura_archivo(archivo_proc)
+                    if len(lectura) == 1:
+                        continue
+                    evento_buscado = int(evento_dia[1].replace('_', '')[:-4])
+                    dummy = ['00000000000000', '2025', '1', '1', '0', '0', '0',
+                             '-2.00', '-79.00', '0', 'rms', 'e-x', 'e-y', 'e-0', 'e-z',
+                             '0', ' ', 'No procesado', evento_dia[1], ' , , ']
+                    for i in range(1, len(catalogo)):
+                        if int(catalogo[i][IDX_EVENTO].replace('_', '')[:-4]) >= evento_buscado:
+                            if int(catalogo[i][IDX_EVENTO].replace('_', '')[:-4]) > evento_buscado:
+                                catalogo.insert(i, dummy)
+                            break
 
         # ---- Tabla resumen de eventos (si aplica) ----
         if banderas['mostrar_tabla_resumen']:
-            print("IMprimeindo resumen")
+            print("Imprimeindo resumen")
             contador_linea = 0
             loc_centrada = (73, 107, 122, 140, 153, 171, 190, 220, 245, 271, 295, 320, 360)
             localizacion = (46, 105, 126, 142, 158, 173, 188, 212, 239, 268, 293, 322, 350)
@@ -2018,34 +2152,9 @@ def reporte_resumen_modos(
         archivo = referencia_directorio_completa(archivo_pdf)
         directorios = obtener_directorios(archivo)
 
-        # Resumen de responsables (tu bloque actual)
-        dibujo_chart = Drawing(400, 200)
-        dibujo_chart.add(String(180, 155, 'Resumen de tiempos responsables:', fontSize=14))
-        lista_resp = lectura_archivo(directorios['archivo_responsables'])
-        aux = len(lista_resp) if lista_resp else 0
-        reportes_sismos = num_reportes(directorios['Directorio_reportes'])
-        reportes_acelerogramas = num_reportes(directorios['Directorio_acelerogramas'])
-        revision = (360, 180, 180)
-        for i in range(0, aux):
-            eventos_reportados = reportes_sismos[i-1] + reportes_acelerogramas[i-1]
-            vector_r = lista_resp[i]
-            if i != 0:
-                formula = (revision[i-1] + int(vector_r[2]) * 60 + int(vector_r[10]) * 300 +
-                           int(vector_r[11]) * 600 + int(vector_r[12]) * 1200 + eventos_reportados * 300) / 60
-            vector_r = lista_resp[i][0:9]
-            if i == 0:
-                vector_r.append("REP.")
-                vector_r.append("t (min)")
-            else:
-                vector_r.append(str(eventos_reportados))
-                vector_r.append(str(formula))
-            for j in range(0, len(vector_r)):
-                x_coor = 105 + j * 40
-                y_coor = 135 - i * 12
-                if j == 0:
-                    x_coor = 45
-                dibujo_chart.add(String(x_coor, y_coor, vector_r[j], fontSize=12))
-        dibujo_chart.drawOn(lienzo, 15, 56)
+        # Resumen de responsables (unificado): usa el método existente
+        lienzo = responsables_tiempos_(lienzo, resumen_responsables,modo_reporte)
+
 
         # Catálogo del día con dummies locales (NO contaminan catálogo maestro)
         catalogo_dia = _construir_catalogo_diario_para_detalle(catalogo, eventos)
