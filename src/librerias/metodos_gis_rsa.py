@@ -139,10 +139,6 @@ def catalogo_gis_(catalogo,indice):
     mapa_ec.plot(ax=ax,alpha=0.3,color="white",edgecolor="black",linewidth=0.4)
     return 
 
-
-
-
-
 def proceso_gis(widget, procesamiento, archivo_estaciones):
     ax = widget.figure.add_subplot(111)
     widget.figure.clf()

@@ -51,58 +51,53 @@ MODO_FACULTAD_RESUMEN         = 5   # M5 – Facultad resumen (Facultad/redes), 
 MODO_INSTITUCIONAL_DETALLADO  = 6   # M6 – Institucional detallado (solo catálogo), sin extras ni responsables
 MODO_INSTITUCIONAL_RESUMEN    = 7   # M7 – Institucional, sin detalle
 
+
+
+
 def activar_hilo(self):
     """
-    Activa el hilo de monitoreo de archivo utilizando QThread.
-    Este hilo detecta cambios en el archivo de procesamiento virtual
-    y actualiza el procesamiento en la interfaz de manera segura.
+    Activa el hilo de monitoreo cuando ya existen los archivos del Virtual.
+    NO usa bucles bloqueantes — el inicio viene desde iniciar_espera_archivos_virtual().
     """
+    archivo_monitoreo = archivos_fast(
+        self.parent.evento_procesar[1],
+        self.parent.directorio_trabajo,
+        self.parent.responsable_evento
+    )[2]
 
-    while not self.bandera_procesamiento:
-        archivo_monitoreo = archivos_fast(
-            self.parent.evento_procesar[1],
-            self.parent.directorio_trabajo,
-            self.parent.responsable_evento
-        )[2]
-
-        if not os.path.exists(archivo_monitoreo):
-            mensaje = f"Evento {archivo_monitoreo} no encontrado\nHay que ejecutar ProcesoV2"
-            self.parent.Lbl_submensajes.setText(mensaje)
-            time.sleep(5)
-            self.parent.Lbl_submensajes.setText('')
-            time.sleep(5)
-        else:
-            self.bandera_procesamiento = 1
-            break
-
-    if self.bandera_procesamiento:
-        mensaje = 'Monitorizando en virtual'
-        # Crear hilo de monitoreo seguro
-        self.file_monitor = FileMonitorThread(
-            archivo_monitoreo,
-            self.parent.directorio_trabajo,
-            self.parent.responsable_evento,
-            self.procesamiento,
-            self.parent.evento_procesar[1]
+    if not os.path.exists(archivo_monitoreo):
+        self.parent.ui.Lbl_submensajes.setText(
+            f"El archivo {archivo_monitoreo} aún no existe."
         )
-        # Conectar la señal del hilo con el método de actualización
-        self.file_monitor.procesamiento_actualizado.connect(self.update_procesamiento)
-        self.file_monitor.start()
-    else:
-        mensaje = 'Sin Monitorizar,\ntrabajando en la estructura\nde datos'
+        return  # La espera ya se maneja fuera
 
-    self.parent.Lbl_Mensajes.setText(mensaje)
+    # Si existe, activar monitoreo
+    self.parent.ui.Lbl_submensajes.setText("Monitorizando en virtual…")
+
+    self.file_monitor = FileMonitorThread(
+        archivo_monitoreo,
+        self.parent.directorio_trabajo,
+        self.parent.responsable_evento,
+        self.procesamiento,
+        self.parent.evento_procesar[1]
+    )
+
+    self.file_monitor.procesamiento_actualizado.connect(self.update_procesamiento)
+    self.file_monitor.start()
+    self.bandera_procesamiento = 1
+
+
 
 
     
 def cargar_combo_eventos(self,text):
     self.sismos_procesar=[]
-    self.cmbx_eventos.clear()
+    self.ui.cmbx_eventos.clear()
     for i in range(0,len(self.eventos)):
         if self.eventos[i][2]==text:
             aux_sismo=(int(self.eventos[i][0]),self.eventos[i][1])#aux_sismo tiene el numero de evento del csv y todo el registro
             self.sismos_procesar.append(aux_sismo)
-            self.cmbx_eventos.addItem(self.eventos[i][1])
+            self.ui.cmbx_eventos.addItem(self.eventos[i][1])
             print(self.eventos[i][1])
     self.preparar_evento('')
 
@@ -183,61 +178,68 @@ def verificar_drives_virtuales(responsable_evento):
         else:
             return False
     return True
-        
-class Procesar_evento(QMainWindow):
-    cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    def __init__(self, archivo, directorio_trabajo, responsable, horario, parent=None):#Constructor de la clase
+
+
+# ============================
+#  EN PROCESAR_EVENTO (QMainWindow o QWidget)
+# ============================
+
+class Procesar_evento(QWidget):  
+    cerrado = pyqtSignal()
+
+    def __init__(self, archivo, directorio_trabajo, responsable, horario, parent=None):
         super().__init__(parent)
-        #Carga la configuración del archivo .ui en el objeto
 
-
-
-        # === Configurar el layout principal (panel izquierdo con UI externo) ===
+        # -------------------------------------------------
+        # CREACIÓN DE LOS 3 PANELES: IZQ – CENTRAL – DER
+        # -------------------------------------------------
         from PyQt5 import uic
-        from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
+        from PyQt5.QtCore import Qt
+        from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget
+        
+        layout_principal = QHBoxLayout(self)
 
-        layout_principal = QHBoxLayout()
+        # === PANEL IZQUIERDO: carga del UI ===
+        self.panel_izquierdo = QWidget(self)
+        layout_izq = QVBoxLayout(self.panel_izquierdo)
+        layout_izq.setContentsMargins(0, 0, 0, 0)
 
-        # Panel izquierdo (contenedor con layout vertical)
-        contenedor_izquierdo = QWidget(self)
-        panel_izquierdo = QVBoxLayout(contenedor_izquierdo)
-        panel_izquierdo.setContentsMargins(0, 0, 0, 0)
 
-        # Cargar la interfaz desde el archivo .ui directamente sobre este QMainWindow
+        ruta_ui = os.path.abspath(os.path.join(ruta_proyecto, 'src', 'ui', 'Proceso.ui'))
+        self.ui = uic.loadUi(ruta_ui)
+        layout_izq.addWidget(self.ui)
 
-        ruta_ui = os.path.abspath(os.path.join(ruta_proyecto, 'src','ui',"Proceso.ui"))
-        ruta_ui = os.path.abspath(ruta_ui)
-        uic.loadUi(ruta_ui, self)  # esto crea un centralWidget temporal
+        layout_principal.addWidget(self.panel_izquierdo, 1)
 
-        # Desacoplar el centralWidget del QMainWindow y reubicarlo en el panel izquierdo
-        widget_ui = self.takeCentralWidget()   # toma y quita el centralWidget actual
-        widget_ui.setParent(None)              # quita el padre para poder reubicarlo
-        panel_izquierdo.addWidget(widget_ui)   # lo coloca en el panel izquierdo
+        # === PANEL CENTRAL (vacío por ahora) ===
+        self.panel_central = QWidget(self)
+        self.layout_central = QVBoxLayout(self.panel_central)
+        # Alinear arriba e izquierda
+        self.layout_central.setAlignment(Qt.AlignTop | Qt.AlignLeft)
 
-        # Añadir el panel izquierdo al layout principal (proporción 1)
-        layout_principal.addWidget(contenedor_izquierdo, 1)
 
-        # === Panel derecho (mapa GIS embebido) ===
-        contenedor_derecho = QWidget(self)
-        panel_derecho = QVBoxLayout(contenedor_derecho)
-        panel_derecho.setContentsMargins(0, 0, 0, 0)
+        self.layout_central.setContentsMargins(0, 0, 0, 0)
+        layout_principal.addWidget(self.panel_central, 1)
 
-        # Instancia única del widget de mapa (GIS/Matplotlib)
-        # Mantén esta referencia para actualizarlo desde la señal del diálogo estaciones_
+        # === PANEL DERECHO (mapa GIS) ===
+        self.panel_derecho = QWidget(self)
+        layout_der = QVBoxLayout(self.panel_derecho)
+        layout_der.setContentsMargins(0, 0, 0, 0)
+
         self.widget_mapa = widget_grafico_mpl(self)
-        panel_derecho.addWidget(self.widget_mapa)
+        layout_der.addWidget(self.widget_mapa)
 
-        # Añadir el panel derecho al layout principal (proporción 4)
-        layout_principal.addWidget(contenedor_derecho, 4)
-        # === Fin panel derecho ===
+        layout_principal.addWidget(self.panel_derecho, 2)
 
+        # ==================================================
+        #   VARIABLE DE CONTROL DEL PANEL CENTRAL
+        # ==================================================
+        self.widget_central_activo = None   # aquí guardaremos estaciones_()
 
-        # Crear contenedor central para el QMainWindow (no admite setLayout directo)
-        contenedor_central = QWidget(self)
-        contenedor_central.setLayout(layout_principal)
-        self.setCentralWidget(contenedor_central)
-        # === Fin del armado del panel izquierdo con UI externo ===
-
+        # --------------------------------------------------------
+        # Establecer layout principal como central del QMainWindow
+        # --------------------------------------------------------
+        self.setLayout(layout_principal)
 
         self.directorio_trabajo = directorio_trabajo
         self.archivo=archivo
@@ -246,19 +248,19 @@ class Procesar_evento(QMainWindow):
         self.visor = Figure(figsize=(8, 4), dpi=100)
         self.canvas = FigureCanvas(self.visor)
         self.setWindowTitle("PROCESAMIENTO")
-        self.Btn_eventos.clicked.connect(self.guardar_evento)
-        self.Btn_Salir.clicked.connect(self.Salir_)
-        self.Btn_procesar.clicked.connect(self.procesar_)
-        self.Btn_reportar.clicked.connect(self.reportar_)
-        self.Btn_insertar.clicked.connect(self.insertar_)
+        self.ui.Btn_eventos.clicked.connect(self.guardar_evento)
+        self.ui.Btn_Salir.clicked.connect(self.Salir_)
+        self.ui.Btn_procesar.clicked.connect(self.procesar_)
+        self.ui.Btn_reportar.clicked.connect(self.reportar_)
+        self.ui.Btn_insertar.clicked.connect(self.insertar_)
         
-        self.Cmb_bx_tipo_evento.activated[str].connect(self.cambio_evento)
-        self.cmbx_t_evento.activated[str].connect(self.cargar_tipo_evento)
-        self.cmbx_eventos.activated[str].connect(self.preparar_evento)
+        self.ui.Cmb_bx_tipo_evento.activated[str].connect(self.cambio_evento)
+        self.ui.cmbx_t_evento.activated[str].connect(self.cargar_tipo_evento)
+        self.ui.cmbx_eventos.activated[str].connect(self.preparar_evento)
         self.parametros=parametros_estaciones()
         self.pagina=0
         self.registro_tiempo=0
-        self.Lbl_directorio.setText(self.directorio_trabajo)
+        self.ui.Lbl_directorio.setText(self.directorio_trabajo)
         self.canales_habilitados=[]
         for i in range(0,101):
             if self.parametros['HAB_CANAL'][i]=='1':
@@ -268,7 +270,7 @@ class Procesar_evento(QMainWindow):
         self.estaciones_eventos=[]
         self.bandera_marcas=1
         self.revision_procesamiento=False
-        self.grupo_carga.setEnabled(False)
+        self.ui.grupo_carga.setEnabled(False)
  
         # Conectar las señales en el __init__ de tu ventana
         d=datetime.today()              #obtención de la fecha y hora actual
@@ -289,11 +291,11 @@ class Procesar_evento(QMainWindow):
 
         # Ejemplos de uso:
         if son_iguales:
-            self.radioButton_inicial.setChecked(True)
+            self.ui.radioButton_inicial.setChecked(True)
         else:
-            self.radioButton_revision.setChecked(True)
-        self.radioButton_inicial.toggled.connect(self.seleccionar_inicial)
-        self.radioButton_revision.toggled.connect(self.seleccionar_revision)
+            self.ui.radioButton_revision.setChecked(True)
+        self.ui.radioButton_inicial.toggled.connect(self.seleccionar_inicial)
+        self.ui.radioButton_revision.toggled.connect(self.seleccionar_revision)
         self.Abrir_archivo()
         # Variables de control para el estado del procesamiento
         self.procesamiento = []      # vacío cuando no hay evento activo
@@ -302,7 +304,129 @@ class Procesar_evento(QMainWindow):
         self.actualizar_mapa_desde_procesamiento(self.procesamiento)
 
 
-    
+    def limpiar_panel_central(self):
+        if self.widget_central_activo is not None:
+            self.widget_central_activo.setParent(None)
+            self.widget_central_activo.deleteLater()
+            self.widget_central_activo = None
+
+
+
+    def incrustar_estaciones(self):
+        """
+        Limpia el panel central e incrusta estaciones_ como widget,
+        sin bloquear la interfaz mientras espera los archivos del virtual.
+        """
+        from PyQt5.QtCore import QTimer
+        from PyQt5.QtWidgets import QSizePolicy
+
+        # 1. limpiar panel central
+        self.limpiar_panel_central()
+
+        # 2. crear widget estaciones_ como WIDGET (no QDialog)
+        self.widget_central_activo = estaciones_(
+            self.estaciones_eventos,
+            self.filtros_estaciones,
+            self.responsable_evento,
+            parent=self
+        )
+
+        # 3. añadir al panel central
+        self.layout_central.addWidget(self.widget_central_activo)
+        self.widget_central_activo.setSizePolicy(
+            QSizePolicy.Fixed, QSizePolicy.Fixed
+            )
+
+
+        # 4. iniciar el proceso de espera → activación
+        #self.widget_central_activo.iniciar_espera_archivos_virtual()
+
+    def iniciar_espera_archivos_virtual(self):
+        """
+        Espera NO BLOQUEANTE hasta que existan los archivos del virtual.
+        Cuando aparecen:
+            - inicia hilo de monitoreo sobre el .fas (virtual)
+            - y desde el hilo se va actualizando el procesamiento (_proc en real).
+        """
+        from PyQt5.QtCore import QTimer
+
+        archivo = self.evento_procesar[1]
+        self.ui.Lbl_submensajes.setText("Esperando archivos del Virtual…")
+
+        def verificar():
+            # 1) Verificar que los drives del virtual existan
+            if not verificar_drives_virtuales(self.responsable_evento):
+                # Sigue esperando hasta que conecten el virtual
+                QTimer.singleShot(800, verificar)
+                return
+
+            # 2) Obtener rutas de archivos en el virtual
+            archivos_v = archivos_fast(
+                archivo,
+                self.directorio_trabajo,
+                self.responsable_evento
+            )
+            # Asumo que archivos_v[2] es el .fas que genera ProcesoV2
+            archivo_monitoreo = archivos_v[2]
+
+            # 3) Si todavía no existe el .fas, seguir esperando
+            if not os.path.exists(archivo_monitoreo):
+                QTimer.singleShot(800, verificar)
+                return
+
+            # 4) Cuando ya existe, arrancar el hilo
+            self.ui.Lbl_submensajes.setText("Archivos del Virtual encontrados, iniciando monitoreo…")
+            self.iniciar_monitor_virtual()
+
+        verificar()
+
+
+    def iniciar_monitor_virtual(self):
+        """
+        Inicia el hilo de monitoreo del archivo .fas en el Virtual.
+        El hilo llamará a guardar_intento(), que leerá el .fas (virtual)
+        y actualizará el archivo de procesamiento en el directorio real.
+        """
+        archivo = self.evento_procesar[1]
+
+        # Archivos en el Virtual (responsable_evento)
+        archivos_v = archivos_fast(
+            archivo,
+            self.directorio_trabajo,
+            self.responsable_evento
+        )
+        archivo_monitoreo = archivos_v[2]   # normalmente el .fas
+
+        # Crear hilo
+        self.file_monitor = FileMonitorThread(
+            archivo_monitoreo,
+            self.directorios,        # diccionario de directorios, no solo la ruta
+            self.responsable_evento,
+            self.procesamiento,
+            archivo,
+            parent=self
+        )
+        self.file_monitor.procesamiento_actualizado.connect(self.actualizar_procesamiento)
+        self.file_monitor.start()
+
+
+
+    def actualizar_procesamiento(self, nuevo):
+        """
+        Recibe el procesamiento actualizado desde el hilo.
+        Guarda el archivo de procesamiento y refresca el mapa embebido.
+        """
+        self.procesamiento = nuevo
+
+        # Guardar al vuelo en el archivo de procesamiento REAL
+        ruta = self.directorios['archivo_procesamiento']
+        escritura_archivo(ruta, nuevo)
+
+        # Refrescar el mapa en el panel derecho
+        self.actualizar_mapa_desde_procesamiento(nuevo)
+
+
+   
     # Métodos asociados
     def seleccionar_inicial(self, estado):
         if estado:
@@ -326,7 +450,7 @@ class Procesar_evento(QMainWindow):
             if not procesamiento:
                 self.widget_mapa.plot([], self.directorios['archivo_estaciones'])
                 if hasattr(self, "Lbl_submensajes"):
-                    self.Lbl_submensajes.setText("Mapa listo — sin evento seleccionado.")
+                    self.ui.Lbl_submensajes.setText("Mapa listo — sin evento seleccionado.")
                 return
             # --- Fin guardia ---
 
@@ -343,12 +467,12 @@ class Procesar_evento(QMainWindow):
                 else:
                     mensaje = 'No Procesar'
                 if hasattr(self, "Lbl_submensajes"):
-                    self.Lbl_submensajes.setText(mensaje)
+                    self.ui.Lbl_submensajes.setText(mensaje)
 
         except Exception as e:
             print("Error al actualizar mapa desde el padre:", e)
             if hasattr(self, "Lbl_submensajes"):
-                self.Lbl_submensajes.setText("Error al actualizar mapa (ver consola).")
+                self.ui.Lbl_submensajes.setText("Error al actualizar mapa (ver consola).")
 
 
     def limpiar_estado(self):
@@ -372,13 +496,13 @@ class Procesar_evento(QMainWindow):
         self.cambio_coeficientes_filtro = Cambio_Coeficientes_Filtro(self.canales_habilitados)
         
     def Abrir_archivo(self):  #Depurado
-        self.Cmb_bx_tipo_evento.clear()
+        self.ui.Cmb_bx_tipo_evento.clear()
         lista_filtros = ["Ruido", "FF", "FC","TELESISMO","SISMO","INDEFINIDO","Evento_local",'CONTROL','REVISION','TODOS']
-        self.Cmb_bx_tipo_evento.addItems(lista_filtros)
-        self.cmbx_t_evento.addItems(lista_filtros)
-        self.cmbx_t_evento.setCurrentText('SISMO')
+        self.ui.Cmb_bx_tipo_evento.addItems(lista_filtros)
+        self.ui.cmbx_t_evento.addItems(lista_filtros)
+        self.ui.cmbx_t_evento.setCurrentText('SISMO')
         self.directorios=obtener_directorios(self.archivo)
-        self.grupo_carga.setEnabled(True)
+        self.ui.grupo_carga.setEnabled(True)
         #Cargar día
         self.eventos_reporte,self.catalogo,self.eventos,\
         vector,self.evento_canales,\
@@ -400,7 +524,7 @@ class Procesar_evento(QMainWindow):
     def preparar_evento(self, text):
         self.evento_procesar=''
         for i,evento in enumerate(self.eventos):
-            if evento[1]==self.cmbx_eventos.currentText():
+            if evento[1]==self.ui.cmbx_eventos.currentText():
                 self.indice_evento_procesar=i
                 self.evento_procesar=evento
                 self.parametro=evento[0]+"  "+evento[1]+"  "+evento[2]
@@ -415,9 +539,9 @@ class Procesar_evento(QMainWindow):
             indice_hora=3
         horario=["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
         self.responsable_evento=self.responsables[indice_hora][0]
-        self.Cmb_bx_tipo_evento.setCurrentText(self.evento_procesar[2])
-        self.txt_responsables.setText(self.responsable_evento)
-        self.txt_horario.setText(horario[indice_hora])
+        self.ui.Cmb_bx_tipo_evento.setCurrentText(self.evento_procesar[2])
+        self.ui.txt_responsables.setText(self.responsable_evento)
+        self.ui.txt_horario.setText(horario[indice_hora])
         self.estaciones_eventos=[]
         self.filtros_estaciones=[]
         for i in range(3,len(self.evento_procesar)):
@@ -501,8 +625,7 @@ class Procesar_evento(QMainWindow):
 
         self.en_estaciones = True
         # Abrir la ventana estaciones_
-        dlg = estaciones_(self.estaciones_eventos, self.filtros_estaciones, self.responsable_evento, self)
-        dlg.exec_()
+        self.incrustar_estaciones()
 
         # --- Al cerrar estaciones_: volver al mapa vacío ---
         self.en_estaciones = False
@@ -536,15 +659,15 @@ class Procesar_evento(QMainWindow):
         print("Saliendo sin procesamiento", self.horario)
 
         # --- 1) Reglas de interfaz: radio buttons y checkbox de detalles ---
-        if self.radioButton_inicial.isChecked():
+        if self.ui.radioButton_inicial.isChecked():
             # En modo inicial: obligar detalles activados y bloquear el checkbox
-            self.checkBox_detalles.setChecked(True)
-            self.checkBox_detalles.setEnabled(False)
-        elif self.radioButton_revision.isChecked():
+            self.ui.checkBox_detalles.setChecked(True)
+            self.ui.checkBox_detalles.setEnabled(False)
+        elif self.ui.radioButton_revision.isChecked():
             # En modo revisión: permitir al usuario marcar/desmarcar detalles
-            self.checkBox_detalles.setEnabled(True)
+            self.ui.checkBox_detalles.setEnabled(True)
         # Si no desea detalles, no hay nada que hacer
-        if not self.checkBox_detalles.isChecked():
+        if not self.ui.checkBox_detalles.isChecked():
             self.close()
 
         # --- 3) Rutas y fecha ---
@@ -609,10 +732,10 @@ class Procesar_evento(QMainWindow):
                 f"¡Revise el archivo!</span><br>"
                 f"<span style='font-size:12pt;'>{archivo_reporte_temporal}</span>"
             )
-            self.Lbl_submensajes.setText(mensaje_html)
+            self.ui.Lbl_submensajes.setText(mensaje_html)
             return
         else:
-            self.Lbl_submensajes.setText("")
+            self.ui.Lbl_submensajes.setText("")
         
         # --- 7) Segunda pasada: flujo original con confirmación de borrado y cierre ---
         aux = "Se revisó archivo reporte\n" + archivo_reporte_temporal
@@ -721,7 +844,7 @@ class Cambio_Coeficientes_Filtro(QWidget):
             self.spbox_fil_fsup[i].setValue(val_sup)        
         self.show()
 
-class estaciones_(QDialog):
+class estaciones_(QWidget):
     senal_procesamiento_cambiado = pyqtSignal(list)
     def __init__(self, estaciones_eventos,filtros,responsable,parent=None):
         super(estaciones_,self).__init__(parent)
@@ -733,15 +856,10 @@ class estaciones_(QDialog):
         self.responsable=responsable
         self.numero_estaciones=len(self.estaciones_eventos)
         self.setFixedSize(600, 600)
-        # Cargar la interfaz desde el archivo .ui directamente en esta instancia
-        ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", "secundaria.ui")
-        ruta_ui = os.path.abspath(ruta_ui)
-        uic.loadUi(ruta_ui, self)
+ 
 # Widgets gráficos
         self.widget_grafico = widget_grafico_mpl(self)
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.widget_grafico)
-        self.setLayout(layout)
+
         self.ck_box_hab_canal={}
         self.lbl_nombre={}
         self.lbl_codigo={}
@@ -829,12 +947,22 @@ class estaciones_(QDialog):
 
         self.Btn_salir_procesamiento = QPushButton("Salir", self)
         self.Btn_salir_procesamiento.setGeometry(500, 470, 60, 24)
-        self.Btn_salir_procesamiento.clicked.connect(self.Salir_)
-        self.Btn_salir_procesamiento.setVisible(True)
 
+        self.Btn_salir_procesamiento.clicked.connect(self.solicitar_cierre)
+        self.Btn_salir_procesamiento.setVisible(True)
+        
         self.mapa_inicial_enviado = False  # control para primer dibujado
 
         self.bandera_procesamiento=0
+
+    def solicitar_cierre(self):
+        """
+        El usuario presiona el botón SALIR.
+        Aquí se llama a close(), lo que ejecuta closeEvent() normalmente.
+        Después, el padre eliminará el widget del panel central.
+        """
+        self.close()   # --> Esto SI ejecuta closeEvent()
+
 
     def showEvent(self, event):
         ############# Hilo monitor de cambio de archivo#################        
@@ -843,7 +971,9 @@ class estaciones_(QDialog):
             self.parent.bandera_virtual=verificar_drives_virtuales(self.responsable)
 
             if self.parent.bandera_virtual:
-                QTimer.singleShot(1000, lambda: activar_hilo(self))
+
+                padre = self.window()   # devuelve la ventana Procesar_evento
+                QTimer.singleShot(300, lambda: padre.iniciar_espera_archivos_virtual())
                 guardar_intento(self.parent.evento_procesar[1],self.parent.directorio_trabajo,self.parent.responsable_evento,self.procesamiento)
             else:
                 if os.path.exists(self.parent.archivos_procesamiento_real[1]):
@@ -887,14 +1017,14 @@ class estaciones_(QDialog):
             # 3) Mensaje discreto si falta coda
             if self.procesamiento and len(self.procesamiento[-1]) > 3:
                 if self.procesamiento[-1][2] != 'Fallido' and self.procesamiento[-1][3] == '0.0':
-                    self.parent.Lbl_submensajes.setText("No se ha marcado el tiempo de coda")
+                    self.parent.ui.Lbl_submensajes.setText("No se ha marcado el tiempo de coda")
 
             # 4) Simular "aplastar Ubicación": dibuja en el panel derecho embebido
             self.Ubicacion_()
 
         except Exception as e:
             print("Error en update_procesamiento:", e)
-            self.parent.Lbl_submensajes.setText("Error al guardar/actualizar (ver consola).")
+            self.parent.ui.Lbl_submensajes.setText("Error al guardar/actualizar (ver consola).")
 
  
     def closeEvent(self, event):
@@ -921,8 +1051,8 @@ class estaciones_(QDialog):
             self.file_monitor.requestInterruption()  # pide detener el hilo
             self.file_monitor.wait()                 # espera a que termine correctamente
             self.bandera_procesamiento = 0
-            self.parent.Lbl_Mensajes.setText("Seguimiento terminado")
-            self.parent.Lbl_submensajes.setText("")
+            self.parent.ui.Lbl_Mensajes.setText("Seguimiento terminado")
+            self.parent.ui.Lbl_submensajes.setText("")
         # ---------------------------------------------------------------
 
         self.parent.estaciones_eventos=auxiliar
@@ -957,6 +1087,12 @@ class estaciones_(QDialog):
         escritura_archivo(self.parent.directorios['archivo_catalogo'],self.parent.catalogo)
         print("Saliendo de estaciones en close")
 
+        if hasattr(self.parent, "limpiar_panel_central"):
+            self.parent.limpiar_panel_central()
+
+
+
+
     def Salir_(self):
         self.close()
 
@@ -987,7 +1123,7 @@ class estaciones_(QDialog):
         except Exception as e:
             print("Error en Ubicacion_:", e)
             if hasattr(self.parent, "Lbl_submensajes"):
-                self.parent.Lbl_submensajes.setText("Error al actualizar ubicación (ver consola).")
+                self.parent.ui.Lbl_submensajes.setText("Error al actualizar ubicación (ver consola).")
 
 
 class reporte_(QDialog):
