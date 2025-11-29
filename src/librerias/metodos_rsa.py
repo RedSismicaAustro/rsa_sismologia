@@ -114,8 +114,6 @@ def grafico_evento_int(visor, stLeido, t_inicio, t_final, estaciones_evento, hab
         if i < len(estaciones_evento):
             canal_ = int(estaciones_evento[i])
             comp_ = int(parametros['COMPONENTE'][canal_]) - 1
-            print("Canal:",canal_,"Componente:",comp_ )
-            print(stLeido[canal_])
             estaciones_graficar.append(canal_)
             st_graficar.append(stLeido[canal_][comp_])
 
@@ -1060,107 +1058,105 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
 
 def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
     """
-    Devuelve las rutas:
-        [ .sis, .fas, .rsa, Phase, .L, .P, .S ]
+    Regla FINAL:
+        - sis y fas → SIEMPRE minuto exacto
+        - FASTHYPO (rsa, Phase, L, P, S):
+              * si .fas existe y .rsa NO → minuto +1
+              * si .fas existe y .rsa SI → minuto exacto
+              * si .fas NO → minuto exacto
 
-    ─ Host    (usuario == '') → .sis/.fas con AAAA
-    ─ Virtual (usuario != '') → .sis/.fas con AA  (se recortan los dos primeros dígitos)
-
-    Formatos FASTHYPO (todos con año AA):
-        · MMDDhhmm.rsa
-        · PhaseDDh.hmm
-        · MMDDhh.mm[L|P|S]
-
-    Si el .rsa exacto no existe se suma 1 minuto y ese minuto “ajustado” se
-    reutiliza en Phase y L/P/S.
-
-    Parámetros:
-        evento: str  -> nombre del archivo '.sis' (ej: AAAAMMDD_hhmmss.sis o AAMMDD_hhmmss.sis)
-        dir_trabajo: str -> ruta base de trabajo
-        usuario: str -> '' host / 'alguien' virtual (se usan rutas de responsables.csv)
-        retornar_validaciones: bool -> si True retorna (rutas, existe, faltantes)
-
-    Retorna:
-        lista_rutas  (por defecto)
-        ó (lista_rutas, existe_dict, faltantes) si retornar_validaciones=True
+    Siempre retorna las 7 rutas, existan o no.
     """
-    # ------------------------------------------------------------------ #
-    # 1 · Carpetas base
-    # ------------------------------------------------------------------ #
-    print("", evento)
+
+    # ------------------------------------------------------------
+    # 1) Carpetas base
+    # ------------------------------------------------------------
     info = obtener_directorios(evento)
     dir_dia  = os.path.join(dir_trabajo, info['Directorio_dia'])
     dir_fast = os.path.join(dir_trabajo, info['Directorio_fastHypo'])
 
+    # Virtual (usuario)
     if usuario:
         csv_path = os.path.join(ruta_datos, "responsables.csv")
         for fila in lectura_archivo(csv_path):
             if fila and fila[0].strip() == usuario.strip():
-                # columnas 1 y 2: dir_dia y dir_fast
                 dir_dia, dir_fast = fila[1], fila[2]
                 break
 
-    # ------------------------------------------------------------------ #
-    # 2 · Despiece de nombre base
-    # ------------------------------------------------------------------ #
-    base = evento[:-4]  # quita '.sis'
-    if len(base) == 13:  # AAMMDD_hhmmss
-        yy, mm, dd = 20 + int(base[:2]), base[2:4], base[4:6]
-        hh, minu, ss = base[7:9], base[9:11], base[11:13]
-        sisfas_base = base  # ya en AA
-    else:  # AAAAMMDD_hhmmss
-        yy, mm, dd = int(base[:4]), base[4:6], base[6:8]
-        hh, minu, ss = base[9:11], base[11:13], base[13:15]
-        # recorta '20' solo para virtual
+    # ------------------------------------------------------------
+    # 2) Parseo del nombre base
+    # ------------------------------------------------------------
+    base = evento[:-4]
+
+    if len(base) == 13:      # AAMMDD_hhmmss
+        yy = 2000 + int(base[:2])
+        mm = base[2:4]
+        dd = base[4:6]
+        hh = base[7:9]
+        minu = base[9:11]
+        ss  = base[11:13]
+        sisfas_base = base
+    else:                    # AAAAMMDD_hhmmss
+        yy = int(base[:4])
+        mm = base[4:6]
+        dd = base[6:8]
+        hh = base[9:11]
+        minu = base[11:13]
+        ss  = base[13:15]
         sisfas_base = base if usuario == '' else base[2:]
 
-    # ------------------------------------------------------------------ #
-    # 3 · .sis / .fas
-    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------
+    # 3) Archivos SIS y FAS (siempre exactos)
+    # ------------------------------------------------------------
     archivo_sis = os.path.join(dir_dia, f"{sisfas_base}.sis")
     archivo_fas = os.path.join(dir_dia, f"{sisfas_base}.fas")
 
-    # ------------------------------------------------------------------ #
-    # 4 · .rsa  (intento minuto real)
-    # ------------------------------------------------------------------ #
+    fas_existe = os.path.exists(archivo_fas)
+
+    # ------------------------------------------------------------
+    # 4) Determinar minuto FASTHYPO
+    # ------------------------------------------------------------
+    # RSA exacto
+    rsa_nom_exacto = f"{mm}{dd}{hh}{minu}.rsa"
+    archivo_rsa_exacto = os.path.join(dir_fast, rsa_nom_exacto)
+    rsa_existe = os.path.exists(archivo_rsa_exacto)
+
+    # Aplicar regla
+    if fas_existe and not rsa_existe:
+        # Incrementar el minuto en 1
+        dt = datetime(yy, int(mm), int(dd), int(hh), int(minu), int(ss)) + timedelta(minutes=1)
+        mm, dd, hh, minu = dt.strftime("%m %d %H %M").split()
+
+    # ------------------------------------------------------------
+    # 5) Construir archivos FASTHYPO con el minuto definitivo
+    # ------------------------------------------------------------
     rsa_nom = f"{mm}{dd}{hh}{minu}.rsa"
     archivo_rsa = os.path.join(dir_fast, rsa_nom)
 
-    # ------------------------------------------------------------------ #
-    # 5 · Redondeo (+1 min) si falta el .rsa
-    # ------------------------------------------------------------------ #
-    if not os.path.exists(archivo_rsa):
-        dt = datetime(yy, int(mm), int(dd), int(hh), int(minu), int(ss)) + timedelta(minutes=1)
-        mm, dd, hh, minu = dt.strftime("%m %d %H %M").split()
-        rsa_nom = f"{mm}{dd}{hh}{minu}.rsa"
-        archivo_rsa = os.path.join(dir_fast, rsa_nom)
-
-    # ------------------------------------------------------------------ #
-    # 6 · Phase  y  L / P / S (mismo minuto usado en .rsa)
-    # ------------------------------------------------------------------ #
     phase_nom = f"Phase{dd}{hh[0]}.{hh[1]}{minu}"
     archivo_phase = os.path.join(dir_fast, phase_nom)
 
     base_lp = f"{mm}{dd}{hh}.{minu}"
-    archivo_L = os.path.join(dir_fast, base_lp + 'L')
-    archivo_P = os.path.join(dir_fast, base_lp + 'P')
-    archivo_S = os.path.join(dir_fast, base_lp + 'S')
+    archivo_L = os.path.join(dir_fast, base_lp + "L")
+    archivo_P = os.path.join(dir_fast, base_lp + "P")
+    archivo_S = os.path.join(dir_fast, base_lp + "S")
 
-    # ------------------------------------------------------------------ #
-    # 7 · Verificación de existencia
-    # ------------------------------------------------------------------ #
-    rutas = [archivo_sis, archivo_fas, archivo_rsa, archivo_phase, archivo_L, archivo_P, archivo_S]
+    # ------------------------------------------------------------
+    # 6) Retorno final
+    # ------------------------------------------------------------
+    rutas = [archivo_sis, archivo_fas, archivo_rsa,
+             archivo_phase, archivo_L, archivo_P, archivo_S]
+
     etiquetas = ['.sis', '.fas', '.rsa', 'Phase', '.L', '.P', '.S']
-
     existe = {etq: os.path.isfile(ruta) for etq, ruta in zip(etiquetas, rutas)}
     faltantes = [etq for etq, ok in existe.items() if not ok]
 
-    # ------------------------------------------------------------------ #
-    # 8 · Retorno
-    # ------------------------------------------------------------------ #
     if retornar_validaciones:
         return rutas, existe, faltantes
+
     return rutas
+
+
 
 
 def guardar_informacion_diaria(archivo,directorio_trabajo,catalogo_anterior,eventos):
@@ -1958,7 +1954,6 @@ def cargar_evento(parametro,eventos_reporte,catalogo,eventos,canales_eventos_dia
         directorio_trabajo:     Directorio de trabajo de ..\DIA\
         directorio_reporte:     Directorio donde se guarda el reporte
     """
-    print("Cargar evento:",parametro)
     if parametro=='':
             return
     ext=len(eventos_reporte)
@@ -2141,10 +2136,9 @@ def cargar_dia(directorios):
     variable_responsables=[["RESPONSABLE","HORA","TOT.","SIS.","FF","FC","IND.","TEL.","Local_CONTROL.","Ruido","3 est","4 est","5 est","6 est","7 est","8 est"]]
     for i in range (0,3):
         total=cont_sismo[i]+cont_FF[i]+cont_FC[i]+cont_indefinido[i]+cont_tele[i]+cont_local[i]+cont_ruido[i]
-        if(total!=0):
-            aux=[responsables[indice_responsables[i]][0],hora_[i],total,cont_sismo[i],cont_FF[i],cont_FC[i],cont_indefinido[i],cont_tele[i],cont_local[i],cont_ruido[i]]
-            aux=aux+contador_n_canales[i]
-            variable_responsables.append(aux)
+        aux=[responsables[indice_responsables[i]][0],hora_[i],total,cont_sismo[i],cont_FF[i],cont_FC[i],cont_indefinido[i],cont_tele[i],cont_local[i],cont_ruido[i]]
+        aux=aux+contador_n_canales[i]
+        variable_responsables.append(aux)
     resumen=[["SISMO","FF","FC","TELESISMOS","Local_CONTROL","INDEFINIDO","Ruido"],[sum(cont_sismo),sum(cont_FF),sum(cont_FC),sum(cont_tele),sum(cont_local),sum(cont_indefinido),sum(cont_ruido)]]
     return eventos_reporte,catalogo,eventos,vector,canales_eventos_dia,root,variable_responsables,resumen
 
@@ -2183,10 +2177,8 @@ def insertar_evento_otras_redes(catalogo,indice_catalogo,eventos_reporte,red_,ma
             indice_localizacion = lectura.index('Localización:')
             localizacion=lectura[indice_localizacion + 1]
             partes = localizacion.split()
-            print(partes)
             latitud = float(partes[0].replace('°', '')) * (-1 if partes[1] == 'S' else 1)
             longitud = float(partes[2].replace('°', '')) * (-1 if partes[3] == 'W' else 1)
-            print(latitud, longitud)
             catalogo_temp[7]=str(longitud)#Longitud
             catalogo_temp[8]=str(latitud)#Latitud
             indice_profundidad = lectura.index('Profundidad:')
@@ -2491,7 +2483,7 @@ def recolectar_evt(directorio_base):
         return re.fullmatch(r"\d{6}", nombre) is not None
 
     # Revisar el contenido del directorio base
-    print("Revisando en dicrectorio ",directorio_base )
+    print("Revisando en directorio ",directorio_base )
     subdirectorios_encontrados=os.listdir(directorio_base)
     print("Subdirectorios encontrados:",subdirectorios_encontrados)
     for subdirectorio in subdirectorios_encontrados:

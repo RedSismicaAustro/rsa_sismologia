@@ -31,6 +31,11 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
+import warnings
+from shapely.errors import ShapelyDeprecationWarning
+
+warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
+
 
 def catalogo_gis(catalogo):
     """
@@ -200,6 +205,7 @@ class widget_grafico_mpl(QWidget):
         self.setLayout(layout)
 
     def plot(self, procesamiento, archivo_estaciones):
+        print("PROCESAMIENTO:\n",procesamiento, archivo_estaciones)
         return proceso_gis(self, procesamiento, archivo_estaciones)
 
 
@@ -274,7 +280,7 @@ def graficar_catalogo_gis(catalogo):
   ax.legend(loc="best")
 
   # Mostrar el mapa
-  plt.show()
+  #plt.show()
 
 
 def cobertura_red(archivo,distancia):

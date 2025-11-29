@@ -23,6 +23,8 @@ import os
 import sys
 import matplotlib
 matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+plt.ioff() 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QMessageBox, QToolBar, QLabel, QVBoxLayout, QWidget
 from PyQt5.QtGui import QIcon, QPainter, QPixmap, QFont
 from PyQt5.QtCore import Qt, QTimer
