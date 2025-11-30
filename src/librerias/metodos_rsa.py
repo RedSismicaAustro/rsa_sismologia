@@ -1150,10 +1150,11 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
     etiquetas = ['.sis', '.fas', '.rsa', 'Phase', '.L', '.P', '.S']
     existe = {etq: os.path.isfile(ruta) for etq, ruta in zip(etiquetas, rutas)}
     faltantes = [etq for etq, ok in existe.items() if not ok]
-
+    print("Archivos fast")
     if retornar_validaciones:
+        print(rutas, existe, faltantes)
         return rutas, existe, faltantes
-
+    print(rutas)
     return rutas
 
 
