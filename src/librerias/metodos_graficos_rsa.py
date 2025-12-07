@@ -1709,129 +1709,194 @@ import os
 #      y **AHORA incluye resumen/página de responsables**.
 #    * M6 (Institucional detallado): SIN extras y **SIN responsables**.
 # =============================================================================
-def derivar_banderas_desde_modo(modo_reporte: int) -> dict:
+def derivar_banderas_desde_modo(modo_reporte: int):
     """
-    Devuelve un diccionario de banderas operativas derivadas del modo.
-    NO incluye 'bandera_firma' ni 'bandera_relleno' (se pasan desde fuera).
+    Traduce el modo numérico (1–7) a las banderas que gobiernan:
+        - Contenido del reporte
+        - Inclusión de responsables
+        - Inclusión de tabla resumen
+        - Inserción de eventos no procesados
+        - Impresión de detalle
+        - Catálogo oficial
+        - Extras técnicos
+        - Tipo institucional (FACULTAD / GADS / OTRO / NO-INSTITUCIONAL)
+        - Formato de portada (0 general, 2 facultad)
     """
+
+    # Base general para todos
     banderas = {
-        'es_periodo': True,                        # Período vs Diario
-        'imprimir_detalle': True,                  # Hojas de señales
-        'mostrar_tabla_resumen': True,             # Tabla con listado de eventos
-        'incluir_indefinidos': False,              # Solo M1
-        'solo_catalogo_oficial': False,            # True en M3/M6
-        'extras_tecnicos': False,                  # Zoom + líneas P/S/coda + RMS/Responsable
-        'mostrar_cobertura_y_estaciones': False,   # Encabezados de cobertura y lista de estaciones
-        'insertar_no_procesado': False,            # Solo M1 inserta dummies al catálogo maestro
-        'es_institucional': False,                 # Layout compacto institucional (M5/M6)
-        'incluir_responsables': False,             # Página y resumen de responsables (M1 y M3)
+        'es_periodo': False,
+        'imprimir_detalle': False,
+        'incluir_responsables': False,
+        'insertar_no_procesado': False,
+        'mostrar_tabla_resumen': False,
+        'solo_catalogo_oficial': False,
+        'extras_tecnicos': False,
+        'tipo_institucional': "NO-INST",
+        'formato_portada': 0,
     }
 
-    if modo_reporte == MODO_PERIODO_FRANJAS:  # M1
+    # ========================
+    #  MODO 1: PERIODO FRANJAS
+    # ========================
+    if modo_reporte == 1:
         banderas.update({
-            'es_periodo': False,
+            'es_periodo': True,
+            'incluir_responsables': True,
             'imprimir_detalle': True,
-            'mostrar_tabla_resumen': True,
-            'incluir_indefinidos': True,
-            'solo_catalogo_oficial': False,
-            'extras_tecnicos': True,
-            'mostrar_cobertura_y_estaciones': True,
             'insertar_no_procesado': True,
-            'es_institucional': False,
-            'incluir_responsables': True,    # ← Sí muestra responsables
-        })
-
-    elif modo_reporte == MODO_DIARIO_REVISION:  # M2
-        banderas.update({
-            'es_periodo': False,
-            'imprimir_detalle': True,
             'mostrar_tabla_resumen': True,
-            'incluir_indefinidos': False,
             'solo_catalogo_oficial': False,
             'extras_tecnicos': True,
-            'mostrar_cobertura_y_estaciones': True,
-            'insertar_no_procesado': False,   # dummies solo locales (no al catálogo maestro)
-            'es_institucional': False,
-            'incluir_responsables': True,
+            'tipo_institucional': "NO-INST",
+            'formato_portada': 0,
         })
+        return banderas
 
-    elif modo_reporte == MODO_OFICIAL_DETALLADO:  # M3 (AJUSTADO)
+    # ========================
+    #  MODO 2: DIARIO REVISIÓN
+    # ========================
+    if modo_reporte == 2:
         banderas.update({
-            'es_periodo': True,
+            'es_periodo': False,
+            'incluir_responsables': True,
             'imprimir_detalle': True,
-            'mostrar_tabla_resumen': True,
-            'incluir_indefinidos': False,
-            'solo_catalogo_oficial': True,       # Solo eventos presentes en catálogo
-            'extras_tecnicos': True,             # ← Sí extras en oficial detallado
-            'mostrar_cobertura_y_estaciones': True,
             'insertar_no_procesado': False,
-            'es_institucional': False,
-            'incluir_responsables': True,        # ← **Sí** muestra responsables (diferencia con M6)
-        })
-
-    elif modo_reporte == MODO_OFICIAL_RESUMEN:  # M4
-        banderas.update({
-            'es_periodo': True,
-            'imprimir_detalle': False,
-            'mostrar_tabla_resumen': True,
-            'incluir_indefinidos': False,
-            'solo_catalogo_oficial': True,   # Consistencia, aunque sin detalle
-            'extras_tecnicos': False,
-            'mostrar_cobertura_y_estaciones': False,
-            'insertar_no_procesado': False,
-            'es_institucional': False,
-            'incluir_responsables': True,
-        })
-
-    elif modo_reporte == MODO_FACULTAD_RESUMEN:  # M5 (Institucional resumen)
-        banderas.update({
-            'es_periodo': True,
-            'imprimir_detalle': False,        # Resumen sin detalle
             'mostrar_tabla_resumen': False,
-            'incluir_indefinidos': False,
-            'solo_catalogo_oficial': True,
-            'extras_tecnicos': False,
-            'mostrar_cobertura_y_estaciones': False,
-            'insertar_no_procesado': False,
-            'es_institucional': True,         # Layout institucional
-            'incluir_responsables': False,
+            'solo_catalogo_oficial': False,
+            'extras_tecnicos': True,
+            'tipo_institucional': "NO-INST",
+            'formato_portada': 0,
         })
+        return banderas
 
-    elif modo_reporte == MODO_INSTITUCIONAL_DETALLADO:  # M6
+    # ========================
+    #  MODO 3: OFICIAL DETALLADO
+    # ========================
+    if modo_reporte == 3:
         banderas.update({
             'es_periodo': True,
+            'incluir_responsables': True,
             'imprimir_detalle': True,
-            'mostrar_tabla_resumen': True,
-            'incluir_indefinidos': False,
-            'solo_catalogo_oficial': True,
-            'extras_tecnicos': False,           # Institucional SIN extras
-            'mostrar_cobertura_y_estaciones': False,
             'insertar_no_procesado': False,
-            'es_institucional': True,
-            'incluir_responsables': False,      # ← **NO** muestra responsables (diferencia con M3)
+            'mostrar_tabla_resumen': True,
+            'solo_catalogo_oficial': True,
+            'extras_tecnicos': True,
+            'tipo_institucional': "NO-INST",
+            'formato_portada': 0,
         })
+        return banderas
 
-    elif modo_reporte == MODO_INSTITUCIONAL_RESUMEN:  # M7
+    # ========================
+    #  MODO 4: OFICIAL RESUMEN
+    # ========================
+    if modo_reporte == 4:
         banderas.update({
             'es_periodo': True,
-            'imprimir_detalle': False,        # Solo resumen
+            'incluir_responsables': True,
+            'imprimir_detalle': False,
+            'insertar_no_procesado': False,
             'mostrar_tabla_resumen': True,
-            'incluir_indefinidos': False,
             'solo_catalogo_oficial': True,
             'extras_tecnicos': False,
-            'mostrar_cobertura_y_estaciones': False,
-            'insertar_no_procesado': False,
-            'es_institucional': True,        # ← usar layout institucional en M7
-            'incluir_responsables': False,
+            'tipo_institucional': "NO-INST",
+            'formato_portada': 0,
         })
+        return banderas
+
+    # ========================
+    #  MODO 5: FACULTAD RESUMEN
+    # ========================
+    if modo_reporte == 5:
+        banderas.update({
+            'es_periodo': True,
+            'incluir_responsables': False,
+            'imprimir_detalle': False,
+            'insertar_no_procesado': False,
+            'mostrar_tabla_resumen': True,
+            'solo_catalogo_oficial': True,
+            'extras_tecnicos': False,
+            'tipo_institucional': "FACULTAD",
+            'formato_portada': 2,
+        })
+        return banderas
+
+    # ==============================
+    #  MODO 6: INSTITUCIONAL DETALLADO
+    # ==============================
+    if modo_reporte == 6:
+        banderas.update({
+            'es_periodo': True,
+            'incluir_responsables': False,
+            'imprimir_detalle': True,
+            'insertar_no_procesado': False,
+            'mostrar_tabla_resumen': True,
+            'solo_catalogo_oficial': True,
+            'extras_tecnicos': False,
+            'tipo_institucional': "GADS",   # representación institucional
+            'formato_portada': 0,
+        })
+        return banderas
+
+    # ==============================
+    #  MODO 7: INSTITUCIONAL RESUMEN
+    # ==============================
+    if modo_reporte == 7:
+        banderas.update({
+            'es_periodo': True,
+            'incluir_responsables': False,
+            'imprimir_detalle': False,
+            'insertar_no_procesado': False,
+            'mostrar_tabla_resumen': True,
+            'solo_catalogo_oficial': True,
+            'extras_tecnicos': False,
+            'tipo_institucional': "GADS",
+            'formato_portada': 0,
+        })
+        return banderas
 
     return banderas
+
+
 
 
 # ============================================================
 # 2) Layout compacto vs general (solo posiciones y tamaños)
 # ============================================================
-def normalizar_layout_por_institucional(es_institucional: bool) -> dict:
+def normalizar_layout_por_institucional(tipo_institucional: str):
+    """
+    Devuelve el layout físico (tamaño del mapa, marca de agua y posición de la
+    caja de simbología) según el tipo de institución:
+
+    - FACULTAD  → formato especial (tipo_formato = 2)
+    - GADS / ELECAUSTRO / OTRO → formato general
+    - NO-INST → formato general
+    """
+
+    # Formato general
+    layout_general = {
+        'tipo_formato': 0,
+        'tamanio':      (90, 325, 400, 400),
+        'marca_agua':   (200, 100, 200, 95),
+        'pos_caja':     (55, 234),
+    }
+
+    # Formato Facultad (solo M5)
+    layout_facultad = {
+        'tipo_formato': 2,
+        'tamanio':      (81, 216, 432, 432),
+        'marca_agua':   (261, 66, 79, 36),
+        'pos_caja':     (85, 109),
+    }
+
+    if tipo_institucional == "FACULTAD":
+        return layout_facultad
+
+    return layout_general
+
+
+
+def normalizar_layout_por_institucional__(es_institucional: bool) -> dict:
     """
     Define posiciones físicas para el mapa, marca de agua y caja de simbología.
     No toca coordenadas de AOI ni estilo (eso viene de mapa_configuracion).
@@ -1926,6 +1991,207 @@ def _construir_catalogo_diario_para_detalle(catalogo: list, eventos: list) -> li
 # ==========================================================================================
 
 def reporte_resumen_modos(
+    archivo_pdf: str,
+    subtitulo_reporte: str,
+    fecha_ini, fecha_fin,
+    catalogo: list,
+    resumen: list,
+    mapa_: int,
+    tipo_mapa: int,
+    modo_reporte: int,
+    estaciones,
+    directorio: str,
+    arbol,
+    resumen_responsables: list,
+    eventos: list,
+    bandera_firma: bool,
+    bandera_relleno: bool,
+):
+
+    print("archivo_pdf:", archivo_pdf,
+          "\nSubtitulo:", subtitulo_reporte,
+          "\nModo:", modo_reporte)
+
+    # 1) BANDERAS POR MODO
+    banderas = derivar_banderas_desde_modo(modo_reporte)
+
+    # 2) MAPA
+    datos_mapa      = mapa_configuracion(mapa_, tipo_mapa)
+    mapa_despliegue = datos_mapa[0]
+    coordenadas     = datos_mapa[1]
+    salto           = datos_mapa[2]
+    titulo_hoja     = datos_mapa[3]
+    estaciones_info = datos_mapa[4]
+
+    # 3) LAYOUT FÍSICO (parche correcto usando tipo_institucional)
+    layout = normalizar_layout_por_institucional(banderas['tipo_institucional'])
+    tamanio    = layout['tamanio']
+    marca_agua = layout['marca_agua']
+    pos_x, pos_y = layout['pos_caja']
+    tipo_formato = banderas.get('formato_portada', 0)
+
+    # 4) VECTOR DE EVENTOS
+    vector = []
+    if catalogo:
+        for fila in catalogo[1:]:
+            if not fila:
+                continue
+            try:
+                lat = float(fila[IDX_LATITUD])
+                lon = float(fila[IDX_LONGITUD])
+                prf = -1.0 * float(fila[IDX_PROFUNDIDAD])
+                mag = float(fila[IDX_MAGNITUD])
+            except:
+                continue
+
+            ruta = fila[IDX_EVENTO]
+            red = 0 if fila[IDX_FUENTE] == "RSA" else 1
+            vector.append([lat, lon, prf, mag, red, ruta])
+
+    # 5) CREAR LIENZO + PORTADA
+    lienzo = canvas.Canvas(archivo_pdf, pagesize=A4)
+    titulo_portada = "SISMICIDAD REGIONAL REGISTRADA"
+
+    lienzo = formato(marca_agua, A4, titulo_portada, subtitulo_reporte, tipo_formato, lienzo)
+    lienzo = mapa(lienzo, mapa_despliegue, tamanio, coordenadas, salto, 1)
+    lienzo = dibujo_sismos_(lienzo, vector, coordenadas, tamanio, mapa_, banderas['es_periodo'], bandera_relleno)
+    lienzo = caja_simbologia(lienzo, resumen, vector, (pos_x, pos_y), mapa_, banderas['es_periodo'], bandera_relleno)
+
+    # ========================================================
+    #                RAMA PERIODO
+    # ========================================================
+    if banderas['es_periodo']:
+
+        lienzo = estadistica_(lienzo, resumen, fecha_ini, mapa_, banderas['es_periodo'])
+
+        if banderas['incluir_responsables']:
+            lienzo.showPage()
+            lienzo = responsables_tiempos_(lienzo, resumen_responsables, modo_reporte)
+
+        if banderas['insertar_no_procesado'] and banderas['imprimir_detalle']:
+            for evento_dia in eventos:
+                if evento_dia[1]=="Fecha; Hora (UTC)":
+                    continue
+                directorios = obtener_directorios(evento_dia[1])
+                archivo_proc = os.path.join(directorio, directorios['archivo_procesamiento'])
+
+                if os.path.exists(archivo_proc):
+                    lectura = lectura_archivo(archivo_proc)
+                    if len(lectura) == 1:
+                        continue
+
+                    ev_num = int(evento_dia[1].replace("_", "")[:-4])
+                    dummy = ['00000000000000','2025','1','1','0','0','0',
+                             '-2.00','-79.00','0','rms','e-x','e-y','e-0','e-z',
+                             '0',' ','No procesado',evento_dia[1],' , , ']
+
+                    for i in range(1, len(catalogo)):
+                        actual = int(catalogo[i][IDX_EVENTO].replace("_","")[:-4])
+                        if actual >= ev_num:
+                            if actual > ev_num:
+                                catalogo.insert(i, dummy)
+                            break
+
+        if banderas['mostrar_tabla_resumen']:
+
+            contador_linea = 0
+            loc_centrada = (73,107,122,140,153,171,190,220,245,271,295,320,360)
+            localizacion = (46,105,126,142,158,173,188,212,239,268,293,322,350)
+            marca_agua_tabla = (120,450,400,200)
+
+            for evento_catalogo in catalogo:
+                if not evento_catalogo:
+                    continue
+                if evento_catalogo[19] == ' ':
+                    continue
+
+                if contador_linea == 80:
+                    contador_linea = 0
+                contador_linea += 1
+                contador_col = 0
+
+                if contador_linea == 1:
+                    lienzo.showPage()
+                    lienzo = formato(marca_agua_tabla, A4, titulo_hoja, subtitulo_reporte, 0, lienzo)
+                    lienzo.setFont('Helvetica', 7)
+
+                try:
+                    magv = float(evento_catalogo[IDX_MAGNITUD])
+                    lienzo.setFillColor(colors.blue if magv > 4 else colors.black)
+                except:
+                    lienzo.setFillColor(colors.black)
+
+                for idx in (0,1,2,3,4,5,6,7,8,9,15,17,19):
+                    texto = evento_catalogo[idx]
+                    if contador_linea == 1:
+                        lienzo.drawString(loc_centrada[contador_col], 740 - contador_linea*8, catalogo[0][idx])
+                    else:
+                        if 5 < contador_col < 9:
+                            try:
+                                texto = str(round(float(texto),2))
+                            except:
+                                pass
+                        if contador_col == 10:
+                            texto = texto + evento_catalogo[idx+1]
+                        lienzo.drawString(localizacion[contador_col], 740 - contador_linea*8, texto)
+                    contador_col += 1
+
+            if contador_linea > 50:
+                lienzo.showPage()
+                lienzo = formato(marca_agua_tabla, A4, titulo_hoja, subtitulo_reporte, 0, lienzo)
+
+            lienzo.setFont('Helvetica', 10)
+            x, y = 100, 740 - (contador_linea + 20)*8
+
+            if modo_reporte in (MODO_INSTITUCIONAL_DETALLADO, MODO_INSTITUCIONAL_RESUMEN) and bandera_firma:
+                lienzo.drawString(x, y, "Ing. Remigio Guevara")
+
+            lienzo.drawString(x, y-10, "Red Sísmica del Austro")
+
+        lienzo.showPage()
+
+        if banderas['imprimir_detalle']:
+            if banderas['solo_catalogo_oficial']:
+                catalogo_para_detalle = _filtrar_catalogo_oficial_sin_dummies(catalogo)
+            else:
+                catalogo_para_detalle = catalogo
+
+            mapa_detalle = mapa_ if banderas['extras_tecnicos'] else 0
+
+            maximos_reporte = imprimir_catalogo(
+                catalogo_para_detalle, arbol, lienzo, directorio,
+                estaciones_info, parametros_estaciones()['SENSOR'],
+                mapa_detalle, arbol.getroot(), tipo_mapa
+            )
+        else:
+            maximos_reporte = []
+
+    # ========================================================
+    #                RAMA DIARIA (M2)
+    # ========================================================
+    else:
+        archivo = referencia_directorio_completa(archivo_pdf)
+        directorios = obtener_directorios(archivo)
+
+        lienzo = responsables_tiempos_(lienzo, resumen_responsables, modo_reporte)
+
+        catalogo_dia = _construir_catalogo_diario_para_detalle(catalogo, eventos)
+
+        lienzo.showPage()
+
+        maximos_reporte = imprimir_catalogo(
+            catalogo_dia, arbol, lienzo, directorio,
+            estaciones_info, parametros_estaciones()['SENSOR'],
+            mapa_, arbol.getroot(), tipo_mapa
+        )
+
+    lienzo.save()
+    return maximos_reporte
+
+
+
+
+def reporte_resumen_modos__(
     archivo_pdf: str,
     subtitulo_reporte: str,
     fecha_ini, fecha_fin,
