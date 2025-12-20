@@ -55,28 +55,25 @@ class VentanaPrincipal(QMainWindow):
         if ruta:
             self.edt_ruta.setText(ruta)
 
+
     def escanear(self):
         ruta_texto = self.edt_ruta.text().strip()
         ruta = Path(ruta_texto)
+
         if not ruta.exists() or not ruta.is_dir():
             QMessageBox.critical(self, "Ruta inválida", "La ruta no existe o no es un directorio.")
             return
 
-        # ÚNICA FUNCIÓN LARGA: recorre todo y construye el árbol
-
-
-        def formatear_fechas_archivo(path: Path) -> str:
-            try:
-                st = path.stat()
-                fecha_creacion = datetime.fromtimestamp(st.st_ctime).strftime("%Y-%m-%d %H:%M:%S")
-                fecha_modificacion = datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-                return f"(creado: {fecha_creacion}, modificado: {fecha_modificacion})"
-            except Exception:
-                return "(fechas no disponibles)"
+        # Guardamos el directorio realmente escaneado
+        self.directorio_escaneado = ruta
 
         def construir_estructura_arbol(ruta_raiz: Path):
             lineas = []
-            raiz_json = {"nombre": ruta_raiz.name, "tipo": "directorio", "contenido": []}
+            raiz_json = {
+                "nombre": ruta_raiz.name,
+                "tipo": "directorio",
+                "contenido": []
+            }
 
             lineas.append(f"{ruta_raiz.resolve()}/")
             lineas.append(f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -116,13 +113,17 @@ class VentanaPrincipal(QMainWindow):
                 ramal = "└── " if es_ultimo else "├── "
                 ruta_entrada = Path(entrada.path)
 
-                # Siempre re-apilamos el estado del directorio actual para continuar con el siguiente hermano
+                # Re-apilamos el estado actual para continuar luego
                 pila.append((directorio_actual, prefijo, nodo_json, entradas, i + 1))
 
                 if entrada.is_dir(follow_symlinks=False):
                     lineas.append(f"{prefijo}{ramal}{entrada.name}/")
 
-                    nodo_dir = {"nombre": entrada.name, "tipo": "directorio", "contenido": []}
+                    nodo_dir = {
+                        "nombre": entrada.name,
+                        "tipo": "directorio",
+                        "contenido": []
+                    }
                     nodo_json["contenido"].append(nodo_dir)
 
                     prefijo_hijo = prefijo + ("    " if es_ultimo else "│   ")
@@ -131,7 +132,6 @@ class VentanaPrincipal(QMainWindow):
                     if err_hijo is not None:
                         lineas.append(f"{prefijo_hijo}└── [Error: {err_hijo}]")
                     else:
-                        # Aquí está la clave: entramos INMEDIATO al subdirectorio (DFS)
                         pila.append((ruta_entrada, prefijo_hijo, nodo_dir, entradas_hijo, 0))
 
                 else:
@@ -156,9 +156,6 @@ class VentanaPrincipal(QMainWindow):
 
             return "\n".join(lineas), raiz_json
 
-
-
-
         texto, self.estructura_json = construir_estructura_arbol(ruta)
         self.salida.setPlainText(texto)
 
@@ -169,26 +166,49 @@ class VentanaPrincipal(QMainWindow):
         if not contenido.strip():
             QMessageBox.information(self, "Sin contenido", "No hay texto para guardar. Escanea primero.")
             return
+
+        if not hasattr(self, "directorio_escaneado"):
+            QMessageBox.warning(self, "Sin escaneo", "No hay un directorio escaneado.")
+            return
+
+        directorio = self.directorio_escaneado
+        nombre_base = directorio.name
+        ruta_sugerida = str(directorio / f"{nombre_base}.txt")
+
         nombre, _ = QFileDialog.getSaveFileName(
-            self, "Guardar estructura como...", f"estructura_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            self,
+            "Guardar estructura como...",
+            ruta_sugerida,
             "Archivo de texto (*.txt)"
         )
+
         if not nombre:
             return
+
         try:
             with open(nombre, "w", encoding="utf-8", newline="\n") as f:
                 f.write(contenido)
 
             ruta_json = os.path.splitext(nombre)[0] + ".json"
-
             with open(ruta_json, "w", encoding="utf-8") as f:
                 json.dump(self.estructura_json, f, indent=2, ensure_ascii=False)
 
+            QMessageBox.information(
+                self,
+                "Guardado",
+                f"Se guardaron:\n{nombre}\n{ruta_json}"
+            )
 
-
-            QMessageBox.information(self, "Guardado", f"Se guardó:\n{nombre}")
         except Exception as e:
-            QMessageBox.critical(self, "Error al guardar", f"No se pudo guardar el archivo:\n{e}")
+            QMessageBox.critical(
+                self,
+                "Error al guardar",
+                f"No se pudo guardar el archivo:\n{e}"
+            )
+
+
+
+
 
 def main():
     app = QApplication(sys.argv)
