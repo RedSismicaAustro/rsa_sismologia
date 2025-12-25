@@ -141,7 +141,7 @@ def encontrar_cadena(lista, cadena):
 
 
 def responsables_tiempos___(lienzo,resumen_responsables):
-    print("resumen_responsables",resumen_responsables)
+    print("Resumen_responsables",resumen_responsables)
             
     dibujo_chart = Drawing(400, 200)
     lista_responsables=[]
@@ -1337,10 +1337,11 @@ def imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_c
         ####################################################################
         #### SISMOGRAMAS
         ####################################################################
-        print("Graficando:  ",catalogo[indice][IDX_EVENTO])
+        
         if catalogo[indice]==[] or catalogo[indice][IDX_EVENTO]=='ruta' :
             indice=indice+1
             continue
+        print("Graficando:  ",catalogo[indice][IDX_EVENTO])
         lienzo.drawString(50,850,'EVENTO: '+catalogo[indice][IDX_EVENTO])
         evento_catalogo=catalogo[indice]  #Variable que tiene la información principal del evento a imprimir, no importa la fuente ni si es reportado o no.
         ayuda=0
@@ -2340,7 +2341,7 @@ def reporte_resumen_modos__(
 
         # ---- Tabla resumen de eventos (si aplica) ----
         if banderas['mostrar_tabla_resumen']:
-            print("Imprimeindo resumen")
+            print("Imprimiendo resumen")
             contador_linea = 0
             loc_centrada = (73, 107, 122, 140, 153, 171, 190, 220, 245, 271, 295, 320, 360)
             localizacion = (46, 105, 126, 142, 158, 173, 188, 212, 239, 268, 293, 322, 350)
