@@ -36,7 +36,7 @@ if ruta_librerias not in sys.path:
 
 import metodos_gestion as mg
 from metodos_gestion import obtener_directorios, parametros_estaciones
-from metodos_rsa import lectura_archivo, clasificar_evento_sismico
+from metodos_rsa import lectura_archivo   # clasificar_evento_sismico ya NO se usa
 
 
 # ==== Canvas ==================================================================
@@ -223,14 +223,9 @@ class VisorEVT(QMainWindow):
             f'{periodo["inicio"]} → {periodo["fin"]}'
         )
 
-        resultado = clasificar_evento_sismico(stream_evt)
-        if not resultado.get("evento_sismico_probable", False):
-            self.eventos_ruido.add(evento_evt["evt"])
-        else:
-            self.eventos_ruido.discard(evento_evt["evt"])
-
+        clave_evt = evento_evt["evt"]
         self.chk_ruido.blockSignals(True)
-        self.chk_ruido.setChecked(evento_evt["evt"] in self.eventos_ruido)
+        self.chk_ruido.setChecked(clave_evt in self.eventos_ruido)
         self.chk_ruido.blockSignals(False)
 
         self._actualizar_catalogo_evt(evento_evt)
@@ -300,17 +295,28 @@ class VisorEVT(QMainWindow):
         if not self.eventos_evt:
             return
 
-        # EVT actualmente seleccionado (solo para identificar el período/canal)
+        # EVT seleccionado solo para identificar el período
         evento_actual = self.eventos_evt[self.indice_evt]
         codigo_canal = evento_actual["cc"]
 
-        # Todos los EVT del mismo período/canal
+        # EVT del período
         eventos_evt_periodo = [
             e for e in self.eventos_evt if e["cc"] == codigo_canal
         ]
-
         if not eventos_evt_periodo:
             return
+
+        # EVT válidos (no ruido)
+        eventos_evt_validos = [
+            e for e in eventos_evt_periodo if e["evt"] not in self.eventos_ruido
+        ]
+        if not eventos_evt_validos:
+            self.txt_sync.setText("No hay EVT válidos (no ruido) en este período.")
+            return
+
+        # EVT ancla = primer EVT no marcado como ruido
+        evento_evt_ancla = eventos_evt_validos[0]
+        fecha_evt_ancla = evento_evt_ancla["dt"]
 
         # Catálogo del período
         eventos_catalogo = self.catalogos_por_canal.get(codigo_canal, [])
@@ -320,113 +326,100 @@ class VisorEVT(QMainWindow):
 
         fechas_catalogo = [x[0] for x in eventos_catalogo]
 
-        # EVT ancla: primer EVT del período (solo para tiempo relativo)
-        evento_ancla = eventos_evt_periodo[0]
-        fecha_evt_ancla = evento_ancla["dt"]
-
-        # SIS ancla: seleccionado en el combobox
+        # SIS ancla (referencia absoluta)
         texto_sis_ancla = self.cmb_catalogo.currentText()
         if not texto_sis_ancla:
-            self.txt_sync.setText("No hay evento de catálogo seleccionado.")
+            self.txt_sync.setText("No hay SIS ancla seleccionado.")
             return
 
         fecha_sis_ancla = datetime.strptime(
             texto_sis_ancla, "%Y%m%d_%H%M%S.sis"
         )
 
-        # Umbral para decidir si el delta directo es válido (2 días)
+        # Umbral para detectar reseteo (2 días)
         umbral_segundos = 2 * 24 * 3600
 
-        # Construcción del reporte
         lineas = [
             f"Período: {codigo_canal}",
-            f"EVT ancla : {evento_ancla['evt']}  →  SIS ancla : {texto_sis_ancla}",
-            "-" * 80
+            f"EVT ancla : {evento_evt_ancla['evt']}  →  SIS ancla : {texto_sis_ancla}",
+            "-" * 140
         ]
 
         for evento_evt in eventos_evt_periodo:
             if evento_evt["evt"] in self.eventos_ruido:
                 continue
 
-            # ==========================
-            # Paso 1: delta directo
-            # ==========================
-            indice = bisect.bisect_left(fechas_catalogo, evento_evt["dt"])
-            if indice == len(fechas_catalogo):
-                indice -= 1
+            # =====================================================
+            # 1) DELTA DIRECTO (tiempo absoluto EVT)
+            # =====================================================
+            idx = bisect.bisect_left(fechas_catalogo, evento_evt["dt"])
 
-            fecha_cat_directo, nombre_cat_directo = eventos_catalogo[indice]
+            candidatos = []
+            if idx < len(fechas_catalogo):
+                candidatos.append(idx)
+            if idx - 1 >= 0:
+                candidatos.append(idx - 1)
+
+            idx_mejor = min(
+                candidatos,
+                key=lambda i: abs(
+                    (fechas_catalogo[i] - evento_evt["dt"]).total_seconds()
+                )
+            )
+
+            fecha_cat_directo, nombre_cat_directo = eventos_catalogo[idx_mejor]
             delta_directo = fecha_cat_directo - evento_evt["dt"]
 
-            # ==========================
-            # Paso 2: decidir referencia
-            # ==========================
+            # =====================================================
+            # 2) DECISIÓN: ¿usar anclaje?
+            # =====================================================
             if abs(delta_directo.total_seconds()) <= umbral_segundos:
-                # Delta válido: usar tiempo absoluto
+                # Tiempo EVT confiable
+                delta_relativo = timedelta(0)
+                fecha_estimado = evento_evt["dt"]
+
+                fecha_cat = fecha_cat_directo
                 nombre_cat = nombre_cat_directo
                 delta_final = delta_directo
 
             else:
-                # Delta muy grande: usar tiempo relativo + referencia SIS ancla
+                # Tiempo EVT no confiable → usar anclaje
                 delta_relativo = evento_evt["dt"] - fecha_evt_ancla
                 fecha_estimado = fecha_sis_ancla + delta_relativo
 
-                indice_ref = bisect.bisect_left(fechas_catalogo, fecha_estimado)
-                if indice_ref == len(fechas_catalogo):
-                    indice_ref -= 1
+                idx = bisect.bisect_left(fechas_catalogo, fecha_estimado)
 
-                fecha_cat_ref, nombre_cat = eventos_catalogo[indice_ref]
-                delta_final = fecha_cat_ref - fecha_estimado
+                candidatos = []
+                if idx < len(fechas_catalogo):
+                    candidatos.append(idx)
+                if idx - 1 >= 0:
+                    candidatos.append(idx - 1)
 
+                idx_mejor = min(
+                    candidatos,
+                    key=lambda i: abs(
+                        (fechas_catalogo[i] - fecha_estimado).total_seconds()
+                    )
+                )
+
+                fecha_cat, nombre_cat = eventos_catalogo[idx_mejor]
+                delta_final = fecha_cat - fecha_estimado
+
+            # =====================================================
+            # SALIDA DETALLADA
+            # =====================================================
             lineas.append(
-                f"{evento_evt['evt']:10s} → {nombre_cat:20s} Δt = {delta_final}"
+                f"{evento_evt['evt']:10s} | "
+                f"Δdir={delta_directo} | "
+                f"Δrel={delta_relativo} | "
+                f"T_est={fecha_estimado} | "
+                f"{nombre_cat:20s} | Δ={delta_final}"
             )
 
         self.txt_sync.setText("\n".join(lineas))
 
 
 
-
-
-    def verificar_sincronizacion___(self):
-        if not self.eventos_evt:
-            return
-
-        evento_referencia = self.eventos_evt[self.indice_evt]
-        codigo_canal = evento_referencia["cc"]
-
-        eventos_evt_canal = [
-            e for e in self.eventos_evt if e["cc"] == codigo_canal
-        ]
-        eventos_catalogo = self.catalogos_por_canal.get(codigo_canal, [])
-
-        if not eventos_catalogo:
-            self.txt_sync.setText("No hay catálogo para este período.")
-            return
-
-        fechas_catalogo = [x[0] for x in eventos_catalogo]
-
-        lineas = [
-            f"Período: {codigo_canal}",
-            "-" * 70
-        ]
-
-        for evento_evt in eventos_evt_canal:
-            if evento_evt["evt"] in self.eventos_ruido:
-                continue
-
-            indice = bisect.bisect_left(fechas_catalogo, evento_evt["dt"])
-            if indice == len(fechas_catalogo):
-                indice -= 1
-
-            fecha_cat, nombre_cat = eventos_catalogo[indice]
-            delta = fecha_cat - evento_evt["dt"]
-
-            lineas.append(
-                f"{evento_evt['evt']:10s} → {nombre_cat:20s} Δt = {delta}"
-            )
-
-        self.txt_sync.setText("\n".join(lineas))
 
     # -------------------------------------------------------------------------
     def marcar_ruido(self, estado):
