@@ -145,6 +145,7 @@ class FileMonitorThread(QThread):
 def verificar_drives_virtuales(responsable_evento):
     responsables = os.path.abspath(os.path.join(ruta_proyecto,'datos','responsables.csv'))
     responsables=lectura_archivo(responsables)
+   
     for responsable in responsables:
         if responsable[0]==responsable_evento:
             lista_drives=responsable[1:]
@@ -834,14 +835,14 @@ class Procesar_evento(QWidget):
 
         aux = int(self.evento_procesar[1][-10:-4])
         if aux < 120000:
-            indice_hora = 1
+            indice_hora = 0
         elif aux < 180000:
-            indice_hora = 2
+            indice_hora = 1
         else:
-            indice_hora = 3
+            indice_hora = 2
 
         horario = ["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
-        self.responsable_evento = self.responsables[indice_hora][0]
+        self.responsable_evento = self.responsables[indice_hora+1][0]
         self.ui.Cmb_bx_tipo_evento.setCurrentText(self.evento_procesar[2])
         self.ui.txt_responsables.setText(self.responsable_evento)
         self.ui.txt_horario.setText(horario[indice_hora])
