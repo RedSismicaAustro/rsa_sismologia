@@ -273,12 +273,14 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             self.lista_archivos_mseed = []                         # limpia lista por estación
 
             # ¿Existe el directorio de la estación?
-            if nombre_dir_estacion not in dir_aux:
+            print(nombre_dir_estacion[:5])
+            if nombre_dir_estacion[:5] not in dir_aux:# COn esto puedo poner cualquier ruta en digitales.csv
                 print(f"Estación {nombre_dir_estacion}: no existe carpeta dentro de 'Datos Estaciones'")
                 print(f"Estacion {nombre_dir_estacion} no tiene registros para este día.")
                 continue
 
             ruta_est = os.path.join(self.directorio_binario, nombre_dir_estacion)
+            print(ruta_est )
             try:
                 arch_aux = os.listdir(ruta_est)
             except Exception as e:
@@ -320,6 +322,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             prev_set = set(previos)
 
             # Detectados actuales (basenames)
+            print("Archivos encontrados:", self.lista_archivos_mseed)
             detectados_base = [os.path.basename(p) for p in self.lista_archivos_mseed]
             detectados_base = list(dict.fromkeys([p for p in detectados_base if p]))
 
@@ -356,6 +359,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 ordenados = []
 
             # Cargar base (solo si existe el unido)
+            print("Archivo:   ",archivo_unido)
             if os.path.exists(archivo_unido):
                 try:
                     st_base = obspy.read(archivo_unido)
