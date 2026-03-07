@@ -40,7 +40,7 @@ import calendar
 import shutil
 from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,VentanaProgreso
 import pandas as pd
-
+from rsa_dominio import obtenerTraza
 
 def leer_mseed(archivo, tipo, t_inicio=None, t_final=None):
     directorios = obtener_directorios(archivo)

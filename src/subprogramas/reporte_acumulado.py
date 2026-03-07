@@ -20,32 +20,21 @@ if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
 
-
+from rsa_io import lectura_resumen,lectura_archivo,escritura_archivo
+from rsa_dominio import correccion
 from metodos_graficos_rsa import reporte_resumen_modos
-from metodos_rsa import lectura_resumen,parametros_estaciones,escritura_archivo,lectura_archivo,correccion,cargar_dia,obtener_datos_reporte,extraer_hasta_directorio
+from metodos_rsa import parametros_estaciones,cargar_dia,obtener_datos_reporte,extraer_hasta_directorio
 from metodos_gestion import obtener_directorios
-#from reportlab.graphics.charts.linecharts import HorizontalLineChart
-from reportlab.graphics.shapes import *
-from reportlab.graphics import shapes
-from reportlab.graphics.charts.textlabels import Label
-from reportlab.lib.colors import *
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.graphics.shapes import Drawing, Rect
-from reportlab.graphics.charts.barcharts import VerticalBarChart
+
 import csv
 from PyQt5 import uic, QtWidgets#Importamos módulo uic y Qtwidgets
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, time, timedelta
 from PyQt5.QtCore import QDate
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QMessageBox,QFileDialog)
-import obspy
+from PyQt5.QtWidgets import ( QMainWindow, QMessageBox,QFileDialog)
 import sys
-from pathlib import Path
 import xml.etree.ElementTree as ET
 import copy
-#import time
 from obspy import read
-import numpy as np
 import calendar
 import os
 from PyQt5.QtCore import pyqtSignal

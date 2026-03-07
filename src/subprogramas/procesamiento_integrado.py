@@ -19,12 +19,17 @@ ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
+from rsa_io import leer_mseed,conversion_mseed,lectura_resumen,lectura_archivo,escritura_archivo,copiar_archivos,num_reportes
+from rsa_dominio import correccion,calidad_estacion,obtenerTraza,punto_fijo_a_punto_flotante,convertir_lista,decimal_a_hexadecimal,obtener_caracter_hexadecimal,intervalo_reporte
+from rsa_procesamiento import lectura_rsa,archivos_fast,verificar_coincidencias,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados,extraer_dia
+
 
 from metodos_gis_rsa import widget_grafico_mpl
-from metodos_rsa import leer_mseed,parametros_estaciones,grafico_evento_int,archivos_fast,verificar_coincidencias
-from metodos_rsa import copiar_archivos,lectura_archivo,escritura_archivo,guardar_informacion_diaria,guardar_intento,ordenar_y_eliminar_duplicados,insertar_evento_otras_redes,cargar_dia,cargar_evento
+from metodos_rsa import parametros_estaciones,grafico_evento_int,insertar_evento_otras_redes,cargar_dia,cargar_evento
 from metodos_gestion import obtener_directorios
 from metodos_reportes_individuales import generar_reporte_sismo
+
+
 #from metodos_reportes_individuales import insertar_evento_otras_redes
 from PyQt5.QtWidgets import (QMainWindow,QMessageBox,QDialog,QLabel,QCheckBox,QPushButton,QComboBox,QSpinBox,QTextEdit,QVBoxLayout,QWidget,QRadioButton)
 from PyQt5 import uic

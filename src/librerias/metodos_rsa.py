@@ -37,7 +37,7 @@ import numpy as np
 import scipy.signal as signal
 from datetime import date
 import calendar
-from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,VentanaProgreso
+from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios
 import pandas as pd
 
 # metodos_rsa.py (archivo puente temporal)
@@ -46,10 +46,16 @@ import pandas as pd
 #from rsa_dominio import correccion,calidad_estacion,obtenerTraza,punto_fijo_a_punto_flotante,convertir_lista,decimal_a_hexadecimal,obtener_caracter_hexadecimal,intervalo_reporte
 #from rsa_procesamiento import lectura_rsa,archivos_fast,verificar_coincidencias,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados,extraer_dia
 
+#from rsa_io import *
+#from rsa_dominio import *
+from rsa_procesamiento import *
 
-from .rsa_io import *
-from .rsa_dominio import *
-from .rsa_procesamiento import *
+from rsa_io import leer_mseed,conversion_mseed,lectura_archivo,escritura_archivo
+
+#from rsa_procesamiento import lectura_rsa,ordenar_y_eliminar_duplicados
+
+
+
 
 IDX_INDICE,IDX_ANIO,IDX_MES,IDX_DIA,IDX_HORA,IDX_MINUTO,IDX_SEGUNDO,\
 IDX_LATITUD,IDX_LONGITUD,IDX_PROFUNDIDAD,IDX_RMS,IDX_E_X,IDX_E_Y,IDX_E_0,\

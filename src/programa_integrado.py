@@ -37,8 +37,7 @@ from subprogramas.reporte_acumulado import Reporte_periodo
 from subprogramas.inicio import Inicio_proceso
 from subprogramas.otras_redes import Otras_redes
 from datetime import datetime
-from metodos_rsa import extraer_dia
-
+from rsa_procesamiento import extraer_dia
 
 class VentanaPrincipal(QMainWindow):
     def __init__(self):

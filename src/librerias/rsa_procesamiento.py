@@ -45,7 +45,7 @@ import pandas as pd
 from rsa_io import leer_mseed,conversion_mseed,lectura_resumen,lectura_archivo,escritura_archivo,copiar_archivos,num_reportes
 from rsa_dominio import *
 from rsa_procesamiento import *
-
+from metodos_rsa import extraccion
 
 IDX_INDICE,IDX_ANIO,IDX_MES,IDX_DIA,IDX_HORA,IDX_MINUTO,IDX_SEGUNDO,\
 IDX_LATITUD,IDX_LONGITUD,IDX_PROFUNDIDAD,IDX_RMS,IDX_E_X,IDX_E_Y,IDX_E_0,\
@@ -577,6 +577,7 @@ def extraer_dia(archivo, responsable, bandera_todo):
     # ----------------------------------------------------------------------
     # 1) Selección de archivo fuente y lecturas base
     # ----------------------------------------------------------------------
+    print("Entro a extraer dia")
     directorios = obtener_directorios(archivo)
 
     # Elegimos primero el archivo correcto y recién luego leemos (evita desfasajes)
