@@ -19,12 +19,17 @@ ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
+from rsa_io import leer_mseed,conversion_mseed,lectura_resumen,lectura_archivo,escritura_archivo,copiar_archivos,num_reportes
+from rsa_dominio import correccion,calidad_estacion,obtenerTraza,punto_fijo_a_punto_flotante,convertir_lista,decimal_a_hexadecimal,obtener_caracter_hexadecimal,intervalo_reporte
+from rsa_procesamiento import lectura_rsa,archivos_fast,verificar_coincidencias,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados,extraer_dia
+
 
 from metodos_gis_rsa import widget_grafico_mpl
-from metodos_rsa import leer_mseed,parametros_estaciones,grafico_evento_int,archivos_fast,verificar_coincidencias
-from metodos_rsa import copiar_archivos,lectura_archivo,escritura_archivo,guardar_informacion_diaria,guardar_intento,ordenar_y_eliminar_duplicados,insertar_evento_otras_redes,cargar_dia,cargar_evento
+from metodos_rsa import parametros_estaciones,grafico_evento_int,insertar_evento_otras_redes,cargar_dia,cargar_evento
 from metodos_gestion import obtener_directorios
 from metodos_reportes_individuales import generar_reporte_sismo
+
+
 #from metodos_reportes_individuales import insertar_evento_otras_redes
 from PyQt5.QtWidgets import (QMainWindow,QMessageBox,QDialog,QLabel,QCheckBox,QPushButton,QComboBox,QSpinBox,QTextEdit,QVBoxLayout,QWidget,QRadioButton)
 from PyQt5 import uic
@@ -145,6 +150,7 @@ class FileMonitorThread(QThread):
 def verificar_drives_virtuales(responsable_evento):
     responsables = os.path.abspath(os.path.join(ruta_proyecto,'datos','responsables.csv'))
     responsables=lectura_archivo(responsables)
+   
     for responsable in responsables:
         if responsable[0]==responsable_evento:
             lista_drives=responsable[1:]
@@ -834,14 +840,14 @@ class Procesar_evento(QWidget):
 
         aux = int(self.evento_procesar[1][-10:-4])
         if aux < 120000:
-            indice_hora = 1
+            indice_hora = 0
         elif aux < 180000:
-            indice_hora = 2
+            indice_hora = 1
         else:
-            indice_hora = 3
+            indice_hora = 2
 
         horario = ["00:00 - 12:00", "12:00 - 18:00", "18:00 - 24:00"]
-        self.responsable_evento = self.responsables[indice_hora][0]
+        self.responsable_evento = self.responsables[indice_hora+1][0]
         self.ui.Cmb_bx_tipo_evento.setCurrentText(self.evento_procesar[2])
         self.ui.txt_responsables.setText(self.responsable_evento)
         self.ui.txt_horario.setText(horario[indice_hora])

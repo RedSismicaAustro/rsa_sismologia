@@ -22,8 +22,14 @@ if ruta_datos not in sys.path:
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from metodos_rsa import leer_mseed,grafico_evento_int,calidad_estacion,cargar_evento,cargar_dia,escritura_archivo,lectura_archivo
-from metodos_rsa import insertar_evento_otras_redes,Guardar_dia,ordenar_y_eliminar_duplicados
+from rsa_io import leer_mseed,conversion_mseed,lectura_resumen,lectura_archivo,escritura_archivo,copiar_archivos,num_reportes
+from rsa_dominio import correccion,calidad_estacion,obtenerTraza,punto_fijo_a_punto_flotante,convertir_lista,decimal_a_hexadecimal,obtener_caracter_hexadecimal,intervalo_reporte
+from rsa_procesamiento import lectura_rsa,archivos_fast,verificar_coincidencias,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados,extraer_dia
+
+
+
+
+from metodos_rsa import grafico_evento_int,cargar_evento,cargar_dia,insertar_evento_otras_redes,Guardar_dia
 from metodos_graficos_rsa import reporte_resumen_modos
 from metodos_gestion import parametros_estaciones,obtener_directorios
 from metodos_reportes_individuales import generar_reporte_sismo,generar_reporte_acelerograma

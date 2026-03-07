@@ -25,18 +25,19 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
                              QLabel, QMessageBox, QCheckBox)
 from PyQt5 import uic
 from metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,lectura_archivo,
-                         escritura_archivo,filtro_evento,extraer_dia)
+                         escritura_archivo,filtro_evento)
+from rsa_procesamiento import extraer_dia
 
-from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios,VentanaProgreso
-import struct
+
+from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
+
 datos_sismo={}
-import copy
 from PyQt5.QtWidgets import (QDialog,QSpinBox)
 
 
 from datetime import datetime
-from PyQt5.QtCore import QDate
-import csv
+
+
 import os
 datos_sismo={}
 #import obspy.realtime #obspy.realtime.signal.offset
@@ -45,7 +46,7 @@ import gc
 #from obspy import read, UTCDateTime
 from obspy import Stream
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtCore import QTimer
+
 
 import matplotlib.pyplot as plt
 
