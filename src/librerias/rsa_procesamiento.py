@@ -17,35 +17,15 @@ ruta_datos = os.path.abspath(os.path.join(ruta_proyecto,'datos'))
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
-import re
+import numpy as np
 import csv
-from PyQt5.QtWidgets import QMessageBox
-from PyQt5.QtCore import QDate
-import matplotlib
-matplotlib.use('Qt5Agg')  # Asegúrate de que esto está antes de importar matplotlib.pyplot
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator    
-import subprocess
-from obspy import read, Trace, Stream
 from datetime import datetime, timedelta
 import sys
 import os
 import xml.etree.ElementTree as ET
-import struct
-
-import numpy as np
-import scipy.signal as signal
-from datetime import date
-import calendar
-from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,VentanaProgreso
-import pandas as pd
-
-# metodos_rsa.py (archivo puente temporal)
-
-from rsa_io import leer_mseed,conversion_mseed,lectura_resumen,lectura_archivo,escritura_archivo,copiar_archivos,num_reportes
-from rsa_dominio import *
-from rsa_procesamiento import *
-from metodos_rsa import extraccion
+from metodos_gestion import obtener_directorios,VentanaProgreso
+from rsa_io import lectura_archivo,escritura_archivo
+from rsa_utilidades import extraccion,codigos,ubicacion,agregar_evento
 
 IDX_INDICE,IDX_ANIO,IDX_MES,IDX_DIA,IDX_HORA,IDX_MINUTO,IDX_SEGUNDO,\
 IDX_LATITUD,IDX_LONGITUD,IDX_PROFUNDIDAD,IDX_RMS,IDX_E_X,IDX_E_Y,IDX_E_0,\
@@ -714,7 +694,92 @@ def extraer_dia(archivo, responsable, bandera_todo):
         # Asegura cierre de la ventana incluso si hay una excepción intermedia
         ventana.cerrar()
 
+def espectro_respuesta(acelerograma, dt,factor,directorio):
+    """
+    Calcula el espectro de respuesta de un sistema de un grado de libertad (SDOF)
+    usando el método de Newmark a partir de un archivo mseed.
 
+    Args:
+        acelerogrma:  Datos desde el mseed
+        dt:Delta t del acelerograma
+        factor: factor de conversión par avolverlo en g
+
+    Returns:
+        tuple: (T, Spa, Spv, Sd, Sa, Sv)
+            - T: Periodos del espectro.
+            - Spa: Pseudoaceleración (GAL).
+            - Spv: Pseudovelocidad (cm/s).
+            - Sd: Desplazamiento máximo (cm).
+            - Sa: Aceleración máxima (cm/s²).
+            - Sv: Velocidad máxima (cm/s).
+    """
+    
+    damp=0.05   #damp (float): Amortiguamiento adimensional. Default: 0.05 (5%).
+    Tmin=0.02   #Tmin (float): Periodo mínimo para el espectro (s). Default: 0.02.
+    Tmax=4.0    #Tmax (float): Periodo máximo para el espectro (s). Default: 4.0.
+    Ax_g = acelerograma * factor/980.  # Suponemos que el factor convierte a m/s²
+
+    # Convertir a fuerza externa
+    m = 1  # Masa normalizada
+    p = -m * Ax_g
+
+    # Selección del método según dt
+    beta = 1/4 if dt > 0.005 else 1/6
+    gamma = 0.5  # Método de aceleración promedio
+
+    # Definir periodos T
+    deltaT = 0.05
+    T = np.arange(Tmin, Tmax + deltaT, deltaT)
+
+    # Inicialización de resultados
+    nT = len(T)
+    ls = len(Ax_g)
+    Sd = np.zeros(nT)
+    Sv = np.zeros(nT)
+    Sa = np.zeros(nT)
+    Spd = np.zeros(nT)
+    Spv = np.zeros(nT)
+    Spa = np.zeros(nT)
+
+    # Cálculo para cada periodo T
+    for j in range(nT):
+        wn = 2 * np.pi / T[j]
+        k = m * wn**2
+        c = 2 * m * wn * damp
+
+        # Inicializar variables del oscilador
+        u = np.zeros(ls)
+        udot = np.zeros(ls)
+        uddot = np.zeros(ls)
+
+        # Calcular parámetros para Newmark
+        khat = k + gamma / beta / dt * c + m / beta / dt**2
+        a = m / beta / dt + gamma * c / beta
+        b = m / (2 * beta) + dt * (gamma / (2 * beta) - 1) * c
+
+        # Resolver la ecuación para cada paso de tiempo
+        for i in range(1, ls):
+            dp = p[i] - p[i - 1]
+            du = (dp + a * udot[i - 1] + b * uddot[i - 1]) / khat
+            dudot = gamma / beta / dt * du - gamma / beta * udot[i - 1] + dt * (1 - gamma / (2 * beta)) * uddot[i - 1]
+            duddot = du / (beta * dt**2) - udot[i - 1] / (beta * dt) - uddot[i - 1] / (2 * beta)
+
+            # Actualizar variables
+            u[i] = u[i - 1] + du
+            udot[i] = udot[i - 1] + dudot
+            uddot[i] = uddot[i - 1] + duddot
+
+        # Calcular valores máximos
+        Sd[j] = np.max(np.abs(u))
+        Sv[j] = np.max(np.abs(udot))
+        Sa[j] = np.max(np.abs(uddot))
+
+        # Cálculo de pseudocantidades
+        Spd[j] = Sd[j]
+        Spv[j] = 2 * np.pi * Spd[j] / T[j]
+        Spa[j] = 2 * np.pi * Spv[j] / T[j]
+
+    return T, Spa, Spv, Sd, Sa, Sv
 
 
 

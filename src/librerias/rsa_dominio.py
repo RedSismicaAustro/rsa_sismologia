@@ -18,12 +18,6 @@ if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
 
-
-
-
-
-
-
 import matplotlib
 matplotlib.use('Qt5Agg')  # Asegúrate de que esto está antes de importar matplotlib.pyplot
   
@@ -31,23 +25,15 @@ from obspy import UTCDateTime, Trace
 from datetime import  timedelta
 import sys
 import os
-
-
 import copy
 import numpy as np
-
-
 import calendar
-
 from metodos_gestion import parametros_estaciones
 
 # metodos_rsa.py (archivo puente temporal)
 
-
 import sys
 import os
-
-
 
 IDX_INDICE,IDX_ANIO,IDX_MES,IDX_DIA,IDX_HORA,IDX_MINUTO,IDX_SEGUNDO,\
 IDX_LATITUD,IDX_LONGITUD,IDX_PROFUNDIDAD,IDX_RMS,IDX_E_X,IDX_E_Y,IDX_E_0,\

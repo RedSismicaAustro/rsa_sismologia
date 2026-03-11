@@ -24,12 +24,12 @@ from matplotlib.figure import Figure
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, 
                              QLabel, QMessageBox, QCheckBox)
 from PyQt5 import uic
-from metodos_rsa import (obtencion_hora,leer_mseed,grafico_evento_int,lectura_archivo,
-                         escritura_archivo,filtro_evento)
+from metodos_rsa import (leer_mseed,grafico_evento_int,lectura_archivo,
+                         filtro_evento)
 from rsa_procesamiento import extraer_dia
+from rsa_io import escritura_archivo
 
-
-from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
+from metodos_gestion import obtencion_hora,lectura_eventos,parametros_estaciones,obtener_directorios
 
 datos_sismo={}
 from PyQt5.QtWidgets import (QDialog,QSpinBox)

@@ -20,7 +20,6 @@ if ruta_librerias not in sys.path:
 
 
 import geopandas as gpd
-import pandas as pd
 import os
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, Polygon

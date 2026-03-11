@@ -16,32 +16,14 @@ ruta_datos = os.path.abspath(os.path.join(ruta_proyecto,'datos'))
 # Insertar la ruta al inicio del sys.path
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
-
-import re
 import csv
-from PyQt5.QtWidgets import QMessageBox
-from PyQt5.QtCore import QDate
-import matplotlib
-matplotlib.use('Qt5Agg')  # Asegúrate de que esto está antes de importar matplotlib.pyplot
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator    
-import subprocess
-from obspy import UTCDateTime, read, Trace, Stream
-from datetime import datetime, timedelta
-import sys
+from obspy import UTCDateTime, read,  Stream
 import os
-import xml.etree.ElementTree as ET
-import struct
-
 import numpy as np
-import scipy.signal as signal
-from datetime import date
-import calendar
 import shutil
-from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios,VentanaProgreso
-import pandas as pd
+from metodos_gestion import obtencion_hora,parametros_estaciones,obtener_directorios
 from rsa_dominio import obtenerTraza
-
+import xml.etree.ElementTree as ET
 def leer_mseed(archivo, tipo, t_inicio=None, t_final=None):
     directorios = obtener_directorios(archivo)
     parametros = parametros_estaciones()
@@ -257,5 +239,72 @@ def num_reportes(directorio):
                     contador_24=contador_24+1
     return (contador_12,contador_18,contador_24)
 
+def Guardar_dia(eventos_reporte,catalogo,eventos,root,responsables,resumen,directorios):#self.eventos_reporte,self.catalogo,self.eventos,self.root,self.responsable,self.directorios
+    #return eventos_reporte,catalogo,eventos,vector,canales_eventos_dia,root,variable_responsables,resumen
+    escritura_archivo(directorios['archivo_reporte'],eventos_reporte)        
+    escritura_archivo(directorios['archivo_catalogo'],catalogo)
+    escritura_archivo(directorios['archivo_csv'],eventos)
+    escritura_archivo(directorios['archivo_responsables'],responsables)
+    escritura_archivo(directorios['archivo_resumen'],resumen)
+    # Crear el objeto de árbol y agregar la raíz
+    tree = ET.ElementTree(root)
+    # Escribir el archivo XML
+    tree.write(directorios['archivo_xml'], encoding="utf-8", xml_declaration=True)
 
+
+def extraer_hasta_directorio(ruta_completa, nombre_directorio):
+    partes = Path(ruta_completa).parts
+    if nombre_directorio in partes:
+        indice = partes.index(nombre_directorio)
+        ruta_recortada = Path(*partes[:indice + 1])
+        return str(ruta_recortada) + '/'
+    else:
+        return ''
+          
+
+
+#########################################################################################    
+# Método lectura_eventos(archivo)
+# Depurado; archivo es un parámetro para poder ubicar los directorios de almacenamiento.
+# Tipicamente está en la dirección G:\Mi unidad\DIA en la computadora de procesamiento 
+# y tiene la forma AAMMDDhhmmss sin extensión.
+# la fuente es el archivo puntos.csv generado en el surfer
+# la respuesta es una tupla de dos elementos, un mensaje y la lista con las horas 
+# aproximadas de los eventos
+#########################################################################################
+def lectura_eventos(archivo):
+    hora_sismo=[]
+    contador=0
+    directorios=obtener_directorios(archivo)
+    archivo_puntos=directorios['Directorio_base']+"/puntos.csv"
+    try:
+        auxiliar=open(archivo_puntos)
+        auxiliar.close
+        with open(archivo_puntos,newline='') as f:
+            datos=csv.reader(f,delimiter=',',quotechar=';')
+            for r in datos:
+                contador=contador+1
+                if contador==2:
+                    x0=float(r[0])
+                    y0=float(r[1])
+                if contador==3:
+                    x1=float(r[0])
+                    y1=float(r[1])
+                if contador > 3:
+                    xn=float(r[0])
+                    yn=float(r[1])
+                    an=round(239*(yn-y0)/(y1-y0)+0.4)
+                    cn=6*(xn-x0)/(x1-x0)
+                    bn=an*6+cn
+                    tiempo=bn/1440
+                    tiempo=int(tiempo*86400*64-20)
+                    hora_sismo.append(tiempo)
+        hora_sismo.sort()
+        for i in range(0,len(hora_sismo)):
+            hora_sismo[i]=int(hora_sismo[i]/64)*64
+        text="Lectura completada"
+    except FileNotFoundError:
+        text="Listado de eventos no encontrado\n\nVerificar Archivos\n\noescoger otro día"
+        hora_sismo=0
+    return(text,hora_sismo)
 

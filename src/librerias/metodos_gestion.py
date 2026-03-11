@@ -1,4 +1,3 @@
-import sys
 import os
 from pathlib import Path
 def extraer_hasta_directorio(ruta_completa, nombre_directorio):
@@ -18,7 +17,8 @@ import csv
 import json
 import obspy
 import subprocess
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar,QMessageBox
+from PyQt5.QtCore import Qt, QCoreApplication
 
 def lectura_archivo(archivo):
     """
@@ -524,9 +524,6 @@ def habilitar_escritura(ruta_archivo):
     except Exception as e:
         print(f"Ha ocurrido un error: {e}")
 
-from PyQt5.QtWidgets import QApplication, QMessageBox
-import sys
-
 def revisar_csv(eventos):
     """
     Ordena una lista de listas por una columna específica (nombre de archivo),
@@ -543,7 +540,6 @@ def revisar_csv(eventos):
     indice_columna_archivo = 1  # Columna de archivos (.sis)
     indice_columna_tipo_evento = 2  # Columna de tipo de evento (columna 3)
     # Creamos la aplicación Qt (es necesario para los diálogos)
-    app = QApplication(sys.argv)
     # Usamos un diccionario para eliminar duplicados, conservando el primer registro encontrado
     eventos_unicos = {}
     for fila in eventos:
@@ -586,9 +582,6 @@ def revisar_csv(eventos):
     # Retornamos la lista ajustada y ordenada
     print("Saliendo revisar csv")
     return eventos_filtrados
-
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar
-from PyQt5.QtCore import Qt, QCoreApplication
 
 class VentanaProgreso(QDialog):
     def __init__(self, mensaje="Procesando...", maximo=100, parent=None):

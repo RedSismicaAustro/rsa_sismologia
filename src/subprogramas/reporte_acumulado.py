@@ -22,8 +22,9 @@ if ruta_datos not in sys.path:
 
 from rsa_io import lectura_resumen,lectura_archivo,escritura_archivo
 from rsa_dominio import correccion
+from rsa_utilidades import obtener_datos_reporte
 from metodos_graficos_rsa import reporte_resumen_modos
-from metodos_rsa import parametros_estaciones,cargar_dia,obtener_datos_reporte,extraer_hasta_directorio
+from metodos_rsa import parametros_estaciones,cargar_dia,extraer_hasta_directorio
 from metodos_gestion import obtener_directorios
 
 import csv

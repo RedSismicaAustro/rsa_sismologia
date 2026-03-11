@@ -22,19 +22,20 @@ if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
 import re
-import time
 from PyQt5 import uic, QtWidgets
-from PyQt5.QtCore import QObject, QDate
+from PyQt5.QtCore import QDate
 import shutil
-import struct
 import numpy as np
 from pathlib import Path as _Path
-from metodos_rsa import loc_cabecera, imprimir_plt, conversion_mseed, leer_mseed, lectura_archivo, escritura_archivo
+
+from rsa_io import leer_mseed,conversion_mseed,lectura_archivo,escritura_archivo
+
+from rsa_utilidades import loc_cabecera
 from metodos_gestion import parametros_estaciones, obtencion_hora, obtener_directorios
 from datetime import datetime
 import obspy
-import csv
-from PyQt5.QtCore import QThread, pyqtSignal, Qt
+
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import ( QMainWindow, QMessageBox, QFileDialog )
 from PyQt5.QtCore import QCoreApplication
 
@@ -289,7 +290,6 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
     import csv
     import re
     import numpy as np
-    from pathlib import Path
     from PyQt5.QtCore import QCoreApplication
 
     # ------------------- Constantes de formato --------------------------- #
@@ -368,12 +368,14 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
     else:
         fila = filas[-1]
         id_evt_csv = extraer_id_evento_desde_ruta_local(fila[0]) if len(fila) > 0 else ""
-        id_dia_csv = (id_evt_csv or "")[:8]
-        # Solo reanudar si es el MISMO DÍA; si no, arrancar desde cero (puntero = '0')
-        if id_evt_csv and id_dia_csv == id_dia_bin:
+
+
+        # Solo reanudar si es exactamente el mismo archivo binario
+        if id_evt_csv and id_evt_csv == id_evt_bin:
             fila_sel = fila
         else:
             fila_sel = [id_evt_bin or archivo_binario, '0', '00000', '0']
+
         referencias = [['Archivo', 'puntero', 'segundo_m', 'contador_s'], fila_sel]
     try:
         puntero_guardado = int(referencias[1][1])
@@ -674,6 +676,122 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.showDate(self.date)
 
     def Abrir_archivo(self):
+        lista_archivos = []
+        directorio_origen = 'R:'
+
+        try:
+            archivos_auxiliar = os.listdir(directorio_origen)
+
+            # aceptar cualquier archivo con formato AAMMDDhhmmss y sin extensión
+            archivos_filtrados = [
+                f for f in archivos_auxiliar
+                if re.fullmatch(r'\d{12}', Path(f).stem)
+                and Path(f).suffix == ''
+            ]
+
+            for archivo_copiar in archivos_filtrados:
+
+                # solo archivos del día seleccionado
+                if archivo_copiar[0:6] == self.dia[2:]:
+
+                    arch_aux = '20' + archivo_copiar
+                    archivo_origen = 'R:/' + archivo_copiar
+                    archivo_destino = self.directorio_trabajo + '20' + archivo_copiar
+
+                    # corrección del caso AAMMDD235959 -> AAMMDD000000
+                    if archivo_copiar[6:12] == "235959":
+                        archivo_destino = self.directorio_trabajo + '20' + archivo_copiar[0:6] + "000000"
+                        arch_aux = '20' + archivo_copiar[0:6] + "000000"
+
+                    lista_archivos.append(arch_aux)
+                    mensaje_lbl(
+                        self.Lbl_Mensajes,
+                        "Copiando archivos:\n " + archivo_origen + ' en ' + archivo_destino,
+                        True
+                    )
+                    shutil.copy(archivo_origen, archivo_destino)
+
+        except FileNotFoundError:
+            auxiliar = self.dia + '000000'
+            lista_archivos.append(auxiliar)
+
+        lista_archivos.sort()
+        mensaje_lbl(self.Lbl_Mensajes, str(lista_archivos), False)
+
+        self.inicializar_()
+        self.archivo = self.directorio_trabajo + (lista_archivos[0] if lista_archivos else self.dia + '000000')
+        self.definir_dia()
+
+        dia_actual, fila_analogico = verificar_o_resetear_por_dia(
+            self.directorio_trabajo,
+            self.directorio_registros,
+            self.archivo,
+            self.Lbl_Mensajes
+        )
+
+        try:
+            contador_s = int(fila_analogico[3]) if len(fila_analogico) > 3 else 0
+        except Exception:
+            contador_s = 0
+
+        dt0 = obtencion_hora(self.archivo)
+        t0_esperado = obspy.UTCDateTime(dt0)
+        carpeta_inconsistentes = os.path.join(self.directorio_registros, "_inconsistentes")
+
+        for i in range(0, 16):
+            if str(self.hab_canal[i]) != "0":
+                hora_string_primera = dt0.strftime('%y%m%d_%H%M%S')
+                nombreMseed_destino = os.path.join(
+                    self.directorio_registros,
+                    f"{self.nombre_canal[i]}_20{hora_string_primera}.mseed"
+                )
+                verificar_mseed_contra_analogico(
+                    nombreMseed_destino,
+                    t0_esperado,
+                    contador_s,
+                    self.Lbl_Mensajes,
+                    carpeta_inconsistentes=carpeta_inconsistentes
+                )
+
+        for archivo_ in lista_archivos:
+            self.inicializar_()
+            self.archivo = self.directorio_trabajo + archivo_
+            self.definir_dia()
+            self.archivo_binario = self.directorio_trabajo + archivo_
+
+            if not os.path.exists(self.archivo_binario):
+                nombre_archivo = self.archivo_binario[-12:]
+                self.archivo_binario, _ = QFileDialog.getOpenFileName(
+                    None, "Seleccionar archivo", "", f"{nombre_archivo} ({nombre_archivo})"
+                )
+
+            self.canal, huecos = Leer_binario_comun(
+                self.directorio_trabajo,
+                self.archivo_binario,
+                self.progressBar,
+                self.Lbl_Mensajes
+            )
+
+            mensaje_lbl(self.Lbl_Mensajes, "Lectura terminada, \n Segundos faltantes " + str(huecos), True)
+            self.Btn_Mseed()
+
+        for i in range(1, len(lista_archivos)):
+            self.unir_mseed(lista_archivos[0], lista_archivos[i])
+
+        if lista_archivos:
+            self.archivo = self.directorio_trabajo + lista_archivos[0]
+            self.fecha_ = obtencion_hora(self.archivo)
+            mensaje_lbl(self.Lbl_Mensajes, self.archivo, False)
+            self.trCanal = leer_mseed(self.archivo, 0)
+            self.imprimir_png()
+            mensaje_lbl(self.Lbl_Mensajes, "Terminado:", True)
+        else:
+            self.archivo = self.directorio_trabajo + self.dia + '000000'
+            mensaje_lbl(self.Lbl_Mensajes, "No hay registros para ese día..\nArchivo buscado: " + self.archivo, True)
+
+
+
+    def Abrir_archivo__(self):
         lista_archivos = []
         directorio_origen = 'R:'
         try:

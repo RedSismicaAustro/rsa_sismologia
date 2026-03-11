@@ -45,7 +45,14 @@ if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
 # ==== Librerías del proyecto / terceros ======================================
-from metodos_rsa import obtenerTraza, lectura_archivo, escritura_archivo
+from rsa_io import lectura_archivo,escritura_archivo
+from rsa_dominio import obtenerTraza
+
+
+
+
+
+
 from metodos_gestion import parametros_estaciones, obtener_directorios
 
 import numpy as np
@@ -266,21 +273,17 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             if self.estacion_habilitada[num_estacion] != '1':
                 print(f"Estación {self.nombre_estacion[num_estacion]}, {self.codigo_estacion[num_estacion]} no habilitada")
                 continue
-            print(f"Estación {self.nombre_estacion[num_estacion]}, {self.codigo_estacion[num_estacion]} habilitada")
-
             nombre_dir_estacion = estacion_digital[0]              # nombre de carpeta dentro de "Datos Estaciones"
             estacion = self.codigo_estacion[num_estacion]          # 'EEEE'
             self.lista_archivos_mseed = []                         # limpia lista por estación
 
             # ¿Existe el directorio de la estación?
-            print(nombre_dir_estacion[:5])
-            if nombre_dir_estacion[:5] not in dir_aux:# COn esto puedo poner cualquier ruta en digitales.csv
-                print(f"Estación {nombre_dir_estacion}: no existe carpeta dentro de 'Datos Estaciones'")
+            ruta_est = os.path.join(self.directorio_binario, nombre_dir_estacion)
+            if not os.path.isdir(ruta_est):
+                print(f"Estación {nombre_dir_estacion}: no existe carpeta {ruta_est}")
                 print(f"Estacion {nombre_dir_estacion} no tiene registros para este día.")
                 continue
-
             ruta_est = os.path.join(self.directorio_binario, nombre_dir_estacion)
-            print(ruta_est )
             try:
                 arch_aux = os.listdir(ruta_est)
             except Exception as e:
@@ -322,7 +325,6 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             prev_set = set(previos)
 
             # Detectados actuales (basenames)
-            print("Archivos encontrados:", self.lista_archivos_mseed)
             detectados_base = [os.path.basename(p) for p in self.lista_archivos_mseed]
             detectados_base = list(dict.fromkeys([p for p in detectados_base if p]))
 
@@ -341,7 +343,11 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             nombrepng = os.path.join(self.directorio, f"{estacion}_{archivo_evento}.png")
 
             # Unión incremental del mismo día
-            rutas_a_unir = list(nuevos_rutas)
+            if not os.path.exists(archivo_unido):
+                rutas_a_unir = list(self.lista_archivos_mseed)
+            else:
+                rutas_a_unir = list(nuevos_rutas)
+
 
             # Ordenar las rutas a unir por starttime real (mejora de coherencia temporal)
             if rutas_a_unir:
@@ -359,7 +365,6 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 ordenados = []
 
             # Cargar base (solo si existe el unido)
-            print("Archivo:   ",archivo_unido)
             if os.path.exists(archivo_unido):
                 try:
                     st_base = obspy.read(archivo_unido)

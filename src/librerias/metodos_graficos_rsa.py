@@ -23,9 +23,18 @@ if ruta_datos not in sys.path:
 
 
 import math 
-from metodos_rsa import extraccion_dato,num_reportes,leer_mseed,convertir_lista,guardar_seniales_csv
-from metodos_rsa import correccion,lectura_archivo,escritura_archivo,espectro_respuesta,referencia_directorio_completa
-from metodos_gestion import parametros_estaciones,obtencion_directorios,obtener_directorios
+
+
+from rsa_io import leer_mseed,lectura_archivo
+from rsa_dominio import correccion,convertir_lista
+from rsa_utilidades import referencia_directorio_completa
+
+
+
+
+from metodos_rsa import extraccion_dato,guardar_seniales_csv
+from rsa_procesamiento import espectro_respuesta
+from metodos_gestion import parametros_estaciones,obtener_directorios
 from metodos_gis_rsa import cobertura_red
 import scipy.fft
 import matplotlib.pyplot as plt
@@ -45,8 +54,6 @@ from reportlab.lib.colors import white
 import numpy as np
 import csv
 import copy
-import xml.etree.ElementTree as ET
-
 
 
 IDX_INDICE,IDX_ANIO,IDX_MES,IDX_DIA,IDX_HORA,IDX_MINUTO,IDX_SEGUNDO,\

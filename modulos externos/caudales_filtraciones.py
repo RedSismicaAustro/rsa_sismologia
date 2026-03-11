@@ -24,13 +24,20 @@ if ruta_datos not in sys.path:
 from PyQt5.QtWidgets import (QMessageBox, QFileDialog)
 from PyQt5 import uic, QtWidgets
 from PyQt5.QtCore import QDate
-from obspy import read, UTCDateTime
+from obspy import read
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 
-from metodos_gestion import obtener_directorios
-from metodos_rsa import lectura_archivo, extraccion, escritura_archivo,obtencion_hora,ordenar_y_eliminar_duplicados
+from metodos_gestion import obtener_directorios,obtencion_hora
+
+
+from rsa_io import lectura_archivo,escritura_archivo
+from rsa_procesamiento import ordenar_y_eliminar_duplicados
+from rsa_utilidades import extraccion
+
+
+
 
 
 # Cargar la interfaz desde el archivo .ui directamente en esta instancia
