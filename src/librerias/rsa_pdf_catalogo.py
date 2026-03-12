@@ -41,9 +41,7 @@ if ruta_librerias not in sys.path:
 if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
-from rsa_utilidades import referencia_directorio_completa
-
-from rsa_io import leer_mseed,lectura_archivo
+from rsa_io import leer_mseed
 from rsa_dominio import convertir_lista
 from rsa_pdf_reportes import impresion_reporte_acelerograma,hoja_seniales_
 
@@ -240,10 +238,6 @@ def _filtrar_catalogo_oficial_sin_dummies(catalogo: list) -> list:
 # ======================================================================================
 # 4) Auxiliar: construir catalogo_dia (M2) con dummies locales si corresponde
 # ======================================================================================
-
-
-
-
 
 def _construir_catalogo_diario_para_detalle(catalogo: list, eventos: list) -> list:
     """
@@ -480,12 +474,7 @@ def reporte_resumen_modos(
     # eventos        Todos los eventos generados en el día.
     # bandera_relleno Permite el rellono o no de los circulos de los eventos para cierto tipo de reportes.    
     
-    
-    
-    
-    
-    
-    
+     
     print("archivo_pdf:", archivo_pdf,
           "\nSubtitulo:", subtitulo_reporte,
           "\nModo:", modo_reporte)
@@ -547,28 +536,86 @@ def reporte_resumen_modos(
             lienzo = responsables_tiempos_(lienzo, resumen_responsables, modo_reporte)
 
         if banderas['insertar_no_procesado'] and banderas['imprimir_detalle']:
-            for evento_dia in eventos:
-                if evento_dia[1]=="Fecha; Hora (UTC)":
-                    continue
-                directorios = obtener_directorios(evento_dia[1])
-                archivo_proc = os.path.join(directorio, directorios['archivo_procesamiento'])
+            catalogo_extendido = catalogo.copy()
 
-                if os.path.exists(archivo_proc):
-                    lectura = lectura_archivo(archivo_proc)
-                    if len(lectura) == 1:
+            for evento_dia in eventos:
+                if not evento_dia or evento_dia[1] == "Fecha; Hora (UTC)":
+                    continue
+
+##########################################################
+
+                evento_id = evento_dia[1]
+
+                try:
+                    hora_evento = int(evento_id[9:11])
+                except Exception:
+                    continue
+
+                hora_ini = 0
+                hora_fin = 24
+
+                try:
+                    if resumen_responsables and len(resumen_responsables) > 1:
+                        franja = str(resumen_responsables[1][1]).strip().upper()
+                        print("FRANJA DETECTADA:", franja)
+                        if franja == "12H":
+                            hora_ini, hora_fin = 0, 12
+                        elif franja == "18H":
+                            hora_ini, hora_fin = 12, 18
+                        elif franja == "24H":
+                            hora_ini, hora_fin = 18, 24
+                except Exception:
+                    hora_ini, hora_fin = 0, 24
+
+                if not (hora_ini <= hora_evento < hora_fin):
+                    continue
+
+####################################################
+
+
+                tipo_evento = evento_dia[2]
+
+                if tipo_evento == "Ruido":
+                    continue
+
+                evento_id = evento_dia[1]
+
+                # Verificar si ya existe en el catálogo
+                existe = False
+                for fila in catalogo_extendido[1:]:
+                    if fila[IDX_EVENTO] == evento_id:
+                        existe = True
+                        break
+
+                if existe:
+                    continue
+
+                try:
+                    ev_num = int(evento_id.replace("_", "")[:-4])
+                except Exception:
+                    continue
+
+                dummy = ['00000000000000','2025','1','1','0','0','0',
+                         '-2.00','-79.00','0','rms','e-x','e-y','e-0','e-z',
+                         '0',' ',tipo_evento,evento_id,' , , ']
+
+                insertado = False
+                for i in range(1, len(catalogo_extendido)):
+                    try:
+                        actual = int(catalogo_extendido[i][IDX_EVENTO].replace("_","")[:-4])
+                    except Exception:
                         continue
 
-                    ev_num = int(evento_dia[1].replace("_", "")[:-4])
-                    dummy = ['00000000000000','2025','1','1','0','0','0',
-                             '-2.00','-79.00','0','rms','e-x','e-y','e-0','e-z',
-                             '0',' ','No procesado',evento_dia[1],' , , ']
+                    if actual >= ev_num:
+                        catalogo_extendido.insert(i, dummy)
+                        insertado = True
+                        break
 
-                    for i in range(1, len(catalogo)):
-                        actual = int(catalogo[i][IDX_EVENTO].replace("_","")[:-4])
-                        if actual >= ev_num:
-                            if actual > ev_num:
-                                catalogo.insert(i, dummy)
-                            break
+                if not insertado:
+                    catalogo_extendido.append(dummy)
+
+            catalogo = catalogo_extendido
+
 
         if banderas['mostrar_tabla_resumen']:
 
@@ -648,8 +695,6 @@ def reporte_resumen_modos(
     #                RAMA DIARIA (M2)
     # ========================================================
     else:
-        archivo = referencia_directorio_completa(archivo_pdf)
-        directorios = obtener_directorios(archivo)
 
         lienzo = responsables_tiempos_(lienzo, resumen_responsables, modo_reporte)
 
