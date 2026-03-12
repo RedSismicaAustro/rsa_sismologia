@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 from rsa_dominio import correccion
 from rsa_io import leer_mseed
 
-from metodos_graficos_rsa import impresion_reporte_acelerograma
+from rsa_pdf_reportes import impresion_reporte_acelerograma
 from metodos_gestion import parametros_estaciones,obtener_directorios
 class Subventana_aceleraciones(QDialog):
     def __init__(self, archivo, catalogo, evento):

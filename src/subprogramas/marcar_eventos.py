@@ -1,20 +1,19 @@
 
 import numpy as np
 from obspy import read
-from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QHBoxLayout, QScrollArea, QWidget 
-from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtWidgets import QMainWindow, QVBoxLayout,QHBoxLayout, QScrollArea, QWidget 
+from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt5 import uic
 import os
 import obspy
-from PyQt5 import QtWidgets
+
 from librerias.metodos_rsa import parametros_estaciones
 from librerias.metodos_gestion import obtener_directorios
 from librerias.metodos_sismicos import diezmar_senal
 import json
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtCore import QTimer
 class CustomScrollArea(QScrollArea):
     def __init__(self, parent=None):
         super().__init__(parent)

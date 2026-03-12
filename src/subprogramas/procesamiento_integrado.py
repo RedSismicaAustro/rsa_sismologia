@@ -19,9 +19,8 @@ ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
-from rsa_io import leer_mseed,conversion_mseed,lectura_resumen,lectura_archivo,escritura_archivo,copiar_archivos,num_reportes
-from rsa_dominio import correccion,calidad_estacion,obtenerTraza,punto_fijo_a_punto_flotante,convertir_lista,decimal_a_hexadecimal,obtener_caracter_hexadecimal,intervalo_reporte
-from rsa_procesamiento import lectura_rsa,archivos_fast,verificar_coincidencias,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados,extraer_dia
+from rsa_io import leer_mseed,lectura_archivo,escritura_archivo,copiar_archivos
+from rsa_procesamiento import archivos_fast,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados
 
 
 from metodos_gis_rsa import widget_grafico_mpl
@@ -31,7 +30,7 @@ from metodos_reportes_individuales import generar_reporte_sismo
 
 
 #from metodos_reportes_individuales import insertar_evento_otras_redes
-from PyQt5.QtWidgets import (QMainWindow,QMessageBox,QDialog,QLabel,QCheckBox,QPushButton,QComboBox,QSpinBox,QTextEdit,QVBoxLayout,QWidget,QRadioButton)
+from PyQt5.QtWidgets import (QMessageBox,QDialog,QLabel,QCheckBox,QPushButton,QComboBox,QSpinBox,QTextEdit,QVBoxLayout,QWidget,QRadioButton)
 from PyQt5 import uic
 from datetime import datetime
 from PyQt5.QtCore import QDate
@@ -41,10 +40,10 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import pyqtSignal
 import xml.etree.ElementTree as ET
-from metodos_graficos_rsa import reporte_resumen_modos
-from PyQt5 import uic
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget
+from rsa_pdf_catalogo import reporte_resumen_modos
+
+
+from PyQt5.QtWidgets import  QHBoxLayout
 
 # =========================
 #  MODOS DE REPORTE (1–7)
@@ -65,7 +64,6 @@ def cargar_combo_eventos(self,text):
             aux_sismo=(int(self.eventos[i][0]),self.eventos[i][1])#aux_sismo tiene el numero de evento del csv y todo el registro
             self.sismos_procesar.append(aux_sismo)
             self.ui.cmbx_eventos.addItem(self.eventos[i][1])
-            print(self.eventos[i][1])
     self.preparar_evento('')
 
 
@@ -1437,7 +1435,6 @@ class estaciones_(QWidget):
     # ===============================================================
 
     def Graficar_(self):
-        print("Entró a graficar en estaciones_")
 
         try:
             archivo = self.parent.evento_procesar[1]
@@ -1523,8 +1520,6 @@ class estaciones_(QWidget):
                 "y deben cerrarse antes de continuar:\n\n" + lista
             )
             msg.exec_()
-
-            print("Archivos en uso: NO se cierra estaciones_.")
             event.ignore()   # NO cerrar
             return           # NO emitir señales
 

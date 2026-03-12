@@ -27,7 +27,7 @@ from rsa_dominio import calidad_estacion
 
 from metodos_rsa import grafico_evento_int,cargar_evento,cargar_dia
 from metodos_rsa import insertar_evento_otras_redes
-from metodos_graficos_rsa import reporte_resumen_modos
+from rsa_pdf_catalogo import reporte_resumen_modos
 from metodos_gestion import parametros_estaciones,obtener_directorios
 from metodos_reportes_individuales import generar_reporte_sismo,generar_reporte_acelerograma
 import csv

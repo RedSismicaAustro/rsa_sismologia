@@ -22,25 +22,16 @@ if ruta_datos not in sys.path:
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from rsa_io import leer_mseed,conversion_mseed,lectura_resumen,lectura_archivo,escritura_archivo,copiar_archivos,num_reportes,Guardar_dia
-from rsa_dominio import correccion,calidad_estacion,obtenerTraza,punto_fijo_a_punto_flotante,convertir_lista,decimal_a_hexadecimal,obtener_caracter_hexadecimal,intervalo_reporte
-from rsa_procesamiento import lectura_rsa,archivos_fast,verificar_coincidencias,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados,extraer_dia
+from rsa_io import lectura_archivo,escritura_archivo,Guardar_dia
+from rsa_procesamiento import ordenar_y_eliminar_duplicados
 
+from metodos_rsa import cargar_dia
+from metodos_gestion import obtener_directorios
 
-
-
-from metodos_rsa import grafico_evento_int,cargar_evento,cargar_dia,insertar_evento_otras_redes
-from metodos_graficos_rsa import reporte_resumen_modos
-from metodos_gestion import parametros_estaciones,obtener_directorios
-from metodos_reportes_individuales import generar_reporte_sismo,generar_reporte_acelerograma
-import csv
-import matplotlib.pyplot as plt
-import numpy as np
-from PyQt5 import uic, QtWidgets,QtCore#Importamos módulo uic y Qtwidgets
-from PyQt5.QtWidgets import (QMainWindow,QMessageBox,QDialog,QFileDialog,QLabel,QCheckBox,QComboBox,QLineEdit,QSpinBox,QPushButton)
+from PyQt5 import uic
+from PyQt5.QtWidgets import (QMainWindow)
 from datetime import datetime, timezone 
-from PyQt5.QtCore import QDate
-import xml.etree.ElementTree as ET
+
 from PyQt5.QtCore import pyqtSignal
 
 IDX_INDICE,IDX_ANIO,IDX_MES,IDX_DIA,IDX_HORA,IDX_MINUTO,IDX_SEGUNDO,\
