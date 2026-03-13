@@ -437,6 +437,7 @@ def reporte_resumen_modos(
     eventos: list,
     bandera_firma: bool,
     bandera_relleno: bool,
+    horario: str = ""
 ):
 
     # Mètodo que genera el reporte de resumen en pdf, pudiendo ser de un día o un período entero sin restricción del tiempo
@@ -544,6 +545,7 @@ def reporte_resumen_modos(
 
 ##########################################################
 
+
                 evento_id = evento_dia[1]
 
                 try:
@@ -554,21 +556,19 @@ def reporte_resumen_modos(
                 hora_ini = 0
                 hora_fin = 24
 
-                try:
-                    if resumen_responsables and len(resumen_responsables) > 1:
-                        franja = str(resumen_responsables[1][1]).strip().upper()
-                        print("FRANJA DETECTADA:", franja)
-                        if franja == "12H":
-                            hora_ini, hora_fin = 0, 12
-                        elif franja == "18H":
-                            hora_ini, hora_fin = 12, 18
-                        elif franja == "24H":
-                            hora_ini, hora_fin = 18, 24
-                except Exception:
-                    hora_ini, hora_fin = 0, 24
+                if horario == "00:00 - 12:00":
+                    hora_ini, hora_fin = 0, 12
+                elif horario == "12:00 - 18:00":
+                    hora_ini, hora_fin = 12, 18
+                elif horario == "18:00 - 24:00":
+                    hora_ini, hora_fin = 18, 24
 
                 if not (hora_ini <= hora_evento < hora_fin):
                     continue
+
+
+
+
 
 ####################################################
 

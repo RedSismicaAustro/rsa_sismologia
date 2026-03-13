@@ -1153,7 +1153,8 @@ class Procesar_evento(QWidget):
                 resumen_responsables,
                 self.eventos_reporte,
                 bandera_firma,
-                bandera_relleno
+                bandera_relleno,
+                self.horario
             )
 
             os.startfile(archivo_reporte_temporal)

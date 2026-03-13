@@ -52,29 +52,6 @@ def lectura_archivo(archivo):
     print("No se pudo leer el archivo con ninguna de las codificaciones conocidas.")
     return []
 
-def lectura_archivo____(archivo):
-
-    import codecs
-    codificaciones_posibles = ['utf-8', 'latin-1', 'cp1252']
-    valores = []
-    for codificacion in codificaciones_posibles:
-        try:
-            with codecs.open(archivo, 'r', encoding=codificacion, errors='strict') as file:
-                for linea in file:
-                    elementos = linea.strip().split(';')
-                    if elementos != ['']:
-                        valores.append(elementos)
-            return valores  # Si se logra leer correctamente, retornamos aquí
-        except UnicodeDecodeError:
-            continue  # Intenta con la siguiente codificación
-        except FileNotFoundError:
-            print(f"El archivo {archivo} no fue encontrado.")
-            return None
-        except Exception as e:
-            print(f"Ocurrió un error al leer el archivo con codificación {codificacion}: {e}")
-            return []
-    print("No se pudo leer el archivo con ninguna de las codificaciones conocidas.")
-    return []
 
 
 def lectura_eventos(archivo):

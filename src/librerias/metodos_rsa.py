@@ -18,7 +18,6 @@ if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
 import re
-import csv
 from PyQt5.QtWidgets import QMessageBox
 import matplotlib
 matplotlib.use('Qt5Agg')  # Asegúrate de que esto está antes de importar matplotlib.pyplot
@@ -221,19 +220,6 @@ def imprimir_plt(archivo,trCanal1,ganancia,diezmado,factor_mult):   #Depurado
 import os
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaciones_eventos,hab_grafico,bandera_marcas,pagina,filtros_estaciones,estaciones_eventos_total,bandera_todos):
     #stLeido es la traza donde se encuetra el mseed de la estaciòn
     #freqmin_ Frecuencia mínima de cada estacion
@@ -271,12 +257,6 @@ def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaci
     #stLeido[0] = obspy.signal.filter.highpass(stLeido[0].data, 1.0, corners=1, zerophase=True, df=stLeido[0].stats.sampling_rate)
     #stLeido[0][0] = obspy.realtime.signal.offset(stLeido[0][0], offset=5.0, rtmemory_list=None)
     grafico_evento_int(visor,stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
-
-
-
-
-
-
 
 
 def cargar_evento(parametro,eventos_reporte,catalogo,eventos,canales_eventos_dia,directorio_trabajo,directorio_reporte):
