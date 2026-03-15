@@ -216,6 +216,7 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
                 dir_dia, dir_fast = fila[1], fila[2]
                 break
 
+    print( dir_dia, dir_fast)
     # ------------------------------------------------------------
     # 2) Parseo del nombre base
     # ------------------------------------------------------------
@@ -318,11 +319,13 @@ def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
     return archivos_fast
 
 def guardar_intento(archivo,directorio,responsables,procesamiento):
-    #Archivo ---   para la lectura del formato para llamar a lectura_rsa
-    #directorio  - 
-    #responsables
-    #procesamiento 
+    #Archivo        ---   para la lectura del formato para llamar a lectura_rsa
+    #directorio     ---   directorio para armar la ubiación del archivo rsa 
+    #responsables   ---   Responsables del procesamiento
+    #procesamiento  ---   Datos de procesamiento que se va acumulando    
+    print(archivo, directorio, responsables)
     resultado = lectura_rsa(archivo, directorio, responsables)
+    
     evento_auxiliar = [str(len(procesamiento) - 1)]
     ahora = datetime.now()
     fecha_formateada = ahora.strftime("%Y-%m-%d %H:%M:%S")

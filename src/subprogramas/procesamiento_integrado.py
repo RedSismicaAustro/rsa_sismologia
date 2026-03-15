@@ -21,12 +21,11 @@ if ruta_librerias not in sys.path:
 
 from rsa_io import leer_mseed,lectura_archivo,escritura_archivo,copiar_archivos
 from rsa_procesamiento import archivos_fast,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados
-
-
 from metodos_gis_rsa import widget_grafico_mpl
 from metodos_rsa import parametros_estaciones,grafico_evento_int,insertar_evento_otras_redes,cargar_dia,cargar_evento
 from metodos_gestion import obtener_directorios
 from metodos_reportes_individuales import generar_reporte_sismo
+from rsa_pdf_catalogo import reporte_resumen_modos
 
 
 #from metodos_reportes_individuales import insertar_evento_otras_redes
@@ -40,7 +39,6 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtCore import pyqtSignal
 import xml.etree.ElementTree as ET
-from rsa_pdf_catalogo import reporte_resumen_modos
 
 
 from PyQt5.QtWidgets import  QHBoxLayout
@@ -173,6 +171,7 @@ class Procesar_evento(QWidget):
         # -----------------------------
         # 1) ESTADO BÁSICO DEL OBJETO
         # -----------------------------
+        print( "Procesando evento ",archivo,"\n", directorio_trabajo, responsable, horario) 
         self.archivo = archivo                        # Ruta o nombre AAAAMMDD_hhmmss.sis
         self.directorio_trabajo = directorio_trabajo  # Directorio ..\DIA\
         self.responsable = responsable                # Responsable global
@@ -206,7 +205,6 @@ class Procesar_evento(QWidget):
         self.directorios = {}
         self.archivos_procesamiento_real = []
         self.archivos_procesamiento_virtual = []
-        self.archivo_procesar = ''
         self.responsable_evento = ''
         self.archivo_reporte = ''
         self.trCanal = None
@@ -303,7 +301,7 @@ class Procesar_evento(QWidget):
         self.Abrir_archivo()  # Carga self.directorios, día, catálogo, etc.
 
         # Estado inicial del mapa
-        self.actualizar_mapa_desde_procesamiento([])
+        self.actualizar_mapa([])
 
     def activar_hilo(self):
         """
@@ -356,7 +354,7 @@ class Procesar_evento(QWidget):
 
         # Crear el hilo monitoreando TODA la lista
         self.file_monitor = FileMonitorThread(lista_fast, parent=self)
-        self.file_monitor.archivo_cambiado.connect(self.actualizar_procesamiento)
+        self.file_monitor.archivo_cambiado.connect(self.recalcular_procesamiento)
 
         print("HILO: iniciado. Monitoreando lista FAST:", lista_fast)
 
@@ -371,7 +369,7 @@ class Procesar_evento(QWidget):
         estaciones_ solicita actualización de ubicación.
         Redibuja usando el procesamiento actual.
         """
-        self.actualizar_mapa_desde_procesamiento(self.procesamiento)
+        self.actualizar_mapa(self.procesamiento)
 
 
     def _estaciones_devuelven_cambios(self, habilitados, filtros_nuevos):
@@ -441,7 +439,7 @@ class Procesar_evento(QWidget):
 
         # 3) Guardar procesamiento final
         try:
-            escritura_archivo(self.archivo_procesar, self.procesamiento)
+            escritura_archivo(self.directorios["archivo_procesamiento"], self.procesamiento)
             print("Procesamiento final guardado.")
         except Exception as e:
             print("Error guardando procesamiento final:", e)
@@ -468,7 +466,7 @@ class Procesar_evento(QWidget):
 
         # 5) Resetear mapa
         try:
-            self.actualizar_mapa_desde_procesamiento([])
+            self.actualizar_mapa([])
             print("Mapa reseteado.")
         except Exception as e:
             print("Error reseteando mapa:", e)
@@ -529,7 +527,7 @@ class Procesar_evento(QWidget):
             self._estaciones_cerraron
             )
         self.widget_central_activo.senal_cambio_vista.connect(
-            self.cambiar_vista_derecha
+            self.invertir_mapa_seniales
             )
 
 
@@ -545,7 +543,7 @@ class Procesar_evento(QWidget):
 
 
 
-    def cambiar_vista_derecha(self, modo):
+    def invertir_mapa_seniales(self, modo):
         # Limpia el panel derecho
         for i in reversed(range(self.panel_derecho.layout().count())):
             w = self.panel_derecho.layout().itemAt(i).widget()
@@ -555,7 +553,7 @@ class Procesar_evento(QWidget):
         if modo == "mapa":
             # Insertar nuevamente el widget_mapa
             self.panel_derecho.layout().addWidget(self.widget_mapa)
-            self.actualizar_mapa_desde_procesamiento(self.procesamiento)
+            self.actualizar_mapa(self.procesamiento)
 
         else:  # "senales"
             # Crear visor para señales
@@ -657,7 +655,7 @@ class Procesar_evento(QWidget):
 
 
         self.file_monitor = FileMonitorThread(archivo_monitoreo, parent=self)
-        self.file_monitor.archivo_cambiado.connect(self.actualizar_procesamiento)
+        self.file_monitor.archivo_cambiado.connect(self.recalcular_procesamiento)
         self.file_monitor.start()
 
 
@@ -672,35 +670,33 @@ class Procesar_evento(QWidget):
 
 
 
-    def actualizar_procesamiento(self):
+    def recalcular_procesamiento(self):
         """
         Llamado cuando el hilo detecta un cambio en el archivo .fas.
         Aquí se recalcula TODO el procesamiento.
         """
-        print("GUI: hilo notificó cambio — recalculando proc...")
-
         try:
-            # Recalcular procesamiento completo
+            # guardar_intento(archivo,directorio,responsables,procesamiento):
             nuevo_proc = guardar_intento(
                 self.evento_procesar[1],
-                self.archivo,
+                self.directorio_trabajo,
                 self.responsable_evento,
                 self.procesamiento
             )
 
             # Guardar archivo *_proc.csv*
-            escritura_archivo(self.archivo_procesar, nuevo_proc)
+            escritura_archivo(self.directorios["archivo_procesamiento"], nuevo_proc)
 
             # Actualizar memoria
             self.procesamiento = nuevo_proc
 
             # Redibujar mapa
-            self.actualizar_mapa_desde_procesamiento(nuevo_proc)
+            self.actualizar_mapa(nuevo_proc)
 
             print("GUI: procesamiento actualizado y mapa redibujado.")
 
         except Exception as e:
-            print("Error en actualizar_procesamiento:", e)
+            print("Error en recalcular_procesamiento:", e)
             self.ui.Lbl_submensajes.setText("Error al actualizar procesamiento.")
 
 
@@ -721,10 +717,11 @@ class Procesar_evento(QWidget):
             # Aquí podrías activar banderas específicas de modo revisión
             pass
 
-    def actualizar_mapa_desde_procesamiento(self, procesamiento):
+    def actualizar_mapa(self, procesamiento):
         """
         Redibuja inmediatamente usando los datos del procesamiento.
         """
+        print("Este metodo siempre debe ejecutarse desde la primera vez")
         try:
             if not procesamiento:
                 self.widget_mapa.plot([], self.directorios['archivo_estaciones'])
@@ -879,7 +876,7 @@ class Procesar_evento(QWidget):
 
         # Cada vez que se prepara evento, limpiar procesamiento actual y mapa
         self.procesamiento = []
-        self.actualizar_mapa_desde_procesamiento(self.procesamiento)
+        self.actualizar_mapa(self.procesamiento)
 
     def cambio_evento(self, text):
         """
@@ -949,10 +946,6 @@ class Procesar_evento(QWidget):
         # (1) Cargar archivo de procesamiento EXISTENTE (si lo hay)
         # ==============================================================
 
-        self.archivo_procesar = os.path.join(
-            self.directorios['Directorio_procesamiento'],
-            archivo[:-4] + '_proc.csv'
-        )
 
         # Asegurar que el directorio de procesamiento existe
         try:
@@ -960,11 +953,20 @@ class Procesar_evento(QWidget):
         except Exception:
             pass
 
-        if os.path.exists(self.archivo_procesar):
+        if os.path.exists(self.directorios["archivo_procesamiento"]):
             # Cargar procesamiento histórico
-            self.procesamiento = lectura_archivo(self.archivo_procesar)
+            print("Evento procesado")
+            self.procesamiento = lectura_archivo(self.directorios["archivo_procesamiento"])
+            self.procesamiento = guardar_intento(
+                self.evento_procesar[1],
+                self.directorio_trabajo,
+                self.responsable_evento,
+                self.procesamiento
+                )
+            
         else:
             # Crear procesamiento inicial
+            print("Evento nuevo")
             self.procesamiento = [
                 [' ', "Fecha_Hora", "Prof.(km)", "Magn.", "Lat.", "Long.", "rms"]
             ]
@@ -972,12 +974,12 @@ class Procesar_evento(QWidget):
             self.procesamiento.append(['0', ahora, "Inicio", " ", " ", " ", " "])
 
             # Guardar archivo inicial
-            escritura_archivo(self.archivo_procesar, self.procesamiento)
+            escritura_archivo(self.directorios["archivo_procesamiento"], self.procesamiento)
         # ==============================================================
         # (2) ACTUALIZAR MAPA INMEDIATAMENTE (ANTES DE ACTIVAR HILO)
         # ==============================================================
-
-        self.actualizar_mapa_desde_procesamiento(self.procesamiento)
+        print("Archivo de procesamiento:",self.procesamiento)
+        self.actualizar_mapa(self.procesamiento)
 
         # ==============================================================
         # (3) Manejo Virtual SOLO si es SISMO
@@ -1277,7 +1279,7 @@ class estaciones_(QWidget):
 
     # Señales hacia Procesar_evento
     senal_cerrar = pyqtSignal()
-    senal_actualizar_procesamiento = pyqtSignal()
+    #senal_recalcular_procesamiento = pyqtSignal()
     senal_actualizar_mapa = pyqtSignal()
     senal_cambios_estaciones = pyqtSignal(list, list)  # (indices habilitados, filtros)
     senal_cambio_vista = pyqtSignal(str)   # "mapa" o "senales"

@@ -204,7 +204,6 @@ class widget_grafico_mpl(QWidget):
         self.setLayout(layout)
 
     def plot(self, procesamiento, archivo_estaciones):
-        print("PROCESAMIENTO:\n",procesamiento, archivo_estaciones)
         return proceso_gis(self, procesamiento, archivo_estaciones)
 
 
