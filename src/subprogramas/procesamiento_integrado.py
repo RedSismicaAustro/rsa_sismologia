@@ -75,13 +75,13 @@ class FileMonitorThread(QThread):
 
     archivo_cambiado = pyqtSignal()
 
-    def __init__(self, lista_archivos, parent=None):
+    def __init__(self, archivo_monitoreo, parent=None):
         super().__init__(parent)
-        # lista_archivos es la lista completa devuelta por archivos_fast()
-        self.lista_archivos = lista_archivos[:]   # copia por seguridad
+        self.archivo_monitoreo = archivo_monitoreo
+        self.ultimo_mtime = None
 
-    def sleep_interruptible(self, seconds):
-        for _ in range(int(seconds * 10)):
+    def sleep_interruptible(self, segundos):
+        for _ in range(int(segundos * 10)):
             if self.isInterruptionRequested():
                 return True
             time.sleep(0.1)
@@ -89,57 +89,30 @@ class FileMonitorThread(QThread):
 
     def run(self):
         """
-        Monitorea TODOS los archivos FAST.
-        Detecta creación o modificación.
+        Monitorea únicamente el archivo .rsa.
+        Detecta creación o modificación real del archivo.
         """
-
-        # Diccionario con tiempos iniciales
-        tiempos = {}
-
-        # Inicializar tiempos (solo para archivos existentes)
-        for ruta in self.lista_archivos:
-            if os.path.exists(ruta):
-                try:
-                    tiempos[ruta] = os.path.getmtime(ruta)
-                except:
-                    tiempos[ruta] = 0
-
-        print("HILO: run() iniciado. Monitoreando archivos:", self.lista_archivos)
+        print("HILO: run() iniciado. Monitoreando:", self.archivo_monitoreo)
 
         while not self.isInterruptionRequested():
 
-            cambio_detectado = False
-
-            for ruta in self.lista_archivos:
-
-                # Archivo recién creado
-                if not os.path.exists(ruta):
-                    continue
-
+            if os.path.exists(self.archivo_monitoreo):
                 try:
-                    t_mod = os.path.getmtime(ruta)
-                except:
-                    continue
+                    tiempo_modificacion = os.path.getmtime(self.archivo_monitoreo)
+                except Exception:
+                    tiempo_modificacion = None
 
-                # Archivo nuevo que no estaba en tiempos
-                if ruta not in tiempos:
-                    tiempos[ruta] = t_mod
-                    cambio_detectado = True
+                if tiempo_modificacion is not None:
+                    if self.ultimo_mtime is None:
+                        self.ultimo_mtime = tiempo_modificacion
+                        self.archivo_cambiado.emit()
+                    elif tiempo_modificacion != self.ultimo_mtime:
+                        self.ultimo_mtime = tiempo_modificacion
+                        print("HILO: cambio detectado en archivo .rsa")
+                        self.archivo_cambiado.emit()
 
-                # Archivo existente modificado
-                elif t_mod != tiempos[ruta]:
-                    tiempos[ruta] = t_mod
-                    cambio_detectado = True
-
-            # Si hubo cambios → emitir señal
-            if cambio_detectado:
-                print("HILO: cambio detectado en alguno de los FAST")
-                self.archivo_cambiado.emit()
-
-            # Espera interruptible
             if self.sleep_interruptible(1):
                 return
-
 
 
 
@@ -171,7 +144,6 @@ class Procesar_evento(QWidget):
         # -----------------------------
         # 1) ESTADO BÁSICO DEL OBJETO
         # -----------------------------
-        print( "Procesando evento ",archivo,"\n", directorio_trabajo, responsable, horario) 
         self.archivo = archivo                        # Ruta o nombre AAAAMMDD_hhmmss.sis
         self.directorio_trabajo = directorio_trabajo  # Directorio ..\DIA\
         self.responsable = responsable                # Responsable global
@@ -303,66 +275,46 @@ class Procesar_evento(QWidget):
         # Estado inicial del mapa
         self.actualizar_mapa([])
 
+
+
     def activar_hilo(self):
         """
-        Activa el hilo de monitoreo de TODOS los archivos FAST del evento.
+        Activa el hilo de monitoreo del archivo .rsa del evento.
         Este método se llama al final de procesar_().
         """
 
-        # Solo para eventos tipo SISMO
         if self.evento_procesar[2] != "SISMO":
             self.ui.Lbl_submensajes.setText("Evento no es SISMO — monitoreo no requerido.")
             return
 
-        # Verificar disponibilidad del Virtual
         if not verificar_drives_virtuales(self.responsable_evento):
             self.ui.Lbl_submensajes.setText("El Virtual no está conectado — monitoreo deshabilitado.")
             return
 
-        # Obtener TODAS las rutas desde archivos_fast
         try:
             lista_fast = archivos_fast(
                 self.evento_procesar[1],
                 self.directorio_trabajo,
                 self.responsable_evento
-                )
-        except Exception as e:
-            print("Error al obtener archivos FAST:", e)
+            )
+        except Exception:
             self.ui.Lbl_submensajes.setText("Error al obtener archivos FAST")
             return
 
-        # El .fas sigue siendo el archivo principal
-        archivo_monitoreo = lista_fast[2]
+        archivo_rsa = lista_fast[2]
 
-        # Si el FAST principal aún no existe → esperar
-        if not os.path.exists(archivo_monitoreo):
-            self.ui.Lbl_submensajes.setText(
-                f"Esperando archivo del Virtual…\n{archivo_monitoreo}"
-                )
-            return
+        self.ui.Lbl_submensajes.setText(f"Monitorizando archivo RSA…\n{archivo_rsa}")
 
-        # Iniciar monitoreo
-        self.ui.Lbl_submensajes.setText("Monitorizando archivos FAST…")
-
-        # Detener hilo anterior si existe
         if hasattr(self, "file_monitor") and self.file_monitor is not None:
             try:
                 self.file_monitor.requestInterruption()
                 self.file_monitor.wait()
-            except:
+            except Exception:
                 pass
 
-        # Crear el hilo monitoreando TODA la lista
-        self.file_monitor = FileMonitorThread(lista_fast, parent=self)
+        self.file_monitor = FileMonitorThread(archivo_rsa, parent=self)
         self.file_monitor.archivo_cambiado.connect(self.recalcular_procesamiento)
-
-        print("HILO: iniciado. Monitoreando lista FAST:", lista_fast)
-
-        # Arrancar hilo
         self.file_monitor.start()
-
-
-
 
     def _estaciones_piden_actualizar_mapa(self):
         """
@@ -415,8 +367,6 @@ class Procesar_evento(QWidget):
         Aquí ya NO se verifica si los archivos están en uso, porque
         esa validación se hace en closeEvent() de estaciones_.
         """
-
-        print("Cierre de estaciones_: iniciando limpieza...")
 
         # 1) Detener hilo
         try:
@@ -629,11 +579,11 @@ class Procesar_evento(QWidget):
         # Iniciar verificación cíclica
         self.timer_verificar.start()
 
+
+
     def iniciar_monitor_virtual(self):
         """
-        Inicia el hilo de monitoreo del archivo .fas en el Virtual.
-        El hilo llamará a guardar_intento(), y este actualizará el archivo de
-        procesamiento en el directorio real.
+        Inicia el hilo de monitoreo del archivo .rsa en el Virtual.
         """
         if not self.evento_procesar:
             return
@@ -644,19 +594,17 @@ class Procesar_evento(QWidget):
             self.directorio_trabajo,
             self.responsable_evento
         )
-        archivo_monitoreo = archivos_v[2]   # normalmente el .fas
+        archivo_monitoreo = archivos_v[2]   # .rsa
 
-        # Asegurar diccionario de directorios
         if not self.directorios:
             self.directorios = obtener_directorios(self.archivo)
 
-        # Detener hilo anterior si estaba activo
         self.detener_monitor_virtual()
-
 
         self.file_monitor = FileMonitorThread(archivo_monitoreo, parent=self)
         self.file_monitor.archivo_cambiado.connect(self.recalcular_procesamiento)
         self.file_monitor.start()
+
 
 
     def detener_monitor_virtual(self):
@@ -670,34 +618,60 @@ class Procesar_evento(QWidget):
 
 
 
+    def intento_es_diferente(self, procesamiento_anterior, procesamiento_nuevo):
+        """
+        Compara la última fila del procesamiento nuevo con la última fila
+        del procesamiento anterior, ignorando el índice y la fecha de grabación.
+        """
+
+        if not procesamiento_anterior or len(procesamiento_anterior) <= 1:
+            return True
+
+        if not procesamiento_nuevo or len(procesamiento_nuevo) <= 1:
+            return False
+
+        ultima_fila_anterior = procesamiento_anterior[-1]
+        ultima_fila_nueva = procesamiento_nuevo[-1]
+
+        firma_anterior = ultima_fila_anterior[2:]
+        firma_nueva = ultima_fila_nueva[2:]
+
+        return firma_anterior != firma_nueva
+
+
     def recalcular_procesamiento(self):
         """
-        Llamado cuando el hilo detecta un cambio en el archivo .fas.
-        Aquí se recalcula TODO el procesamiento.
+        Llamado cuando el hilo detecta un cambio en el archivo .rsa.
+        Aquí se recalcula el procesamiento y solo se graba si el intento
+        nuevo es diferente del último ya almacenado.
         """
         try:
-            # guardar_intento(archivo,directorio,responsables,procesamiento):
+            procesamiento_base = [fila[:] for fila in self.procesamiento]
+
             nuevo_proc = guardar_intento(
                 self.evento_procesar[1],
                 self.directorio_trabajo,
                 self.responsable_evento,
-                self.procesamiento
+                [fila[:] for fila in self.procesamiento]
             )
 
-            # Guardar archivo *_proc.csv*
+            if not self.intento_es_diferente(procesamiento_base, nuevo_proc):
+                self.ui.Lbl_submensajes.setText("RSA sin cambios útiles. No se agregó nuevo intento.")
+                print("GUI: intento repetido detectado, no se guarda.")
+                return
+
             escritura_archivo(self.directorios["archivo_procesamiento"], nuevo_proc)
-
-            # Actualizar memoria
             self.procesamiento = nuevo_proc
-
-            # Redibujar mapa
             self.actualizar_mapa(nuevo_proc)
 
+            self.ui.Lbl_submensajes.setText("Procesamiento actualizado desde RSA.")
             print("GUI: procesamiento actualizado y mapa redibujado.")
 
         except Exception as e:
             print("Error en recalcular_procesamiento:", e)
             self.ui.Lbl_submensajes.setText("Error al actualizar procesamiento.")
+
+
 
 
     def seleccionar_inicial(self, estado):
@@ -721,7 +695,6 @@ class Procesar_evento(QWidget):
         """
         Redibuja inmediatamente usando los datos del procesamiento.
         """
-        print("Este metodo siempre debe ejecutarse desde la primera vez")
         try:
             if not procesamiento:
                 self.widget_mapa.plot([], self.directorios['archivo_estaciones'])

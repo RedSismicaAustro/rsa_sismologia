@@ -38,7 +38,7 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
 #  archivo_rsa es el archivo genrardo por el fasthypo con extencion .rsa generada a partir del archivo.
 #  usuario es para tomar información del sistema o de procesamiento, cuaNdo el valor es '', toma del sistema y si no toma de procesamiento asignando los valores 
 #   del drive adecuado en las computadoras de procesamiento.
-    
+    print("Lectura RSA") 
     directorios=obtener_directorios(os.path.join(directorio_trabajo,archivo))    
     eventos=lectura_archivo(directorios['archivo_csv'])
     archivo_procesamiento=verificar_coincidencias(eventos,archivo,archivos_fast(archivo,directorio_trabajo,usuario))
@@ -190,6 +190,7 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
         return 
 
 def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
+    print("Archivos fast")
     """
     Regla FINAL:
         - sis y fas → SIEMPRE minuto exacto
@@ -216,7 +217,7 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
                 dir_dia, dir_fast = fila[1], fila[2]
                 break
 
-    print( dir_dia, dir_fast)
+    
     # ------------------------------------------------------------
     # 2) Parseo del nombre base
     # ------------------------------------------------------------
@@ -289,6 +290,7 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
     return rutas
 
 def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
+    print("verificar_coincidencias")
     contador = 0
     sufijo = ['', 'a', 'b', 'c']
     clave_minuto = Path(evento_procesar).stem.replace('_', '')[:12]
@@ -323,7 +325,7 @@ def guardar_intento(archivo,directorio,responsables,procesamiento):
     #directorio     ---   directorio para armar la ubiación del archivo rsa 
     #responsables   ---   Responsables del procesamiento
     #procesamiento  ---   Datos de procesamiento que se va acumulando    
-    print(archivo, directorio, responsables)
+    print("Guardando intento:\n",archivo, directorio, responsables)
     resultado = lectura_rsa(archivo, directorio, responsables)
     
     evento_auxiliar = [str(len(procesamiento) - 1)]
@@ -351,6 +353,7 @@ def guardar_informacion_diaria(archivo,directorio_trabajo,catalogo_anterior,even
     #archivo:          Archivo del día con formato AAMMDD_hhmmss.csv
     #directorio_trabajo:   Directorio del drive de trabajo
     #catalogo_anterior:    Catalogo encontrado en el día para cargar la información de otras redes.
+    print("guardar_informacion_diaria")
     archivo=archivo[-16:]
     directorios=obtener_directorios(archivo)
     archivo_csv=directorio_trabajo+'/'+directorios['Directorio_base']+'/'+archivo
@@ -510,7 +513,7 @@ def ordenar_y_eliminar_duplicados(catalogo, indice, bandera=True):
     Returns:
         Lista ordenada y sin duplicados.
     """    
-    
+    print(" ordenar_y_eliminar_duplicados")
     if bandera:
         
         if not catalogo or not isinstance(catalogo, list):
