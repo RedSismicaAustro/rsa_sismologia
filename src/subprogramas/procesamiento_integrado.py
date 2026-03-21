@@ -20,7 +20,7 @@ if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 
 from rsa_io import leer_mseed,lectura_archivo,escritura_archivo,copiar_archivos
-from rsa_procesamiento import archivos_fast,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados
+from rsa_procesamiento import archivos_fast,guardar_intento,guardar_informacion_diaria,ordenar_y_eliminar_duplicados,verificar_coincidencias
 from metodos_gis_rsa import widget_grafico_mpl
 from metodos_rsa import parametros_estaciones,grafico_evento_int,insertar_evento_otras_redes,cargar_dia,cargar_evento
 from metodos_gestion import obtener_directorios
@@ -396,7 +396,8 @@ class Procesar_evento(QWidget):
 
         # 4) Copiar y borrar archivos del Virtual (ya verificado antes)
         if self.evento_procesar and self.evento_procesar[2] == 'SISMO':
-
+            print(self.archivos_procesamiento_virtual,
+            self.archivos_procesamiento_real)
             try:
                 copiar_archivos(
                     self.archivos_procesamiento_virtual,
@@ -973,22 +974,47 @@ class Procesar_evento(QWidget):
                 msg.exec_()
 
             else:
-                # Rutas Virtual y Real
+
+
+
+
+
+                # Rutas base Virtual y Real
                 self.archivos_procesamiento_virtual = archivos_fast(
                     archivo,
                     self.directorio_trabajo,
                     self.responsable_evento
                 )
-                self.archivos_procesamiento_real = archivos_fast(
+
+                self.archivos_procesamiento_real_base = archivos_fast(
                     archivo,
                     self.directorio_trabajo,
                     ''
                 )
 
-                # Copiar archivos desde Real hacia Virtual
+                # Rutas reales definitivas en host (con posible sufijo)
+                self.archivos_procesamiento_real = verificar_coincidencias(
+                    self.eventos,
+                    archivo,
+                    self.archivos_procesamiento_real_base.copy()
+                )
+
+                # --------------------------------------------------
+                # Copia REAL -> VIRTUAL
+                # Solo .sis y .fas si existe
+                # En virtual NO se requieren sufijos
+                # --------------------------------------------------
+                origen_real_virtual = [self.archivos_procesamiento_real_base[0]]
+                destino_real_virtual = [self.archivos_procesamiento_virtual[0]]
+
+                if os.path.exists(self.archivos_procesamiento_real_base[1]):
+                    origen_real_virtual.append(self.archivos_procesamiento_real_base[1])
+                    destino_real_virtual.append(self.archivos_procesamiento_virtual[1])
+
+                print(origen_real_virtual,destino_real_virtual)
                 copiar_archivos(
-                    self.archivos_procesamiento_real,
-                    self.archivos_procesamiento_virtual
+                    origen_real_virtual,
+                    destino_real_virtual
                 )
 
                 # ==================================================

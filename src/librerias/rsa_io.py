@@ -208,14 +208,11 @@ def escritura_archivo(archivo, valores):
 
 
 def copiar_archivos(archivos_origen, archivos_destino):
-    lista=(17,17,12,11,10,10,10)
-    for i in range(0,7):
+    for archivo_origen, archivo_destino in zip(archivos_origen, archivos_destino):
         try:
-            archivo_dest=archivos_destino[i][:-lista[i]]+archivos_origen[i][-lista[i]:]
-            shutil.copyfile(archivos_origen[i],archivo_dest)
+            shutil.copyfile(archivo_origen, archivo_destino)
         except FileNotFoundError:
             pass
-
 
 
 

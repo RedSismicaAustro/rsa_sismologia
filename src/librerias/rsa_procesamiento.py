@@ -41,10 +41,34 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
     print("Lectura RSA") 
     directorios=obtener_directorios(os.path.join(directorio_trabajo,archivo))    
     eventos=lectura_archivo(directorios['archivo_csv'])
-    archivo_procesamiento=verificar_coincidencias(eventos,archivo,archivos_fast(archivo,directorio_trabajo,usuario))
-    archivo_fas=archivo_procesamiento[1]
-    archivo_rsa=archivo_procesamiento[2]
-    archivo_fase=archivo_procesamiento[3]
+
+
+    base_evento = Path(archivo).stem.replace('_', '')
+    if len(base_evento) == 12:  # AAMMDDhhmmss
+        ss_evento = int(base_evento[10:12])
+    else:  # AAAAMMDDhhmmss
+        ss_evento = int(base_evento[12:14])
+
+    archivos_evento = archivos_fast(archivo, directorio_trabajo, usuario)
+    # Si el evento está después del segundo 50, se intenta primero con minuto +1.
+    # Si no existe el RSA, se retrocede al minuto real.
+    if ss_evento > 50 and not os.path.exists(archivos_evento[2]):
+        archivos_evento = archivos_fast(
+            archivo,
+            directorio_trabajo,
+            usuario,
+            forzar_minuto_real=True
+        )
+
+    # El sufijo solo aplica en host
+    if usuario == '':
+        archivos_evento = verificar_coincidencias(eventos, archivo, archivos_evento)
+
+    archivo_fas = archivos_evento[1]
+    archivo_rsa = archivos_evento[2]
+    archivo_fase = archivos_evento[3]
+
+
     bandera_error=0
     archivo_estaciones = os.path.join(directorio_trabajo, directorios["archivo_estaciones"])
     lectura_estaciones=lectura_archivo(archivo_estaciones)
@@ -189,15 +213,107 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
     else:
         return 
 
-def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
+
+def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False, forzar_minuto_real=False):
+    print("Archivos fast")
+    """
+    Regla:
+        - sis y fas → SIEMPRE minuto exacto
+        - FASTHYPO (rsa, Phase, L, P, S):
+              * si ss > 50 → por defecto minuto +1
+              * si ss <= 50 → minuto exacto
+        - si forzar_minuto_real=True → FASTHYPO usa siempre el minuto exacto
+
+    Siempre retorna las 7 rutas, existan o no.
+    """
+
+    info = obtener_directorios(evento)
+    dir_dia = os.path.join(dir_trabajo, info['Directorio_dia'])
+    dir_fast = os.path.join(dir_trabajo, info['Directorio_fastHypo'])
+
+    if usuario:
+        csv_path = os.path.join(ruta_datos, "responsables.csv")
+        for fila in lectura_archivo(csv_path):
+            if fila and fila[0].strip() == usuario.strip():
+                dir_dia, dir_fast = fila[1], fila[2]
+                break
+
+    base = evento[:-4]
+
+    if len(base) == 13:      # AAMMDD_hhmmss
+        yy = 2000 + int(base[:2])
+        mm = base[2:4]
+        dd = base[4:6]
+        hh = base[7:9]
+        minu = base[9:11]
+        ss = base[11:13]
+        sisfas_base = base
+    else:                    # AAAAMMDD_hhmmss
+        yy = int(base[:4])
+        mm = base[4:6]
+        dd = base[6:8]
+        hh = base[9:11]
+        minu = base[11:13]
+        ss = base[13:15]
+        sisfas_base = base if usuario == '' else base[2:]
+
+    archivo_sis = os.path.join(dir_dia, f"{sisfas_base}.sis")
+    archivo_fas = os.path.join(dir_dia, f"{sisfas_base}.fas")
+
+    segundo_evento = int(ss)
+    dt_evento = datetime(yy, int(mm), int(dd), int(hh), int(minu), segundo_evento)
+
+    if forzar_minuto_real:
+        dt_fast = dt_evento
+    else:
+        if segundo_evento > 50:
+            dt_fast = dt_evento + timedelta(minutes=1)
+        else:
+            dt_fast = dt_evento
+
+    mm_fast, dd_fast, hh_fast, minu_fast = dt_fast.strftime("%m %d %H %M").split()
+
+    rsa_nom = f"{mm_fast}{dd_fast}{hh_fast}{minu_fast}.rsa"
+    archivo_rsa = os.path.join(dir_fast, rsa_nom)
+
+    phase_nom = f"Phase{dd_fast}{hh_fast[0]}.{hh_fast[1]}{minu_fast}"
+    archivo_phase = os.path.join(dir_fast, phase_nom)
+
+    base_lp = f"{mm_fast}{dd_fast}{hh_fast}.{minu_fast}"
+    archivo_L = os.path.join(dir_fast, base_lp + "L")
+    archivo_P = os.path.join(dir_fast, base_lp + "P")
+    archivo_S = os.path.join(dir_fast, base_lp + "S")
+
+    rutas = [
+        archivo_sis,
+        archivo_fas,
+        archivo_rsa,
+        archivo_phase,
+        archivo_L,
+        archivo_P,
+        archivo_S
+    ]
+
+    etiquetas = ['.sis', '.fas', '.rsa', 'Phase', '.L', '.P', '.S']
+    existe = {etq: os.path.isfile(ruta) for etq, ruta in zip(etiquetas, rutas)}
+    faltantes = [etq for etq, ok in existe.items() if not ok]
+
+    if retornar_validaciones:
+        return rutas, existe, faltantes
+
+    return rutas
+
+
+
+
+def archivos_fast__(evento, dir_trabajo, usuario, retornar_validaciones=False):
     print("Archivos fast")
     """
     Regla FINAL:
         - sis y fas → SIEMPRE minuto exacto
         - FASTHYPO (rsa, Phase, L, P, S):
-              * si .fas existe y .rsa NO → minuto +1
-              * si .fas existe y .rsa SI → minuto exacto
-              * si .fas NO → minuto exacto
+              * si el evento ocurre entre el segundo 50 y 59 → minuto +1
+              * en cualquier otro caso → minuto exacto
 
     Siempre retorna las 7 rutas, existan o no.
     """
@@ -206,7 +322,7 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
     # 1) Carpetas base
     # ------------------------------------------------------------
     info = obtener_directorios(evento)
-    dir_dia  = os.path.join(dir_trabajo, info['Directorio_dia'])
+    dir_dia = os.path.join(dir_trabajo, info['Directorio_dia'])
     dir_fast = os.path.join(dir_trabajo, info['Directorio_fastHypo'])
 
     # Virtual (usuario)
@@ -217,7 +333,6 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
                 dir_dia, dir_fast = fila[1], fila[2]
                 break
 
-    
     # ------------------------------------------------------------
     # 2) Parseo del nombre base
     # ------------------------------------------------------------
@@ -229,7 +344,7 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
         dd = base[4:6]
         hh = base[7:9]
         minu = base[9:11]
-        ss  = base[11:13]
+        ss = base[11:13]
         sisfas_base = base
     else:                    # AAAAMMDD_hhmmss
         yy = int(base[:4])
@@ -237,7 +352,7 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
         dd = base[6:8]
         hh = base[9:11]
         minu = base[11:13]
-        ss  = base[13:15]
+        ss = base[13:15]
         sisfas_base = base if usuario == '' else base[2:]
 
     # ------------------------------------------------------------
@@ -246,32 +361,29 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
     archivo_sis = os.path.join(dir_dia, f"{sisfas_base}.sis")
     archivo_fas = os.path.join(dir_dia, f"{sisfas_base}.fas")
 
-    fas_existe = os.path.exists(archivo_fas)
-
     # ------------------------------------------------------------
     # 4) Determinar minuto FASTHYPO
     # ------------------------------------------------------------
-    # RSA exacto
-    rsa_nom_exacto = f"{mm}{dd}{hh}{minu}.rsa"
-    archivo_rsa_exacto = os.path.join(dir_fast, rsa_nom_exacto)
-    rsa_existe = os.path.exists(archivo_rsa_exacto)
+    segundo_evento = int(ss)
+    dt_evento = datetime(yy, int(mm), int(dd), int(hh), int(minu), segundo_evento)
 
-    # Aplicar regla
-    if fas_existe and not rsa_existe:
-        # Incrementar el minuto en 1
-        dt = datetime(yy, int(mm), int(dd), int(hh), int(minu), int(ss)) + timedelta(minutes=1)
-        mm, dd, hh, minu = dt.strftime("%m %d %H %M").split()
+    if segundo_evento > 50:
+        dt_fast = dt_evento + timedelta(minutes=1)
+    else:
+        dt_fast = dt_evento
+
+    mm_fast, dd_fast, hh_fast, minu_fast = dt_fast.strftime("%m %d %H %M").split()
 
     # ------------------------------------------------------------
     # 5) Construir archivos FASTHYPO con el minuto definitivo
     # ------------------------------------------------------------
-    rsa_nom = f"{mm}{dd}{hh}{minu}.rsa"
+    rsa_nom = f"{mm_fast}{dd_fast}{hh_fast}{minu_fast}.rsa"
     archivo_rsa = os.path.join(dir_fast, rsa_nom)
 
-    phase_nom = f"Phase{dd}{hh[0]}.{hh[1]}{minu}"
+    phase_nom = f"Phase{dd_fast}{hh_fast[0]}.{hh_fast[1]}{minu_fast}"
     archivo_phase = os.path.join(dir_fast, phase_nom)
 
-    base_lp = f"{mm}{dd}{hh}.{minu}"
+    base_lp = f"{mm_fast}{dd_fast}{hh_fast}.{minu_fast}"
     archivo_L = os.path.join(dir_fast, base_lp + "L")
     archivo_P = os.path.join(dir_fast, base_lp + "P")
     archivo_S = os.path.join(dir_fast, base_lp + "S")
@@ -279,45 +391,173 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False):
     # ------------------------------------------------------------
     # 6) Retorno final
     # ------------------------------------------------------------
-    rutas = [archivo_sis, archivo_fas, archivo_rsa,
-             archivo_phase, archivo_L, archivo_P, archivo_S]
+    rutas = [
+        archivo_sis,
+        archivo_fas,
+        archivo_rsa,
+        archivo_phase,
+        archivo_L,
+        archivo_P,
+        archivo_S
+    ]
 
     etiquetas = ['.sis', '.fas', '.rsa', 'Phase', '.L', '.P', '.S']
     existe = {etq: os.path.isfile(ruta) for etq, ruta in zip(etiquetas, rutas)}
     faltantes = [etq for etq, ok in existe.items() if not ok]
+
     if retornar_validaciones:
         return rutas, existe, faltantes
+
     return rutas
+
+
 
 def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
     print("verificar_coincidencias")
     contador = 0
     sufijo = ['', 'a', 'b', 'c']
-    clave_minuto = Path(evento_procesar).stem.replace('_', '')[:12]
+    base_evento = Path(evento_procesar).stem.replace('_', '')
+
+    if len(base_evento) == 12:
+        yy = 2000 + int(base_evento[:2])
+        mm = int(base_evento[2:4])
+        dd = int(base_evento[4:6])
+        hh = int(base_evento[6:8])
+        minu = int(base_evento[8:10])
+        ss = int(base_evento[10:12])
+    else:
+        yy = int(base_evento[:4])
+        mm = int(base_evento[4:6])
+        dd = int(base_evento[6:8])
+        hh = int(base_evento[8:10])
+        minu = int(base_evento[10:12])
+        ss = int(base_evento[12:14])
+
+    dt_evento = datetime(yy, mm, dd, hh, minu, ss)
+    if ss > 50:
+        dt_evento = dt_evento + timedelta(minutes=1)
+
+    clave_minuto = dt_evento.strftime("%Y%m%d%H%M")
+
     for evento in eventos:
         tipo_evento = evento[2]
         if tipo_evento != 'SISMO':
             continue
-        if Path(evento[1]).stem.replace('_', '')[:12] == clave_minuto:
-            if evento[1] == evento_procesar:
+
+        base_actual = Path(evento[1]).stem.replace('_', '')
+
+        if len(base_actual) == 12:
+            yy_a = 2000 + int(base_actual[:2])
+            mm_a = int(base_actual[2:4])
+            dd_a = int(base_actual[4:6])
+            hh_a = int(base_actual[6:8])
+            minu_a = int(base_actual[8:10])
+            ss_a = int(base_actual[10:12])
+        else:
+            yy_a = int(base_actual[:4])
+            mm_a = int(base_actual[4:6])
+            dd_a = int(base_actual[6:8])
+            hh_a = int(base_actual[8:10])
+            minu_a = int(base_actual[10:12])
+            ss_a = int(base_actual[12:14])
+
+        dt_actual = datetime(yy_a, mm_a, dd_a, hh_a, minu_a, ss_a)
+        if ss_a > 50:
+            dt_actual = dt_actual + timedelta(minutes=1)
+
+        clave_actual = dt_actual.strftime("%Y%m%d%H%M")
+
+        if clave_actual == clave_minuto:
+            if base_actual == base_evento:
                 break
             contador += 1
 
     if contador >= len(sufijo):
         contador = len(sufijo) - 1
+
     suf = sufijo[contador]
     if not suf:
-        return archivos_fast  # sin cambios para el primero del minuto
+        return archivos_fast
 
-    # .sis (0) y .fas (1) NO cambian; aplicar sufijo al resto
-    # RSA (2): antes de la extensión .rsa
     if archivos_fast[2].lower().endswith('.rsa'):
         archivos_fast[2] = archivos_fast[2][:-4] + suf + '.rsa'
 
-    # Phase (3) y L/P/S (4..6): agregar sufijo al final del nombre
     for i in range(3, 7):
         if archivos_fast[i]:
             archivos_fast[i] = archivos_fast[i] + suf
+
+    return archivos_fast
+
+
+
+
+def verificar_coincidencias__(eventos, evento_procesar, archivos_fast):
+    print("verificar_coincidencias")
+    contador = 0
+    sufijo = ['', 'a', 'b', 'c']
+    base_evento = Path(evento_procesar).stem.replace('_', '')
+    if len(base_evento) == 12:  # AAMMDDhhmmss
+        yy = 2000 + int(base_evento[:2])
+        mm = int(base_evento[2:4])
+        dd = int(base_evento[4:6])
+        hh = int(base_evento[6:8])
+        minu = int(base_evento[8:10])
+        ss = int(base_evento[10:12])
+    else:  # AAAAMMDDhhmmss
+        yy = int(base_evento[:4])
+        mm = int(base_evento[4:6])
+        dd = int(base_evento[6:8])
+        hh = int(base_evento[8:10])
+        minu = int(base_evento[10:12])
+        ss = int(base_evento[12:14])
+    dt_evento = datetime(yy, mm, dd, hh, minu, ss)
+    if ss > 50:
+        dt_evento = dt_evento + timedelta(minutes=1)
+    clave_minuto = dt_evento.strftime("%Y%m%d%H%M")
+    for evento in eventos:
+        tipo_evento = evento[2]
+        if tipo_evento != 'SISMO':
+            continue
+        base_actual = Path(evento[1]).stem.replace('_', '')
+        if len(base_actual) == 12:  # AAMMDDhhmmss
+            yy_a = 2000 + int(base_actual[:2])
+            mm_a = int(base_actual[2:4])
+            dd_a = int(base_actual[4:6])
+            hh_a = int(base_actual[6:8])
+            minu_a = int(base_actual[8:10])
+            ss_a = int(base_actual[10:12])
+        else:  # AAAAMMDDhhmmss
+            yy_a = int(base_actual[:4])
+            mm_a = int(base_actual[4:6])
+            dd_a = int(base_actual[6:8])
+            hh_a = int(base_actual[8:10])
+            minu_a = int(base_actual[10:12])
+            ss_a = int(base_actual[12:14])
+        dt_actual = datetime(yy_a, mm_a, dd_a, hh_a, minu_a, ss_a)
+        if ss_a >= 50:
+            dt_actual = dt_actual + timedelta(minutes=1)
+
+        clave_actual = dt_actual.strftime("%Y%m%d%H%M")
+
+        if clave_actual == clave_minuto:
+            if base_actual == base_evento:
+                break
+            contador += 1
+
+    if contador >= len(sufijo):
+        contador = len(sufijo) - 1
+
+    suf = sufijo[contador]
+    if not suf:
+        return archivos_fast
+
+    if archivos_fast[2].lower().endswith('.rsa'):
+        archivos_fast[2] = archivos_fast[2][:-4] + suf + '.rsa'
+
+    for i in range(3, 7):
+        if archivos_fast[i]:
+            archivos_fast[i] = archivos_fast[i] + suf
+
     return archivos_fast
 
 def guardar_intento(archivo,directorio,responsables,procesamiento):
