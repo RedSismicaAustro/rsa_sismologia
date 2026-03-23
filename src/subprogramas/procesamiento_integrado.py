@@ -116,57 +116,6 @@ class FileMonitorThread(QThread):
 
 
 
-
-
-
-
-
-
-class FileMonitorThread___(QThread):
-
-    archivo_cambiado = pyqtSignal()
-
-    def __init__(self, archivo_monitoreo, parent=None):
-        super().__init__(parent)
-        self.archivo_monitoreo = archivo_monitoreo
-        self.ultimo_mtime = None
-
-    def sleep_interruptible(self, segundos):
-        for _ in range(int(segundos * 10)):
-            if self.isInterruptionRequested():
-                return True
-            time.sleep(0.1)
-        return False
-
-    def run(self):
-        """
-        Monitorea únicamente el archivo .rsa.
-        Detecta creación o modificación real del archivo.
-        """
-        print("HILO: run() iniciado. Monitoreando:", self.archivo_monitoreo)
-
-        while not self.isInterruptionRequested():
-
-            if os.path.exists(self.archivo_monitoreo):
-                try:
-                    tiempo_modificacion = os.path.getmtime(self.archivo_monitoreo)
-                except Exception:
-                    tiempo_modificacion = None
-
-                if tiempo_modificacion is not None:
-                    if self.ultimo_mtime is None:
-                        self.ultimo_mtime = tiempo_modificacion
-                        self.archivo_cambiado.emit()
-                    elif tiempo_modificacion != self.ultimo_mtime:
-                        self.ultimo_mtime = tiempo_modificacion
-                        print("HILO: cambio detectado en archivo .rsa")
-                        self.archivo_cambiado.emit()
-
-            if self.sleep_interruptible(1):
-                return
-
-
-
 def verificar_drives_virtuales(responsable_evento):
     responsables = os.path.abspath(os.path.join(ruta_proyecto,'datos','responsables.csv'))
     responsables=lectura_archivo(responsables)
@@ -327,12 +276,10 @@ class Procesar_evento(QWidget):
         self.actualizar_mapa([])
 
 
-
-
     def activar_hilo(self):
         """
         Activa el hilo de monitoreo del archivo .rsa del evento.
-        Si el segundo del evento es mayor que 50, monitorea dos posibilidades:
+        Si ss > 50, monitorea dos posibilidades:
             - minuto +1
             - minuto real
         """
@@ -353,23 +300,28 @@ class Procesar_evento(QWidget):
             else:
                 ss_evento = int(base_evento[12:14])
 
-            lista_fast = archivos_fast(
-                archivo,
-                self.directorio_trabajo,
-                self.responsable_evento
-            )
-
-            archivos_monitoreo = [lista_fast[2]]
-
             if ss_evento > 50:
+                lista_fast_siguiente = archivos_fast(
+                    archivo,
+                    self.directorio_trabajo,
+                    self.responsable_evento,
+                    modo_minuto_fast='siguiente'
+                )
                 lista_fast_real = archivos_fast(
                     archivo,
                     self.directorio_trabajo,
                     self.responsable_evento,
-                    forzar_minuto_real=True
+                    modo_minuto_fast='real'
                 )
-                if lista_fast_real[2] != lista_fast[2]:
-                    archivos_monitoreo.append(lista_fast_real[2])
+                archivos_monitoreo = [lista_fast_siguiente[2], lista_fast_real[2]]
+            else:
+                lista_fast_real = archivos_fast(
+                    archivo,
+                    self.directorio_trabajo,
+                    self.responsable_evento,
+                    modo_minuto_fast='real'
+                )
+                archivos_monitoreo = [lista_fast_real[2]]
 
         except Exception as e:
             print("Error al obtener archivos FAST:", e)
@@ -387,49 +339,14 @@ class Procesar_evento(QWidget):
             except Exception:
                 pass
 
+        self.archivo_rsa_actual = ''
         self.file_monitor = FileMonitorThread(archivos_monitoreo, parent=self)
         self.file_monitor.archivo_cambiado.connect(self.recalcular_procesamiento)
         self.file_monitor.start()
 
 
-    def activar_hilo___(self):
-        """
-        Activa el hilo de monitoreo del archivo .rsa del evento.
-        Este método se llama al final de procesar_().
-        """
 
-        if self.evento_procesar[2] != "SISMO":
-            self.ui.Lbl_submensajes.setText("Evento no es SISMO — monitoreo no requerido.")
-            return
 
-        if not verificar_drives_virtuales(self.responsable_evento):
-            self.ui.Lbl_submensajes.setText("El Virtual no está conectado — monitoreo deshabilitado.")
-            return
-
-        try:
-            lista_fast = archivos_fast(
-                self.evento_procesar[1],
-                self.directorio_trabajo,
-                self.responsable_evento
-            )
-        except Exception:
-            self.ui.Lbl_submensajes.setText("Error al obtener archivos FAST")
-            return
-
-        archivo_rsa = lista_fast[2]
-
-        self.ui.Lbl_submensajes.setText(f"Monitorizando archivo RSA…\n{archivo_rsa}")
-
-        if hasattr(self, "file_monitor") and self.file_monitor is not None:
-            try:
-                self.file_monitor.requestInterruption()
-                self.file_monitor.wait()
-            except Exception:
-                pass
-
-        self.file_monitor = FileMonitorThread(archivo_rsa, parent=self)
-        self.file_monitor.archivo_cambiado.connect(self.recalcular_procesamiento)
-        self.file_monitor.start()
 
     def _estaciones_piden_actualizar_mapa(self):
         """
@@ -476,7 +393,120 @@ class Procesar_evento(QWidget):
         except Exception as e:
             print("Error en _estaciones_devuelven_cambios:", e)
 
+
+
+
+
+
     def _estaciones_cerraron(self):
+        """
+        estaciones_ se cerró correctamente.
+        """
+        try:
+            if hasattr(self, "file_monitor") and self.file_monitor is not None and self.file_monitor.isRunning():
+                self.file_monitor.requestInterruption()
+                self.file_monitor.wait()
+                print("Hilo detenido.")
+        except Exception as e:
+            print("Error deteniendo hilo:", e)
+
+        self.file_monitor = None
+
+        try:
+            if hasattr(self, "timer_verificar") and self.timer_verificar.isActive():
+                self.timer_verificar.stop()
+                print("Timer verificar detenido.")
+        except Exception as e:
+            print("Error deteniendo timer_verificar:", e)
+
+        try:
+            escritura_archivo(self.directorios["archivo_procesamiento"], self.procesamiento)
+            print("Procesamiento final guardado.")
+        except Exception as e:
+            print("Error guardando procesamiento final:", e)
+
+        if self.evento_procesar and self.evento_procesar[2] == 'SISMO':
+            try:
+                archivo = self.evento_procesar[1]
+                rutas_real_base = archivos_fast(
+                    archivo,
+                    self.directorio_trabajo,
+                    '',
+                    modo_minuto_fast='real'
+                )
+
+                if self.archivo_rsa_actual:
+                    nombre_rsa = Path(self.archivo_rsa_actual).stem.rstrip('abc')
+                    mm_fast = nombre_rsa[0:2]
+                    dd_fast = nombre_rsa[2:4]
+                    hh_fast = nombre_rsa[4:6]
+                    minu_fast = nombre_rsa[6:8]
+
+                    dir_fast_real = os.path.dirname(rutas_real_base[2])
+
+                    rutas_real_base[2] = os.path.join(dir_fast_real, f"{mm_fast}{dd_fast}{hh_fast}{minu_fast}.rsa")
+                    rutas_real_base[3] = os.path.join(dir_fast_real, f"Phase{dd_fast}{hh_fast[0]}.{hh_fast[1]}{minu_fast}")
+
+                    base_lp = f"{mm_fast}{dd_fast}{hh_fast}.{minu_fast}"
+                    rutas_real_base[4] = os.path.join(dir_fast_real, base_lp + "L")
+                    rutas_real_base[5] = os.path.join(dir_fast_real, base_lp + "P")
+                    rutas_real_base[6] = os.path.join(dir_fast_real, base_lp + "S")
+
+                self.archivos_procesamiento_real = verificar_coincidencias(
+                    self.eventos,
+                    archivo,
+                    rutas_real_base
+                )
+
+                print(self.archivos_procesamiento_virtual, self.archivos_procesamiento_real)
+
+                copiar_archivos(
+                    self.archivos_procesamiento_virtual,
+                    self.archivos_procesamiento_real
+                )
+                print("Copiado Virtual → Real.")
+
+            except Exception as e:
+                print("Error copiando Virtual → Real:", e)
+
+            try:
+                for ruta in self.archivos_procesamiento_virtual:
+                    if os.path.exists(ruta):
+                        os.remove(ruta)
+                print("Archivos del Virtual eliminados.")
+            except Exception as e:
+                print("Error limpiando Virtual:", e)
+
+        try:
+            self.actualizar_mapa([])
+            print("Mapa reseteado.")
+        except Exception as e:
+            print("Error reseteando mapa:", e)
+
+        try:
+            self.limpiar_panel_central()
+        except Exception as e:
+            print("Error limpiando panel central:", e)
+
+        try:
+            self.preparar_evento(self.ui.cmbx_eventos.currentText())
+            print("Evento recargado.")
+        except Exception as e:
+            print("Error recargando evento:", e)
+
+        self.en_estaciones = False
+        self.bandera_procesamiento = 0
+        self.ui.grupo_carga.setEnabled(True)
+        print("Cierre finalizado.")
+
+
+
+
+
+
+
+
+    def _estaciones_cerraron__(self):
         """
         estaciones_ se cerró correctamente.
         Aquí ya NO se verifica si los archivos están en uso, porque
@@ -756,7 +786,14 @@ class Procesar_evento(QWidget):
         return firma_anterior != firma_nueva
 
 
+
     def recalcular_procesamiento(self, ruta_cambiada=None):
+        """
+        Llamado cuando el hilo detecta un cambio en el archivo .rsa.
+        Aquí se recalcula el procesamiento y solo se graba si el intento
+        nuevo es diferente del último ya almacenado.
+        """
+
 # Nota importante:
 # Este método recibe `ruta_cambiada` porque la señal del hilo
 # `archivo_cambiado.emit(ruta)` envía automáticamente la ruta del .rsa
@@ -775,16 +812,20 @@ class Procesar_evento(QWidget):
 # - el hilo detecta y avisa qué archivo cambió;
 # - este método recibe ese aviso;
 # - pero el procesamiento real se recalcula desde el evento actual.
+
         try:
             if ruta_cambiada:
-                print("Cambio detectado en:", ruta_cambiada)
+                self.archivo_rsa_actual = ruta_cambiada
+                print("RSA detectado por el hilo:", self.archivo_rsa_actual)
+
             procesamiento_base = [fila[:] for fila in self.procesamiento]
 
             nuevo_proc = guardar_intento(
                 self.evento_procesar[1],
                 self.directorio_trabajo,
                 self.responsable_evento,
-                [fila[:] for fila in self.procesamiento]
+                [fila[:] for fila in self.procesamiento],
+                self.archivo_rsa_actual
             )
 
             if not self.intento_es_diferente(procesamiento_base, nuevo_proc):
@@ -798,7 +839,6 @@ class Procesar_evento(QWidget):
 
             self.ui.Lbl_submensajes.setText("Procesamiento actualizado desde RSA.")
             print("GUI: procesamiento actualizado y mapa redibujado.")
-
 
         except Exception as e:
             print("Error en recalcular_procesamiento:", e)

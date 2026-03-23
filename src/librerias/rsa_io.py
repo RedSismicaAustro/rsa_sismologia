@@ -215,8 +215,6 @@ def copiar_archivos(archivos_origen, archivos_destino):
             pass
 
 
-
-
 def num_reportes(directorio):
     contador_12=0
     contador_18=0

@@ -32,33 +32,54 @@ IDX_LATITUD,IDX_LONGITUD,IDX_PROFUNDIDAD,IDX_RMS,IDX_E_X,IDX_E_Y,IDX_E_0,\
 IDX_E_Z,IDX_MAGNITUD,IDX_UNIDAD_MAG,\
 IDX_FUENTE,IDX_EVENTO,IDX_LUGAR = 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
 
-def lectura_rsa(archivo,directorio_trabajo,usuario):
-#  Mètodo para obtebner la información completa del sismo
-#  archivo es el nombre del archivo .sis generado por el registro continuo sin el .sis
-#  archivo_rsa es el archivo genrardo por el fasthypo con extencion .rsa generada a partir del archivo.
-#  usuario es para tomar información del sistema o de procesamiento, cuaNdo el valor es '', toma del sistema y si no toma de procesamiento asignando los valores 
-#   del drive adecuado en las computadoras de procesamiento.
-    print("Lectura RSA") 
-    directorios=obtener_directorios(os.path.join(directorio_trabajo,archivo))    
-    eventos=lectura_archivo(directorios['archivo_csv'])
 
+def lectura_rsa(archivo, directorio_trabajo, usuario, archivo_rsa_detectado=''):
+    # Método para obtener la información completa del sismo
+    print("Lectura RSA")
 
+    directorios = obtener_directorios(os.path.join(directorio_trabajo, archivo))
+    eventos = lectura_archivo(directorios['archivo_csv'])
+
+    archivos_evento = []
     base_evento = Path(archivo).stem.replace('_', '')
+
     if len(base_evento) == 12:  # AAMMDDhhmmss
         ss_evento = int(base_evento[10:12])
     else:  # AAAAMMDDhhmmss
         ss_evento = int(base_evento[12:14])
 
-    archivos_evento = archivos_fast(archivo, directorio_trabajo, usuario)
-    # Si el evento está después del segundo 50, se intenta primero con minuto +1.
-    # Si no existe el RSA, se retrocede al minuto real.
-    if ss_evento > 50 and not os.path.exists(archivos_evento[2]):
-        archivos_evento = archivos_fast(
-            archivo,
-            directorio_trabajo,
-            usuario,
-            forzar_minuto_real=True
-        )
+    # Si ya sé cuál RSA cambió en virtual, uso ese como prioritario
+    if archivo_rsa_detectado:
+        archivos_evento = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='real')
+        archivos_evento[2] = archivo_rsa_detectado
+
+        nombre_rsa = Path(archivo_rsa_detectado).stem.rstrip('abc')
+        mm_fast = nombre_rsa[0:2]
+        dd_fast = nombre_rsa[2:4]
+        hh_fast = nombre_rsa[4:6]
+        minu_fast = nombre_rsa[6:8]
+
+        dir_fast = os.path.dirname(archivo_rsa_detectado)
+        archivos_evento[3] = os.path.join(dir_fast, f"Phase{dd_fast}{hh_fast[0]}.{hh_fast[1]}{minu_fast}")
+
+        base_lp = f"{mm_fast}{dd_fast}{hh_fast}.{minu_fast}"
+        archivos_evento[4] = os.path.join(dir_fast, base_lp + "L")
+        archivos_evento[5] = os.path.join(dir_fast, base_lp + "P")
+        archivos_evento[6] = os.path.join(dir_fast, base_lp + "S")
+
+    else:
+        if ss_evento > 50:
+            rutas_siguiente = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='siguiente')
+            rutas_real = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='real')
+
+            if os.path.exists(rutas_siguiente[2]):
+                archivos_evento = rutas_siguiente
+            elif os.path.exists(rutas_real[2]):
+                archivos_evento = rutas_real
+            else:
+                archivos_evento = rutas_siguiente
+        else:
+            archivos_evento = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='real')
 
     # El sufijo solo aplica en host
     if usuario == '':
@@ -68,163 +89,205 @@ def lectura_rsa(archivo,directorio_trabajo,usuario):
     archivo_rsa = archivos_evento[2]
     archivo_fase = archivos_evento[3]
 
-
-    bandera_error=0
+    bandera_error = 0
     archivo_estaciones = os.path.join(directorio_trabajo, directorios["archivo_estaciones"])
-    lectura_estaciones=lectura_archivo(archivo_estaciones)
-    aux=len(archivo)
-    if archivo[-11:-10]=="_":
-        sismo_aux=archivo[-17:-11]+archivo[-10:aux]
+    lectura_estaciones = lectura_archivo(archivo_estaciones)
+
+    aux = len(archivo)
+    if archivo[-11:-10] == "_":
+        sismo_aux = archivo[-17:-11] + archivo[-10:aux]
     else:
-        sismo_aux=archivo[-10:aux]
-    lectura_fase=[]
-    auxiliar=["Disp.","t_pr.","t_sec.","marc.s","t_cod."]
+        sismo_aux = archivo[-10:aux]
+
+    lectura_fase = []
+    auxiliar = ["Disp.", "t_pr.", "t_sec.", "marc.s", "t_cod."]
     lectura_fase.append(auxiliar)
-    if os.path.exists(archivo_fase): #Toma lectura del archivo phase si existe
-        with open(archivo_fase,newline='') as f_f:
-            lectura_archivo_fase=csv.reader(f_f,delimiter='\n',quotechar=';')
+
+    if os.path.exists(archivo_fase):
+        with open(archivo_fase, newline='') as f_f:
+            lectura_archivo_fase = csv.reader(f_f, delimiter='\n', quotechar=';')
             for lectura in lectura_archivo_fase:
                 for v in lectura:
-                    auxiliar=[v[4:8],v[19:24],v[31:36],v[36:40],v[70:75]]
+                    auxiliar = [v[4:8], v[19:24], v[31:36], v[36:40], v[70:75]]
                     lectura_fase.append(auxiliar)
-    elif os.path.exists(archivo_fas):# Si no esiste phase lee del .fas
-        archivo_abrir = open(archivo_fas,'rb')
-        bandera_1=1
-        auxiliar=[]
-        contador=0
+
+    elif os.path.exists(archivo_fas):
+        archivo_abrir = open(archivo_fas, 'rb')
+        bandera_1 = 1
+        auxiliar = []
+        contador = 0
+
         while bandera_1:
-            cabecera_0=archivo_abrir.read(2)
-            resultado=codigos(cabecera_0,archivo_abrir)
-            if cabecera_0==b'\x08\x00':
-                if contador==2:
+            cabecera_0 = archivo_abrir.read(2)
+            resultado = codigos(cabecera_0, archivo_abrir)
+
+            if cabecera_0 == b'\x08\x00':
+                if contador == 2:
                     auxiliar.append(resultado[0])
-                    contador=3
-                if contador==1:
+                    contador = 3
+                if contador == 1:
                     auxiliar.append(resultado[0][:5])
                     auxiliar.append(resultado[0][-4:])
-                    contador=2
-                if resultado[1]==28:
-                    auxiliar=[]
-                    if resultado[0][:4]!='    ':
-                        if contador==0:
-                            auxiliar=[resultado[0][4:8],resultado[0][-5:]]
-                            contador=1
-                if auxiliar!=[]and contador==3:
+                    contador = 2
+                if resultado[1] == 28:
+                    auxiliar = []
+                    if resultado[0][:4] != '    ':
+                        if contador == 0:
+                            auxiliar = [resultado[0][4:8], resultado[0][-5:]]
+                            contador = 1
+                if auxiliar != [] and contador == 3:
                     lectura_fase.append(auxiliar)
-                    contador=0
+                    contador = 0
+
             if len(cabecera_0) == 0:
-                bandera_1=0
+                bandera_1 = 0
+                archivo_abrir.close()
     else:
-        auxiliar=['    ','    ','    ','    ','    ']
+        auxiliar = ['    ', '    ', '    ', '    ', '    ']
         lectura_fase.append(auxiliar)
 
     if os.path.exists(archivo_rsa):
-        with open(archivo_rsa,newline='') as f_r:
-            lectura_archivo_rsa=csv.reader(f_r,delimiter=' ',quotechar=';')
-            estaciones_evento=""
-            lectura_total=[] #Variable que tiene los datos del archivo linea por linea
+        with open(archivo_rsa, newline='') as f_r:
+            lectura_archivo_rsa = csv.reader(f_r, delimiter=' ', quotechar=';')
+            estaciones_evento = ""
+            lectura_total = []
+
             for lectura in lectura_archivo_rsa:
-                datos_=[]
+                datos_ = []
                 for v in lectura:
-                    if v=='' or v==' ':
+                    if v == '' or v == ' ':
                         pass
                     else:
                         datos_.append(v)
                 lectura_total.append(datos_)
+
             for i, datos_ in enumerate(lectura_total):
                 try:
-                    if len(datos_)>0:
-                        if datos_[0]=='sta':
-                            if lectura_total[i-1]!=[]:
-                                latitud=float(lectura_total[i-1][0])
-                                longitud=float(lectura_total[i-1][1])
-                                profundidad=round(float(lectura_total[i-1][2]),1)
-                                segundo_sismo=float(lectura_total[i-1][3])
-                                datos_estaciones=[]
-                                auxiliar=lectura_estaciones[0][2:8]+datos_[1:]+lectura_fase[0]
+                    if len(datos_) > 0:
+                        if datos_[0] == 'sta':
+                            if lectura_total[i - 1] != []:
+                                latitud = float(lectura_total[i - 1][0])
+                                longitud = float(lectura_total[i - 1][1])
+                                profundidad = round(float(lectura_total[i - 1][2]), 1)
+                                segundo_sismo = float(lectura_total[i - 1][3])
+                                datos_estaciones = []
+                                auxiliar = lectura_estaciones[0][2:8] + datos_[1:] + lectura_fase[0]
                                 datos_estaciones.append(auxiliar)
-                                indice=i
-                                while lectura_total[i]!=[]:
-                                    i=i+1
-                                    if lectura_total[i]!=[]:
-                                        estacion_=lectura_total[i][0]
-                                        lista_seleccionada = next((lista for lista in lectura_estaciones if lista[2] == estacion_), None)
-                                        if lista_seleccionada==None:
-                                            
-                                            if estacion_=='CALCULO':
-                                                estaciones=''
+                                indice = i
+
+                                while lectura_total[i] != []:
+                                    i = i + 1
+                                    if lectura_total[i] != []:
+                                        estacion_ = lectura_total[i][0]
+                                        lista_seleccionada = next(
+                                            (lista for lista in lectura_estaciones if lista[2] == estacion_),
+                                            None
+                                        )
+
+                                        if lista_seleccionada is None:
+                                            if estacion_ == 'CALCULO':
+                                                estaciones = ''
                                                 for estacion in datos_estaciones:
-                                                    if estacion!='nombre':
-                                                        estaciones=estaciones+estacion[0]+' ' 
+                                                    if estacion != 'nombre':
+                                                        estaciones = estaciones + estacion[0] + ' '
                                                 return
-                                            print("Estacion ",estacion_)
+                                            print("Estacion ", estacion_)
                                             return
-                                        if len(lectura_fase)!=2:
-                                            auxiliar_est=lista_seleccionada[2:8]+lectura_total[i][1:]+lectura_fase[i-indice]
+
+                                        if len(lectura_fase) != 2:
+                                            auxiliar_est = lista_seleccionada[2:8] + lectura_total[i][1:] + lectura_fase[i - indice]
                                         else:
-                                            auxiliar_est=lista_seleccionada[2:8]+lectura_total[i][1:]+lectura_fase[1]
+                                            auxiliar_est = lista_seleccionada[2:8] + lectura_total[i][1:] + lectura_fase[1]
+
                                         datos_estaciones.append(auxiliar_est)
-                        if datos_[0]=='error':
-                            ex=float(datos_[3])
-                            ey=float(datos_[6])
-                            e0=float(datos_[10])
-                        if datos_[0]=='event':
-                            id_sismo='20'+sismo_aux[0:10]+'00'
-                            anio_sismo=2000+int(datos_[3])
-                            mes_sismo=int(datos_[4])
-                            dia_sismo=int(datos_[5])
-                            hora_sismo=int(datos_[6])
-                            minuto_sismo=int(datos_[7])
-                        if datos_[0]=='rms=':
-                            rms=float(datos_[1])
-                            aux=len(lectura_total[i+3][1])
-                            ez=float(lectura_total[i+3][1][0:aux-2])
-                            i=i+3
-                        if datos_[0]=='Promedio':
-                            if datos_[4]!='No':
-                                magnitud= float(datos_[4])
+
+                        if datos_[0] == 'error':
+                            ex = float(datos_[3])
+                            ey = float(datos_[6])
+                            e0 = float(datos_[10])
+
+                        if datos_[0] == 'event':
+                            id_sismo = '20' + sismo_aux[0:10] + '00'
+                            anio_sismo = 2000 + int(datos_[3])
+                            mes_sismo = int(datos_[4])
+                            dia_sismo = int(datos_[5])
+                            hora_sismo = int(datos_[6])
+                            minuto_sismo = int(datos_[7])
+
+                        if datos_[0] == 'rms=':
+                            rms = float(datos_[1])
+                            aux = len(lectura_total[i + 3][1])
+                            ez = float(lectura_total[i + 3][1][0:aux - 2])
+                            i = i + 3
+
+                        if datos_[0] == 'Promedio':
+                            if datos_[4] != 'No':
+                                magnitud = float(datos_[4])
                             else:
-                                magnitud= 0.0
+                                magnitud = 0.0
+
                 except ValueError:
-                    bandera_error=1
+                    bandera_error = 1
 
-
-            if bandera_error:#Cuando hay error en el procesamiento por  conversion de variables.
+            if bandera_error:
                 return 1
-            else:                
-                ubicacion_sismo=ubicacion(latitud,longitud)
-                ruta=archivo
-                if segundo_sismo<0:#hay que transformar en archivo datetime y hacer la operaciòn para que sea exacto
-                    segundo_sismo=60+segundo_sismo
-                    minuto_sismo = minuto_sismo-1
-                    if minuto_sismo==-1:
-                        minuto_sismo=59
-                        hora_sismo=hora_sismo-1
+            else:
+                ubicacion_sismo = ubicacion(latitud, longitud)
+                ruta = archivo
+
+                if segundo_sismo < 0:
+                    segundo_sismo = 60 + segundo_sismo
+                    minuto_sismo = minuto_sismo - 1
+                    if minuto_sismo == -1:
+                        minuto_sismo = 59
+                        hora_sismo = hora_sismo - 1
+
                 for ev in datos_estaciones:
-                    if ev!=[] and ev[0]!="sta" and ev[0]!='    ' and ev[0]!='nombre':
-                        estaciones_evento=estaciones_evento+ev[0]+" "
-                datos_sismo=[id_sismo,str(anio_sismo),str(mes_sismo),str(dia_sismo),str(hora_sismo),str(minuto_sismo),str(segundo_sismo),str(latitud),str(longitud),str(profundidad),str(rms),str(ex),str(ey),str(e0),str(ez),str(magnitud),'Md','RSA',ruta,ubicacion_sismo]
-                datos_estaciones = [sublista[:12]+sublista[13:15]+sublista[16:17]+sublista[19:]  for sublista in datos_estaciones]
-                #datos_sismo-------------Datos extraidos del registro aammddhhmmss.rsa
-                #estaciones_evento-------Datos extraidos del registro aammddhhmmss.rsa
-                #datos_estaciones--------Datos extraidos del registro aammddhhmmss.rsa
+                    if ev != [] and ev[0] != "sta" and ev[0] != '    ' and ev[0] != 'nombre':
+                        estaciones_evento = estaciones_evento + ev[0] + " "
 
-                return(datos_sismo,estaciones_evento,archivo_rsa,datos_estaciones)
+                datos_sismo = [
+                    id_sismo, str(anio_sismo), str(mes_sismo), str(dia_sismo),
+                    str(hora_sismo), str(minuto_sismo), str(segundo_sismo),
+                    str(latitud), str(longitud), str(profundidad), str(rms),
+                    str(ex), str(ey), str(e0), str(ez), str(magnitud),
+                    'Md', 'RSA', ruta, ubicacion_sismo
+                ]
+
+                datos_estaciones = [sublista[:12] + sublista[13:15] + sublista[16:17] + sublista[19:] for sublista in datos_estaciones]
+
+                return (datos_sismo, estaciones_evento, archivo_rsa, datos_estaciones)
     else:
-        return 
+        return
 
-def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False, forzar_minuto_real=False):
+
+
+def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False, modo_minuto_fast='auto'):
     print("Archivos fast")
+    """
+    Regla:
+        - sis y fas -> SIEMPRE minuto exacto
+        - FASTHYPO (rsa, Phase, L, P, S):
+              * modo_minuto_fast='real'      -> minuto exacto
+              * modo_minuto_fast='siguiente' -> minuto +1
+              * modo_minuto_fast='auto'      -> si ss > 50 usa +1, caso contrario minuto exacto
+
+    Siempre retorna las 7 rutas, existan o no.
+    """
+
     info = obtener_directorios(evento)
     dir_dia = os.path.join(dir_trabajo, info['Directorio_dia'])
     dir_fast = os.path.join(dir_trabajo, info['Directorio_fastHypo'])
+
     if usuario:
         csv_path = os.path.join(ruta_datos, "responsables.csv")
         for fila in lectura_archivo(csv_path):
             if fila and fila[0].strip() == usuario.strip():
                 dir_dia, dir_fast = fila[1], fila[2]
                 break
+
     base = Path(evento).stem
+
     if len(base) == 13:      # AAMMDD_hhmmss
         yy = 2000 + int(base[:2])
         mm = base[2:4]
@@ -241,50 +304,71 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False, for
         minu = base[11:13]
         ss = base[13:15]
         sisfas_base = base if usuario == '' else base[2:]
+
     archivo_sis = os.path.join(dir_dia, f"{sisfas_base}.sis")
     archivo_fas = os.path.join(dir_dia, f"{sisfas_base}.fas")
+
     segundo_evento = int(ss)
     dt_evento = datetime(yy, int(mm), int(dd), int(hh), int(minu), segundo_evento)
-    if forzar_minuto_real:
+
+    if modo_minuto_fast == 'real':
         dt_fast = dt_evento
-    else:
+    elif modo_minuto_fast == 'siguiente':
+        dt_fast = dt_evento + timedelta(minutes=1)
+    else:  # auto
         if segundo_evento > 50:
             dt_fast = dt_evento + timedelta(minutes=1)
         else:
             dt_fast = dt_evento
+
     mm_fast, dd_fast, hh_fast, minu_fast = dt_fast.strftime("%m %d %H %M").split()
+
     rsa_nom = f"{mm_fast}{dd_fast}{hh_fast}{minu_fast}.rsa"
     archivo_rsa = os.path.join(dir_fast, rsa_nom)
+
     phase_nom = f"Phase{dd_fast}{hh_fast[0]}.{hh_fast[1]}{minu_fast}"
     archivo_phase = os.path.join(dir_fast, phase_nom)
+
     base_lp = f"{mm_fast}{dd_fast}{hh_fast}.{minu_fast}"
     archivo_L = os.path.join(dir_fast, base_lp + "L")
     archivo_P = os.path.join(dir_fast, base_lp + "P")
     archivo_S = os.path.join(dir_fast, base_lp + "S")
-    rutas = [archivo_sis, archivo_fas, archivo_rsa, archivo_phase, archivo_L, archivo_P, archivo_S]
+
+    rutas = [
+        archivo_sis,
+        archivo_fas,
+        archivo_rsa,
+        archivo_phase,
+        archivo_L,
+        archivo_P,
+        archivo_S
+    ]
+
     etiquetas = ['.sis', '.fas', '.rsa', 'Phase', '.L', '.P', '.S']
     existe = {etq: os.path.isfile(ruta) for etq, ruta in zip(etiquetas, rutas)}
     faltantes = [etq for etq, ok in existe.items() if not ok]
+
     if retornar_validaciones:
         return rutas, existe, faltantes
+
     return rutas
 
 
 
-def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
+def verificar_coincidencias(eventos, evento_procesar, rutas_fast):
     print("verificar_coincidencias")
     contador = 0
     sufijo = ['', 'a', 'b', 'c']
-    base_evento = Path(evento_procesar).stem.replace('_', '')
 
-    if len(base_evento) == 12:
+    base_evento = Path(evento_procesar).stem.replace('_', '')
+    if len(base_evento) == 12:  # AAMMDDhhmmss
         yy = 2000 + int(base_evento[:2])
         mm = int(base_evento[2:4])
         dd = int(base_evento[4:6])
         hh = int(base_evento[6:8])
         minu = int(base_evento[8:10])
         ss = int(base_evento[10:12])
-    else:
+    else:  # AAAAMMDDhhmmss
         yy = int(base_evento[:4])
         mm = int(base_evento[4:6])
         dd = int(base_evento[6:8])
@@ -304,15 +388,14 @@ def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
             continue
 
         base_actual = Path(evento[1]).stem.replace('_', '')
-
-        if len(base_actual) == 12:
+        if len(base_actual) == 12:  # AAMMDDhhmmss
             yy_a = 2000 + int(base_actual[:2])
             mm_a = int(base_actual[2:4])
             dd_a = int(base_actual[4:6])
             hh_a = int(base_actual[6:8])
             minu_a = int(base_actual[8:10])
             ss_a = int(base_actual[10:12])
-        else:
+        else:  # AAAAMMDDhhmmss
             yy_a = int(base_actual[:4])
             mm_a = int(base_actual[4:6])
             dd_a = int(base_actual[6:8])
@@ -336,45 +419,57 @@ def verificar_coincidencias(eventos, evento_procesar, archivos_fast):
 
     suf = sufijo[contador]
     if not suf:
-        return archivos_fast
+        return rutas_fast
 
-    if archivos_fast[2].lower().endswith('.rsa'):
-        archivos_fast[2] = archivos_fast[2][:-4] + suf + '.rsa'
+    if rutas_fast[2].lower().endswith('.rsa'):
+        rutas_fast[2] = rutas_fast[2][:-4] + suf + '.rsa'
 
     for i in range(3, 7):
-        if archivos_fast[i]:
-            archivos_fast[i] = archivos_fast[i] + suf
+        if rutas_fast[i]:
+            rutas_fast[i] = rutas_fast[i] + suf
 
-    return archivos_fast
-
-
+    return rutas_fast
 
 
-def guardar_intento(archivo,directorio,responsables,procesamiento):
-    #Archivo        ---   para la lectura del formato para llamar a lectura_rsa
-    #directorio     ---   directorio para armar la ubiación del archivo rsa 
-    #responsables   ---   Responsables del procesamiento
-    #procesamiento  ---   Datos de procesamiento que se va acumulando    
-    print("Guardando intento:\n",archivo, directorio, responsables)
-    resultado = lectura_rsa(archivo, directorio, responsables)
-    
-    evento_auxiliar = [str(len(procesamiento) - 1)]
-    ahora = datetime.now()
-    fecha_formateada = ahora.strftime("%Y-%m-%d %H:%M:%S")
-    evento_auxiliar.append(fecha_formateada)
+def guardar_intento(archivo, directorio, responsables, procesamiento, archivo_rsa_detectado=''):
+    print("guardar_intento")
+
+    resultado = lectura_rsa(
+        archivo,
+        directorio,
+        responsables,
+        archivo_rsa_detectado
+    )
+
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    indice = str(len(procesamiento) - 1)
+
     if resultado is None:
-        evento_auxiliar.append('Fallido')
-    elif resultado ==1:
-        evento_auxiliar.append('Fallido')
-        evento_auxiliar.append('Error de conversion')
-    
-    else:
-        auxiliar = [9, 15, 7, 8, 10]
-        for k in auxiliar:
-            evento_auxiliar.append(str(resultado[0][k]))
-        evento_auxiliar.append(resultado[1])
-    procesamiento.append(evento_auxiliar)
+        fila = [indice, ahora, "Fallido", " ", " ", " ", " "]
+        procesamiento.append(fila)
+        return procesamiento
+
+    if resultado == 1:
+        fila = [indice, ahora, "Fallido", "Error de conversion", " ", " ", " "]
+        procesamiento.append(fila)
+        return procesamiento
+
+    datos_sismo = resultado[0]
+
+    try:
+        profundidad = datos_sismo[9]
+        magnitud = datos_sismo[15]
+        latitud = datos_sismo[7]
+        longitud = datos_sismo[8]
+        rms = datos_sismo[10]
+        fila = [indice, ahora, profundidad, magnitud, latitud, longitud, rms]
+    except Exception:
+        fila = [indice, ahora, "Fallido", " ", " ", " ", " "]
+
+    procesamiento.append(fila)
     return procesamiento
+
+
 
 
 
