@@ -27,18 +27,19 @@ if ruta_datos not in sys.path:
 # ESTA estación
 # Datos EVT daton con la información del registro en el nombre o en los metadatos del registro
 
-from metodos_rsa import parametros_estaciones,obtener_directorios,obtenerTraza,escritura_archivo,recolectar_evt,lectura_archivo,clasificar_evento_sismico,ejecutar_en_vm
-from PyQt5 import uic, QtWidgets#Importamos módulo uic y Qtwidgets
+from rsa_io import lectura_archivo,escritura_archivo,extraer_hasta_directorio
 
-import re
-import matplotlib.pyplot as plt
-import numpy as np
+
+
+from metodos_rsa import parametros_estaciones,obtener_directorios,recolectar_evt,clasificar_evento_sismico,ejecutar_en_vm
+from PyQt5 import uic, QtWidgets#Importamos módulo uic y Qtwidgets
 from PyQt5.QtWidgets import (QApplication,QMainWindow, QMessageBox)
 from obspy import read
 from obspy import Stream
 from datetime import datetime
 from datetime import timedelta
-from obspy.io.mseed.util import get_record_information
+from PyQt5.QtCore import QUrl
+
 dic_estaciones = {
     "CHB": "CHAB",
     "CHC": "CHAC",
@@ -273,13 +274,9 @@ def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, b
         list[list]: Una lista con una sola fila de resumen del procesamiento del EVT.
     """
     import os, re, gc
-    from datetime import datetime
     import matplotlib.pyplot as plt
-    from pathlib import Path
 
     # Imports locales para abrir PNG sin bloquear la app
-    from PyQt5.QtCore import QUrl
-    from PyQt5.QtGui import QDesktopServices
     from PyQt5.QtWidgets import QMessageBox
 
     datos_completos = []
@@ -494,7 +491,7 @@ class MyApp(QMainWindow):
         ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", "Insertar_evt.ui")
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui, self)
-
+        self.cargar_ayuda_desde_archivo()
         self.setWindowTitle("LECTURA EVT")
         self.parametros = parametros_estaciones()
         self.directorio_trabajo = 'G:/Mi unidad/DIA/'
@@ -504,6 +501,55 @@ class MyApp(QMainWindow):
         self.Btn_directorio_datos.clicked.connect(self.Cargar_directorio)
         self.Btn_iniciar.clicked.connect(self.Iniciar)
         self.Btn_salir.clicked.connect(self.salir)
+
+
+
+    def cargar_ayuda_desde_archivo(self):
+        """
+        Carga en el QTextBrowser 'txt_ayuda' el archivo HTML de ayuda ubicado en:
+        rsa_sismologia/datos/ayuda_insercion_evt.html
+        """
+        try:
+            ruta_ayuda = os.path.join(ruta_proyecto, "datos", "ayuda_insercion_evt.html")
+            ruta_ayuda = os.path.abspath(ruta_ayuda)
+
+            if not os.path.exists(ruta_ayuda):
+                mensaje_html = f"""
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                </head>
+                <body>
+                    <h2 style="color:#b85450;">Archivo de ayuda no encontrado</h2>
+                    <p>No existe el archivo de ayuda esperado en la siguiente ruta:</p>
+                    <p><code>{ruta_ayuda}</code></p>
+                </body>
+                </html>
+                """
+                self.txt_ayuda.setHtml(mensaje_html)
+                return
+
+            self.txt_ayuda.setSource(QUrl.fromLocalFile(ruta_ayuda))
+
+        except Exception as error:
+            mensaje_error = f"""
+            <html>
+            <head>
+                <meta charset="utf-8">
+            </head>
+            <body>
+                <h2 style="color:#b85450;">Error al cargar la ayuda</h2>
+                <p><b>Detalle:</b> {str(error)}</p>
+            </body>
+            </html>
+            """
+            self.txt_ayuda.setHtml(mensaje_error)
+
+
+
+
+
+
 
     def Cargar_directorio(self, event):
         if self.radioDirectorio1.isChecked():
