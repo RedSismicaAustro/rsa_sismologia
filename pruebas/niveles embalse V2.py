@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 from datetime import datetime
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog, QLabel
-from metodos_rsa import lectura_archivo, escritura_archivo
+from rsa_io import lectura_archivo, escritura_archivo
+
+
 
 
 # ========================
