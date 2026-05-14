@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "libreria_RSA") (type "KiCad") (uri "I:/Mi unidad/RSA/tarjetas/Librerias existentes/simbolos/libreria_RSA.kicad_sym") (options "") (descr ""))
+)

@@ -8,20 +8,18 @@ RUTA_PROYECTO = os.path.abspath(
 )
 
 ARCHIVOS = [
-    # lógica común
-    os.path.join(RUTA_PROYECTO, "comun", "logica.py"),
-
-    # programa principal
+    # Programa principal
     os.path.join(RUTA_PROYECTO, "esp32", "main.py"),
     os.path.join(RUTA_PROYECTO, "esp32", "boot.py"),
 
-    # TODOS los drivers en el mismo directorio
+    # Drivers usados
     os.path.join(RUTA_PROYECTO, "esp32", "drivers", "i2c_bus.py"),
-    os.path.join(RUTA_PROYECTO, "esp32", "drivers", "aht20.py"),
-    os.path.join(RUTA_PROYECTO, "esp32", "drivers", "lis3dhtr.py"),
     os.path.join(RUTA_PROYECTO, "esp32", "drivers", "rgb_led.py"),
-    os.path.join(RUTA_PROYECTO, "esp32", "drivers", "sensor_adc.py"),
     os.path.join(RUTA_PROYECTO, "esp32", "drivers", "lcd_i2c.py"),
+    os.path.join(RUTA_PROYECTO, "esp32", "drivers", "hx711.py"),
+    os.path.join(RUTA_PROYECTO, "esp32", "drivers", "ds3231.py"),
+    os.path.join(RUTA_PROYECTO, "esp32", "drivers", "touch_sd.py"),
+    os.path.join(RUTA_PROYECTO, "esp32", "drivers", "control_reles.py"),
 ]
 print("Subida de archivos al SP32")
 def subir_archivos():
