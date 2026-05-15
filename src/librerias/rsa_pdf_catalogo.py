@@ -158,6 +158,7 @@ def imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_c
         # En evento _generar se tiene los datos a desplegarse en el reporte, sean de la RSA como de otras redes.
         directorios=obtener_directorios(evento_catalogo_sis)
         archivo_csv=directorio+'/'+directorios['archivo_csv']
+        eventos_a_graficar=[]
         with open(archivo_csv,newline='') as f:
             eventos_dia=csv.reader(f,delimiter=';',quotechar=';')
             for evento in eventos_dia:
