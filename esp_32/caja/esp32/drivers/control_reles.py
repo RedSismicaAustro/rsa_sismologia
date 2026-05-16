@@ -22,6 +22,8 @@ class ControlReles:
     # -------------------------------------------------
 
     MODO_DEFORMACION = "deformacion"
+    MODO_INCORRECTO_1 = "incorrecto 1"
+    MODO_INCORRECTO_2 = "incorrecto 2"
     MODO_TEMPERATURA = "temperatura"
 
     # -------------------------------------------------
@@ -245,6 +247,52 @@ class ControlReles:
 
     # -------------------------------------------------
 
+    def seleccionar_modo_incorrecto_1(self):
+        """
+        Selecciona medición incorrecto 1, solo pruebas.
+
+        Configuración:
+        - rele_3 = 0
+        - rele_4 = 1
+
+        Combinación válida:
+        01 -> incorrecto 1
+        """
+
+        self.rele_3.value(0)
+
+        self.rele_4.value(1)
+
+        self.modo_actual = (
+            self.MODO_INCORRECTO_1
+        )
+
+    # -------------------------------------------------
+
+    def seleccionar_modo_incorrecto_2(self):
+        """
+        Selecciona medición incorrecto 1, solo pruebas.
+
+        Configuración:
+        - rele_3 = 1
+        - rele_4 = 0
+
+        Combinación válida:
+        10 -> incorrecto 2
+        """
+
+        self.rele_3.value(1)
+
+        self.rele_4.value(0)
+
+        self.modo_actual = (
+            self.MODO_INCORRECTO_2
+        )
+
+
+
+    # -------------------------------------------------
+
     def seleccionar_modo_temperatura(self):
         """
         Selecciona medición de temperatura.
@@ -274,22 +322,25 @@ class ControlReles:
         Parámetro:
         - modo:
             * MODO_DEFORMACION
+            * MODO_INCORRECTO_1
+            * MODO_INCORRECTO_2
             * MODO_TEMPERATURA
         """
 
         if modo == self.MODO_DEFORMACION:
-
             self.seleccionar_modo_deformacion()
 
-        elif modo == self.MODO_TEMPERATURA:
+        elif modo == self.MODO_INCORRECTO_1:
+            self.seleccionar_modo_incorrecto_1()
 
+        elif modo == self.MODO_INCORRECTO_2:
+            self.seleccionar_modo_incorrecto_2()
+
+        elif modo == self.MODO_TEMPERATURA:
             self.seleccionar_modo_temperatura()
 
         else:
-
-            raise ValueError(
-                "Modo de medición no válido"
-            )
+            raise ValueError("Modo de medición no válido")
 
     # -------------------------------------------------
 

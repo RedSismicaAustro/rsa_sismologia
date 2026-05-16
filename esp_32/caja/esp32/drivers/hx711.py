@@ -1,141 +1,131 @@
 from machine import Pin
-from time import sleep_us
+from time import sleep_us, sleep_ms, ticks_ms, ticks_diff
 
 
 class HX711:
     """
-    Librería básica para manejo del ADC HX711.
+    Librería para manejo del ADC HX711.
 
-    El HX711 es un convertidor analógico-digital de 24 bits
-    diseñado para celdas de carga y puentes de Wheatstone.
+    El HX711 trabaja con dos líneas:
+    - DT  : salida de datos del HX711 hacia el ESP32.
+    - SCK : reloj generado por el ESP32.
 
-    Comunicación:
-    - DT  : línea de datos
-    - SCK : reloj serial
+    Funcionamiento:
+    - DT en alto  : conversión en proceso.
+    - DT en bajo  : dato disponible.
+    - El ESP32 genera 24 pulsos SCK para leer el dato.
+    - Pulsos extra seleccionan canal y ganancia para la siguiente conversión.
 
-    El HX711 trabaja enviando:
-    - 24 bits de datos
-    - pulsos adicionales para seleccionar:
-        * canal
-        * ganancia
-
-    Ganancias soportadas:
-    - 128 : Canal A
-    - 64  : Canal A
-    - 32  : Canal B
+    Ganancias:
+    - 128 -> Canal A
+    - 64  -> Canal A
+    - 32  -> Canal B
     """
 
-    def __init__(self, pin_datos, pin_clock, ganancia=128):
-        """
-        Inicializa el HX711.
+    GANANCIA_A_128 = 128
+    GANANCIA_A_64 = 64
+    GANANCIA_B_32 = 32
 
-        Parámetros:
-        - pin_datos : GPIO conectado al pin DT
-        - pin_clock : GPIO conectado al pin SCK
-        - ganancia  : ganancia inicial (128, 64 o 32)
-        """
-
-        # Configuración de pines
+    def __init__(self, pin_datos, pin_clock, ganancia=GANANCIA_A_128):
         self.pin_datos = Pin(pin_datos, Pin.IN)
         self.pin_clock = Pin(pin_clock, Pin.OUT)
 
-        # Configuración interna
         self.ganancia = ganancia
+        self.pulsos_ganancia = 1
 
-        # Offset utilizado para tara
         self.offset = 0
-
-        # Factor de escala para calibración
         self.escala = 1.0
 
-        # Inicializar reloj en bajo
+        self.ultima_lectura_cruda = None
+        self.ultima_lectura = None
+
+        # SCK debe quedar en bajo.
+        # Si SCK queda alto más de ~60 us, el HX711 entra en power-down.
         self.pin_clock.value(0)
+        sleep_ms(500)
 
-        # Configurar cantidad de pulsos
-        # según ganancia seleccionada
-        self._configurar_ganancia()
+        self.configurar_ganancia(ganancia)
 
-    # -------------------------------------------------
-
-    def _configurar_ganancia(self):
+    def configurar_ganancia(self, ganancia):
         """
-        Configura la cantidad de pulsos extra requeridos
-        por el HX711 para seleccionar canal y ganancia.
+        Configura canal y ganancia para la siguiente conversión.
 
-        Tabla HX711:
-        - 1 pulso  -> Canal A ganancia 128
-        - 3 pulsos -> Canal A ganancia 64
-        - 2 pulsos -> Canal B ganancia 32
+        Pulsos extra después de los 24 bits:
+        - 1 pulso  -> Canal A, ganancia 128
+        - 2 pulsos -> Canal B, ganancia 32
+        - 3 pulsos -> Canal A, ganancia 64
         """
 
-        if self.ganancia == 128:
+        if ganancia == self.GANANCIA_A_128:
             self.pulsos_ganancia = 1
 
-        elif self.ganancia == 64:
-            self.pulsos_ganancia = 3
-
-        elif self.ganancia == 32:
+        elif ganancia == self.GANANCIA_B_32:
             self.pulsos_ganancia = 2
 
-        else:
-            raise ValueError("Ganancia inválida")
+        elif ganancia == self.GANANCIA_A_64:
+            self.pulsos_ganancia = 3
 
-    # -------------------------------------------------
+        else:
+            raise ValueError("Ganancia invalida. Use 128, 64 o 32.")
+
+        self.ganancia = ganancia
+
+        # Se realiza una lectura de descarte para aplicar la ganancia
+        # a la siguiente conversión, si el HX711 responde.
+        self.leer_crudo(timeout_ms=1500)
 
     def disponible(self):
         """
-        Verifica si el HX711 tiene datos listos.
-
-        El pin DT:
-        - LOW  -> dato disponible
-        - HIGH -> conversión en proceso
-
-        Retorna:
-        - True  : dato listo
-        - False : aún ocupado
+        Retorna True cuando DT está en bajo,
+        indicando dato listo.
         """
 
         return self.pin_datos.value() == 0
 
-    # -------------------------------------------------
-
-    def leer_crudo(self):
+    def esperar_disponible(self, timeout_ms=1500):
         """
-        Lee una muestra cruda de 24 bits desde el HX711.
+        Espera a que el HX711 tenga dato listo.
 
-        Proceso:
-        1. Esperar dato disponible.
-        2. Generar 24 pulsos de reloj.
-        3. Leer bits MSB primero.
-        4. Generar pulsos extra de ganancia.
-        5. Convertir a entero signed.
+        Se usa timeout para evitar que el programa se cuelgue
+        si el HX711 no responde, no está alimentado, o SCK quedó mal.
+        """
+
+        inicio = ticks_ms()
+
+        while not self.disponible():
+
+            if ticks_diff(ticks_ms(), inicio) >= timeout_ms:
+                return False
+
+            sleep_ms(1)
+
+        return True
+
+    def leer_crudo(self, timeout_ms=1500):
+        """
+        Lee una muestra cruda signed de 24 bits.
 
         Retorna:
-        - Valor entero signed de 24 bits.
+        - entero signed si la lectura fue correcta.
+        - None si no hubo dato disponible dentro del timeout.
         """
 
-        # Esperar hasta que HX711 tenga datos
-        while not self.disponible():
-            pass
+        if not self.esperar_disponible(timeout_ms):
+            return None
 
         valor = 0
 
-        # Lectura de 24 bits
         for _ in range(24):
 
-            # Flanco ascendente
             self.pin_clock.value(1)
             sleep_us(1)
 
-            # Desplazar y agregar bit
             valor = (valor << 1) | self.pin_datos.value()
 
-            # Flanco descendente
             self.pin_clock.value(0)
             sleep_us(1)
 
-        # Pulsos extra para seleccionar
-        # canal y ganancia siguiente
+        # Pulsos extra para definir canal/ganancia siguiente.
         for _ in range(self.pulsos_ganancia):
 
             self.pin_clock.value(1)
@@ -144,82 +134,159 @@ class HX711:
             self.pin_clock.value(0)
             sleep_us(1)
 
-        # Conversión signed 24 bits
-        # HX711 entrega complemento a dos
+        # Conversión complemento a dos de 24 bits.
         if valor & 0x800000:
             valor -= 0x1000000
 
+        self.ultima_lectura_cruda = valor
+
         return valor
 
-    # -------------------------------------------------
-
-    def leer(self, muestras=5):
+    def leer_promedio_crudo(self, muestras=10, timeout_ms=1500, espera_entre_muestras_ms=120):
         """
-        Lee múltiples muestras y retorna promedio calibrado.
+        Lee varias muestras crudas y retorna su promedio.
 
-        Parámetros:
-        - muestras : cantidad de muestras a promediar
+        Para módulos HX711 típicos a 10 SPS, una muestra nueva aparece
+        aproximadamente cada 100 ms. Por eso se deja una espera
+        entre lecturas.
+        """
 
-        Proceso:
-        1. Leer múltiples muestras crudas.
-        2. Calcular promedio.
-        3. Aplicar offset (tara).
-        4. Aplicar escala.
+        acumulado = 0
+        validas = 0
+
+        for _ in range(muestras):
+
+            valor = self.leer_crudo(timeout_ms=timeout_ms)
+
+            if valor is not None:
+                acumulado += valor
+                validas += 1
+
+            sleep_ms(espera_entre_muestras_ms)
+
+        if validas == 0:
+            return None
+
+        return acumulado / validas
+
+    def leer(self, muestras=5, timeout_ms=1500, espera_entre_muestras_ms=120):
+        """
+        Lee valor calibrado:
+        (promedio_crudo - offset) / escala
+        """
+
+        promedio = self.leer_promedio_crudo(
+            muestras=muestras,
+            timeout_ms=timeout_ms,
+            espera_entre_muestras_ms=espera_entre_muestras_ms
+        )
+
+        if promedio is None:
+            return None
+
+        valor = (promedio - self.offset) / self.escala
+
+        self.ultima_lectura = valor
+
+        return valor
+
+    def tarar(self, muestras=20, timeout_ms=1500):
+        """
+        Calcula el offset del sistema.
+
+        Debe ejecutarse sin carga o con la condición base definida.
 
         Retorna:
-        - Valor calibrado.
+        - True si la tara fue válida.
+        - False si no se pudieron obtener muestras.
         """
 
-        acumulado = 0
+        promedio = self.leer_promedio_crudo(
+            muestras=muestras,
+            timeout_ms=timeout_ms,
+            espera_entre_muestras_ms=120
+        )
 
-        # Acumular muestras
-        for _ in range(muestras):
-            acumulado += self.leer_crudo()
+        if promedio is None:
+            return False
 
-        # Promedio
-        promedio = acumulado / muestras
+        self.offset = promedio
 
-        # Aplicar calibración
-        return (promedio - self.offset) / self.escala
-
-    # -------------------------------------------------
-
-    def tarar(self, muestras=20):
-        """
-        Realiza tara del sistema.
-
-        La tara calcula el offset promedio
-        cuando no existe carga aplicada.
-
-        Parámetros:
-        - muestras : cantidad de muestras para promedio
-        """
-
-        acumulado = 0
-
-        for _ in range(muestras):
-            acumulado += self.leer_crudo()
-
-        # Guardar offset promedio
-        self.offset = acumulado / muestras
-
-    # -------------------------------------------------
+        return True
 
     def establecer_escala(self, escala):
         """
-        Configura factor de escala.
+        Define el factor de escala.
 
-        Este factor permite convertir:
-        - cuentas ADC
-        en:
-        - gramos
-        - kg
-        - deformación
-        - fuerza
-        - etc.
-
-        Parámetros:
-        - escala : factor multiplicativo
+        La escala convierte cuentas ADC a unidades físicas:
+        gramos, kg, deformación, fuerza, etc.
         """
 
+        if escala == 0:
+            raise ValueError("La escala no puede ser cero")
+
         self.escala = escala
+
+    def calibrar_con_peso(self, peso_conocido, muestras=20, timeout_ms=1500):
+        """
+        Calcula la escala usando una carga conocida.
+
+        Procedimiento típico:
+        1. Tarar sin carga.
+        2. Colocar peso conocido.
+        3. Ejecutar este método.
+        """
+
+        promedio = self.leer_promedio_crudo(
+            muestras=muestras,
+            timeout_ms=timeout_ms,
+            espera_entre_muestras_ms=120
+        )
+
+        if promedio is None:
+            return False
+
+        diferencia = promedio - self.offset
+
+        if diferencia == 0:
+            return False
+
+        self.escala = diferencia / peso_conocido
+
+        return True
+
+    def apagar(self):
+        """
+        Pone el HX711 en modo bajo consumo.
+
+        SCK en alto por más de 60 us apaga el chip.
+        """
+
+        self.pin_clock.value(0)
+        sleep_us(1)
+        self.pin_clock.value(1)
+        sleep_us(70)
+
+    def encender(self):
+        """
+        Despierta el HX711 dejando SCK en bajo.
+        """
+
+        self.pin_clock.value(0)
+        sleep_ms(500)
+
+    def obtener_estado(self):
+        """
+        Retorna estado interno útil para diagnóstico.
+        """
+
+        return {
+            "ganancia": self.ganancia,
+            "offset": self.offset,
+            "escala": self.escala,
+            "ultima_lectura_cruda": self.ultima_lectura_cruda,
+            "ultima_lectura": self.ultima_lectura,
+            "disponible": self.disponible(),
+            "dt": self.pin_datos.value(),
+            "sck": self.pin_clock.value(),
+        }
