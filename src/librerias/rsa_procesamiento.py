@@ -50,7 +50,7 @@ def lectura_rsa(archivo, directorio_trabajo, usuario, archivo_rsa_detectado=''):
 
     # Si ya sé cuál RSA cambió en virtual, uso ese como prioritario
     if archivo_rsa_detectado:
-        archivos_evento = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='real')
+        archivos_evento = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='auto')
         archivos_evento[2] = archivo_rsa_detectado
 
         nombre_rsa = Path(archivo_rsa_detectado).stem.rstrip('abc')
@@ -68,18 +68,7 @@ def lectura_rsa(archivo, directorio_trabajo, usuario, archivo_rsa_detectado=''):
         archivos_evento[6] = os.path.join(dir_fast, base_lp + "S")
 
     else:
-        if ss_evento > 50:
-            rutas_siguiente = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='siguiente')
-            rutas_real = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='real')
-
-            if os.path.exists(rutas_siguiente[2]):
-                archivos_evento = rutas_siguiente
-            elif os.path.exists(rutas_real[2]):
-                archivos_evento = rutas_real
-            else:
-                archivos_evento = rutas_siguiente
-        else:
-            archivos_evento = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='real')
+        archivos_evento = archivos_fast(archivo, directorio_trabajo, usuario, modo_minuto_fast='auto')
 
     # El sufijo solo aplica en host
     if usuario == '':
@@ -260,21 +249,15 @@ def lectura_rsa(archivo, directorio_trabajo, usuario, archivo_rsa_detectado=''):
     else:
         return
 
-
-
 def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False, modo_minuto_fast='auto'):
-    print("Archivos fast")
     """
-    Regla:
-        - sis y fas -> SIEMPRE minuto exacto
-        - FASTHYPO (rsa, Phase, L, P, S):
-              * modo_minuto_fast='real'      -> minuto exacto
-              * modo_minuto_fast='siguiente' -> minuto +1
-              * modo_minuto_fast='auto'      -> si ss > 50 usa +1, caso contrario minuto exacto
-
-    Siempre retorna las 7 rutas, existan o no.
+    Genera rutas para archivos FASTHYPO.
+    
+    modo_minuto_fast:
+        'real'      -> fuerza minuto exacto
+        'siguiente' -> fuerza minuto + 1
+        'auto'      -> busca archivos existentes o usa ss>50 si no existen
     """
-
     info = obtener_directorios(evento)
     dir_dia = os.path.join(dir_trabajo, info['Directorio_dia'])
     dir_fast = os.path.join(dir_trabajo, info['Directorio_fastHypo'])
@@ -310,49 +293,65 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False, mod
 
     segundo_evento = int(ss)
     dt_evento = datetime(yy, int(mm), int(dd), int(hh), int(minu), segundo_evento)
+    dt_siguiente = dt_evento + timedelta(minutes=1)
+
+    def generar_rutas_fast(dt):
+        mm_fast = dt.strftime("%m")
+        dd_fast = dt.strftime("%d")
+        hh_fast = dt.strftime("%H")
+        minu_fast = dt.strftime("%M")
+
+        rsa_nom = f"{mm_fast}{dd_fast}{hh_fast}{minu_fast}.rsa"
+        archivo_rsa = os.path.join(dir_fast, rsa_nom)
+
+        phase_nom = f"Phase{dd_fast}{hh_fast[0]}.{hh_fast[1]}{minu_fast}"
+        archivo_phase = os.path.join(dir_fast, phase_nom)
+
+        base_lp = f"{mm_fast}{dd_fast}{hh_fast}.{minu_fast}"
+        archivo_L = os.path.join(dir_fast, base_lp + "L")
+        archivo_P = os.path.join(dir_fast, base_lp + "P")
+        archivo_S = os.path.join(dir_fast, base_lp + "S")
+
+        return [archivo_rsa, archivo_phase, archivo_L, archivo_P, archivo_S]
+
+    rutas_fast_real = generar_rutas_fast(dt_evento)
+    rutas_fast_siguiente = generar_rutas_fast(dt_siguiente)
 
     if modo_minuto_fast == 'real':
-        dt_fast = dt_evento
+        rutas_fast_elegidas = rutas_fast_real
     elif modo_minuto_fast == 'siguiente':
-        dt_fast = dt_evento + timedelta(minutes=1)
-    else:  # auto
-        if segundo_evento > 50:
-            dt_fast = dt_evento + timedelta(minutes=1)
+        rutas_fast_elegidas = rutas_fast_siguiente
+    else:
+        existe_real = os.path.exists(rutas_fast_real[0])
+        existe_siguiente = os.path.exists(rutas_fast_siguiente[0])
+
+        if existe_real or os.path.exists(rutas_fast_real[1]):
+            rutas_fast_elegidas = rutas_fast_real
+        elif existe_siguiente or os.path.exists(rutas_fast_siguiente[1]):
+            rutas_fast_elegidas = rutas_fast_siguiente
         else:
-            dt_fast = dt_evento
-
-    mm_fast, dd_fast, hh_fast, minu_fast = dt_fast.strftime("%m %d %H %M").split()
-
-    rsa_nom = f"{mm_fast}{dd_fast}{hh_fast}{minu_fast}.rsa"
-    archivo_rsa = os.path.join(dir_fast, rsa_nom)
-
-    phase_nom = f"Phase{dd_fast}{hh_fast[0]}.{hh_fast[1]}{minu_fast}"
-    archivo_phase = os.path.join(dir_fast, phase_nom)
-
-    base_lp = f"{mm_fast}{dd_fast}{hh_fast}.{minu_fast}"
-    archivo_L = os.path.join(dir_fast, base_lp + "L")
-    archivo_P = os.path.join(dir_fast, base_lp + "P")
-    archivo_S = os.path.join(dir_fast, base_lp + "S")
+            if segundo_evento > 50:
+                rutas_fast_elegidas = rutas_fast_siguiente
+            else:
+                rutas_fast_elegidas = rutas_fast_real
 
     rutas = [
         archivo_sis,
         archivo_fas,
-        archivo_rsa,
-        archivo_phase,
-        archivo_L,
-        archivo_P,
-        archivo_S
+        rutas_fast_elegidas[0],
+        rutas_fast_elegidas[1],
+        rutas_fast_elegidas[2],
+        rutas_fast_elegidas[3],
+        rutas_fast_elegidas[4]
     ]
 
-    etiquetas = ['.sis', '.fas', '.rsa', 'Phase', '.L', '.P', '.S']
-    existe = {etq: os.path.isfile(ruta) for etq, ruta in zip(etiquetas, rutas)}
-    faltantes = [etq for etq, ok in existe.items() if not ok]
-
     if retornar_validaciones:
+        etiquetas = ['.sis', '.fas', '.rsa', 'Phase', '.L', '.P', '.S']
+        existe = {etq: os.path.isfile(ruta) for etq, ruta in zip(etiquetas, rutas)}
+        faltantes = [etq for etq, ok in existe.items() if not ok]
         return rutas, existe, faltantes
 
     return rutas
-
 
 
 def verificar_coincidencias(eventos, evento_procesar, rutas_fast):
