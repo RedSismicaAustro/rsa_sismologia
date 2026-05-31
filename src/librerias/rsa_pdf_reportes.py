@@ -488,9 +488,12 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
                         tiempo_inicio,tiempo_inicial,duracion, catNames=obtener_marcas_tiempo(trCanal[i])
                         estacion=trCanal[i][0].stats.station
                         estacion_completa=dato[i+3]
-                        grado_=int(estacion_completa[6:8])
-                        freqmin_=int(estacion_completa[8:10])
-                        freqmax_=int(estacion_completa[10:12])
+                        try:
+                            grado_=int(estacion_completa[6:8])
+                            freqmin_=int(estacion_completa[8:10])
+                            freqmax_=int(estacion_completa[10:12])
+                        except ValueError:
+                            grado_=0
                         if grado_!=0:
                                 trCanal[i][0].filter("bandpass",freqmin=freqmin_,freqmax=freqmax_,corners=grado_)
                                 trCanal_copia_filtrada[i][0].filter("bandpass",freqmin=freqmin_,freqmax=freqmax_,corners=grado_)
