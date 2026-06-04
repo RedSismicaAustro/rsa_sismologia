@@ -39,6 +39,7 @@ class VisorEVT(QWidget):
         self.fecha_base_ref = None
         self.mtime_ref = None
         self.fecha_descarga_str = None
+        self.evento_ancla_calibracion = None
 
         self.figura = Figure(figsize=(10, 6))
         self.canvas = FigureCanvas(self.figura)
@@ -70,13 +71,12 @@ class VisorEVT(QWidget):
         self.boton_marcar_ruido = QPushButton("Marcar como Ruido [Ctrl+R]")
         self.boton_marcar_ruido.clicked.connect(lambda: self.marcar_actual("ruido"))
 
-        self.boton_calibrar = QPushButton("Calibrar con último EVT marcado (±5h)")
-        self.boton_calibrar.clicked.connect(self.calibrar_con_ultimo_sismo)
-
         self.boton_mostrar_fechas = QPushButton("Mostrar fechas de sismos")
         self.boton_mostrar_fechas.clicked.connect(self.mostrar_fechas_sismos)
-        self.boton_salir = QPushButton("Salir y guardar eventos")
-        self.boton_salir.clicked.connect(self.salir_guardar)
+        self.boton_guardar = QPushButton("Guardar eventos")
+        self.boton_guardar.clicked.connect(self.guardar_eventos)
+        self.boton_salir = QPushButton("Salir")
+        self.boton_salir.clicked.connect(self.salir)
 
         # Lista de archivos EVT
         self.lista_archivos = QListWidget()
@@ -109,8 +109,8 @@ class VisorEVT(QWidget):
         layout_raiz.addWidget(self.edit_raiz)
         layout_raiz.addWidget(self.boton_raiz)
 
-        self.boton_cargar_catalogo = QPushButton("Cargar catálogo para esta fecha")
-        self.boton_cargar_catalogo.clicked.connect(self.cargar_catalogo_fecha)
+        self.boton_cargar_catalogo = QPushButton("Calibrar y asignar con catalogo")
+        self.boton_cargar_catalogo.clicked.connect(self.calibrar_con_ultimo_sismo)
 
         # Layout principal
         splitter_principal = QSplitter(Qt.Horizontal)
@@ -124,7 +124,6 @@ class VisorEVT(QWidget):
         layout_izq.addWidget(self.boton_cargar_carpeta)
         layout_izq.addWidget(self.boton_marcar_evento)
         layout_izq.addWidget(self.boton_marcar_ruido)
-        layout_izq.addWidget(self.boton_calibrar)
         layout_izq.addWidget(self.boton_mostrar_fechas)
         layout_izq.addWidget(self.lista_archivos)
         layout_izq.addWidget(self.label_margen)
@@ -133,6 +132,7 @@ class VisorEVT(QWidget):
         layout_izq.addWidget(self.tabla_asignaciones)
         layout_izq.addLayout(layout_raiz)
         layout_izq.addWidget(self.boton_cargar_catalogo)
+        layout_izq.addWidget(self.boton_guardar)
         layout_izq.addWidget(self.boton_salir)
 
         panel_derecho = QWidget()
@@ -161,6 +161,23 @@ class VisorEVT(QWidget):
             hhmmss = match.group(1)
             return f"{hhmmss[:2]}:{hhmmss[2:4]}:{hhmmss[4:]}"
         return ""
+
+    def obtener_fecha_hora_evento_catalogo(self, nombre_evento, fecha_respaldo=None, hora_respaldo=None):
+        match = re.search(r"(\d{8})_(\d{6})", str(nombre_evento))
+        if match:
+            try:
+                return datetime.strptime(f"{match.group(1)}_{match.group(2)}", "%Y%m%d_%H%M%S")
+            except ValueError:
+                return None
+
+        if fecha_respaldo and hora_respaldo:
+            hora_limpia = str(hora_respaldo).replace(":", "")
+            try:
+                return datetime.strptime(f"{fecha_respaldo}_{hora_limpia}", "%Y%m%d_%H%M%S")
+            except ValueError:
+                return None
+
+        return None
 
     def cargar_catalogo_por_fecha(self, fecha_str):
         if fecha_str in self.cache_catalogos:
@@ -200,18 +217,8 @@ class VisorEVT(QWidget):
         except:
             return None
 
-    def cargar_catalogo_fecha(self):
-        if not self.fecha_descarga_str:
-            QMessageBox.warning(self, "Sin fecha", "Primero cargue una carpeta de descarga.")
-            return
-        # Solo se carga para tener disponible el catálogo del día de descarga (por si se necesita)
-        # No se muestra en interfaz
-        matriz = self.cargar_catalogo_por_fecha(self.fecha_descarga_str)
-        if matriz is None:
-            QMessageBox.warning(self, "Catálogo no encontrado", f"No se encontró catálogo para {self.fecha_descarga_str}")
-
     # ------------------------------------------------------------
-    # Calibración (usa el último EVT marcado como sismo y la referencia original)
+    # Calibracion (usa el ultimo EVT marcado como sismo y la referencia original)
     # ------------------------------------------------------------
     def calibrar_con_ultimo_sismo(self):
         evt_eventos = [(ruta, sub, nom, mtime) for (ruta, sub, nom, mtime) in self.archivos_evt
@@ -223,108 +230,104 @@ class VisorEVT(QWidget):
         evt_eventos.sort(key=lambda x: x[3])
         ruta_ult, sub_ult, nom_ult, mtime_ult = evt_eventos[-1]
 
-        # Calcular la fecha corregida usando la referencia ORIGINAL (no la actual)
+        # Siempre se parte de la referencia original: cada intento recalcula desde cero.
         fecha_corr_ult = self.corregir_fecha_con_referencia(mtime_ult, self.fecha_base_ref_original)
         if not fecha_corr_ult:
-            QMessageBox.warning(self, "Error", "No se pudo obtener la hora corregida del último EVT.")
+            QMessageBox.warning(self, "Error", "No se pudo obtener la hora corregida del ultimo EVT.")
             return
 
         fecha_evt_str = fecha_corr_ult.strftime("%Y%m%d")
         catalogo_fecha = self.cargar_catalogo_por_fecha(fecha_evt_str)
         if catalogo_fecha is None:
-            QMessageBox.warning(self, "Catálogo no encontrado", f"No se encontró catálogo para la fecha {fecha_evt_str}")
+            QMessageBox.warning(self, "Catalogo no encontrado", f"No se encontro catalogo para la fecha {fecha_evt_str}")
             return
 
         margen_horas = 5
-        seg_evt = fecha_corr_ult.hour * 3600 + fecha_corr_ult.minute * 60 + fecha_corr_ult.second
         opciones = []
-        for num, evento, tipo, hora_str, _ in catalogo_fecha:
-            if not hora_str:
+        for num, evento, tipo, hora_str, path_csv in catalogo_fecha:
+            tiempo_catalogo = self.obtener_fecha_hora_evento_catalogo(evento, fecha_evt_str, hora_str)
+            if tiempo_catalogo is None:
                 continue
-            try:
-                h_cat = datetime.strptime(hora_str, "%H:%M:%S").time()
-            except:
-                continue
-            seg_cat = h_cat.hour * 3600 + h_cat.minute * 60 + h_cat.second
-            if abs(seg_cat - seg_evt) <= margen_horas * 3600:
-                opciones.append((num, evento, tipo, hora_str))
+            diferencia_seg = abs((tiempo_catalogo - fecha_corr_ult).total_seconds())
+            if diferencia_seg <= margen_horas * 3600:
+                opciones.append((num, evento, tipo, hora_str, path_csv, tiempo_catalogo, diferencia_seg))
 
         if not opciones:
-            QMessageBox.warning(self, "Sin coincidencias", f"No hay eventos en el catálogo de {fecha_evt_str} dentro de ±{margen_horas} horas.")
+            QMessageBox.warning(self, "Sin coincidencias", f"No hay eventos en el catalogo de {fecha_evt_str} dentro de +/-{margen_horas} horas.")
             return
 
+        opciones.sort(key=lambda item: item[5])
         dialogo = QDialog(self)
-        dialogo.setWindowTitle("Calibración - seleccione el evento real")
-        dialogo.setGeometry(300, 300, 600, 400)
+        dialogo.setWindowTitle("Calibracion - seleccione el evento real")
+        dialogo.setGeometry(300, 300, 700, 400)
         layout = QVBoxLayout(dialogo)
 
-        lbl_info = QLabel(f"Último EVT marcado como sismo: {nom_ult}\n"
-                          f"Fecha corregida (según referencia original): {fecha_corr_ult.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                          f"Catálogo de: {fecha_evt_str}\n"
-                          f"Seleccione el evento real (±{margen_horas}h):")
+        lbl_info = QLabel(f"Ultimo EVT marcado como sismo: {nom_ult}\n"
+                          f"Fecha corregida inicial: {fecha_corr_ult.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                          f"Catalogo de: {fecha_evt_str}\n"
+                          f"Seleccione el evento real. Ese evento quedara con diferencia 0.")
         layout.addWidget(lbl_info)
 
         lista = QListWidget()
-        for num, ev, tp, hr in opciones:
-            item = QListWidgetItem(f"{num} - {ev} ({tp})  Hora: {hr}")
-            item.setData(Qt.UserRole, (num, ev, tp, hr))
+        for num, ev, tp, hr, path_csv, tiempo_catalogo, diferencia_seg in opciones:
+            item = QListWidgetItem(
+                f"{num} - {ev} ({tp})  Hora: {hr}  Dif inicial: {diferencia_seg/60:.1f} min"
+            )
+            item.setData(Qt.UserRole, (num, ev, tp, hr, path_csv, tiempo_catalogo))
             lista.addItem(item)
         layout.addWidget(lista)
 
-        btn_ok = QPushButton("Aceptar y recalibrar")
+        btn_ok = QPushButton("Aceptar, recalibrar y asignar")
         layout.addWidget(btn_ok)
 
         def on_accept():
             sel = lista.currentItem()
             if not sel:
-                QMessageBox.warning(dialogo, "Selección", "Debe seleccionar un evento.")
+                QMessageBox.warning(dialogo, "Seleccion", "Debe seleccionar un evento.")
                 return
-            num, ev, tp, hora_real_str = sel.data(Qt.UserRole)
-            self.recalibrar_referencia_desde_original(ruta_ult, hora_real_str)
+            num, ev, tp, hora_real_str, path_csv, tiempo_catalogo = sel.data(Qt.UserRole)
+            if not self.recalibrar_referencia_desde_original(ruta_ult, tiempo_catalogo):
+                return
+            self.evento_ancla_calibracion = (ruta_ult, num, ev, path_csv, tiempo_catalogo)
             dialogo.accept()
             self.asignar_todos_automaticamente()
 
         btn_ok.clicked.connect(on_accept)
         dialogo.exec_()
 
-    def recalibrar_referencia_desde_original(self, ruta_evt, hora_real_str):
-        """Calcula el delta usando la referencia original y actualiza self.fecha_base_ref"""
-        # Obtener información del EVT
+    def recalibrar_referencia_desde_original(self, ruta_evt, tiempo_real_catalogo):
+        """Recalcula la referencia desde la referencia original y ancla el EVT elegido al catalogo."""
         for r, sub, nom, mtime in self.archivos_evt:
             if r == ruta_evt:
                 evt_info = (r, sub, nom, mtime)
                 break
         else:
-            return
+            return False
 
-        # Fecha corregida usando la referencia ORIGINAL
         fecha_corr_original = self.corregir_fecha_con_referencia(evt_info[3], self.fecha_base_ref_original)
         if not fecha_corr_original:
-            return
+            return False
 
-        # Parsear hora real seleccionada
-        try:
-            hora_real = datetime.strptime(hora_real_str, "%H:%M:%S").time()
-        except:
-            QMessageBox.warning(self, "Error", f"Hora inválida: {hora_real_str}")
-            return
-
-        # Calcular el desplazamiento necesario
-        fecha_base_dia = self.fecha_base_ref_original.replace(hour=0, minute=0, second=0)
-        hora_real_dt = datetime.combine(fecha_base_dia.date(), hora_real)
-        delta = hora_real_dt - fecha_corr_original
-
-        # Aplicar el desplazamiento a la referencia original para obtener la nueva referencia
+        delta = tiempo_real_catalogo - fecha_corr_original
         self.fecha_base_ref = self.fecha_base_ref_original + delta
 
-        # Actualizar información en la interfaz
+        fecha_verificacion = self.corregir_fecha(evt_info[3])
+        diferencia_verificacion = abs((fecha_verificacion - tiempo_real_catalogo).total_seconds())
+        if diferencia_verificacion > 0.001:
+            QMessageBox.warning(
+                self,
+                "Calibracion",
+                f"La referencia no quedo exactamente en cero. Diferencia: {diferencia_verificacion:.6f} s"
+            )
+            return False
+
         self.actualizar_info_ultimo_sismo()
-        # Actualizar el EVT actual si está visible
         for i in range(self.lista_archivos.count()):
             ruta = self.archivos_evt[i][0]
             if ruta == self.archivo_actual_ruta:
                 self.cargar_y_graficar_evt(ruta, self.archivos_evt[i][3])
                 break
+        return True
 
     # ------------------------------------------------------------
     # Asignación automática (usa la referencia actual)
@@ -354,7 +357,19 @@ class VisorEVT(QWidget):
                                         "No se encontró catálogo", "")
                 continue
 
-            seg_evt = fecha_corr.hour * 3600 + fecha_corr.minute * 60 + fecha_corr.second
+            if self.evento_ancla_calibracion and ruta == self.evento_ancla_calibracion[0]:
+                _, numero_ancla, evento_ancla, path_csv_ancla, _ = self.evento_ancla_calibracion
+                self.asociaciones[ruta] = numero_ancla
+                self.agregar_fila_tabla(nom, fecha_corr.strftime("%Y-%m-%d %H:%M:%S"),
+                                        f"{numero_ancla} - {evento_ancla}", "0.0")
+                row = self.tabla_asignaciones.rowCount() - 1
+                self.tabla_asignaciones.item(row, 0).setData(Qt.UserRole, (fecha_str, evento_ancla, path_csv_ancla))
+                for i in range(self.lista_archivos.count()):
+                    if self.archivos_evt[i][0] == ruta:
+                        self.lista_archivos.item(i).setForeground(QColor("darkgreen"))
+                        break
+                continue
+
             mejor_evento = None
             mejor_diff = margen_seg + 1
             mejor_num = None
@@ -362,14 +377,10 @@ class VisorEVT(QWidget):
             mejor_path_csv = None
 
             for num, ev, tp, hora_str, path_csv in catalogo:
-                if not hora_str:
+                tiempo_catalogo = self.obtener_fecha_hora_evento_catalogo(ev, fecha_str, hora_str)
+                if tiempo_catalogo is None:
                     continue
-                try:
-                    h_cat = datetime.strptime(hora_str, "%H:%M:%S").time()
-                except:
-                    continue
-                seg_cat = h_cat.hour * 3600 + h_cat.minute * 60 + h_cat.second
-                diff = abs(seg_cat - seg_evt)
+                diff = abs((tiempo_catalogo - fecha_corr).total_seconds())
                 if diff < mejor_diff:
                     mejor_diff = diff
                     mejor_evento = (num, ev, path_csv)
@@ -576,7 +587,7 @@ class VisorEVT(QWidget):
         nombre_archivo = os.path.basename(ruta_ultimo)
         self.label_ultimo_sismo.setText(
             f"📅 Último sismo: {nombre_archivo} - {fecha_corregida.strftime('%Y-%m-%d %H:%M:%S')} "
-            f"(referencia: {self.fecha_base_ref.strftime('%Y-%m-%d %H:%M:%S')} → {diff_texto})"
+            f"(referencia: {self.fecha_base_ref.strftime('%Y-%m-%d %H:%M:%S')} -> {diff_texto})"
         )
 
     def mostrar_fechas_sismos(self):
@@ -595,7 +606,7 @@ class VisorEVT(QWidget):
         for ruta, mtime, nombre in eventos:
             fecha_corr = self.corregir_fecha(mtime)
             if fecha_corr:
-                contenido += f"{nombre}\n  → {fecha_corr.strftime('%Y-%m-%d %H:%M:%S')}\n  (ruta: {ruta})\n\n"
+                contenido += f"{nombre}\n  -> {fecha_corr.strftime('%Y-%m-%d %H:%M:%S')}\n  (ruta: {ruta})\n\n"
             else:
                 contenido += f"{nombre}\n  → Error en corrección\n\n"
         texto.setPlainText(contenido)
@@ -619,6 +630,7 @@ class VisorEVT(QWidget):
             self.fecha_descarga_str = nombre_carpeta
         else:
             self.fecha_descarga_str = None
+            self.evento_ancla_calibracion = None
             QMessageBox.warning(self, "Formato de carpeta", "La carpeta no tiene nombre AAAAMMDD.")
         # Establecer la referencia original
         self.fecha_base_ref_original = self.obtener_fecha_base_desde_carpeta(carpeta)
@@ -733,30 +745,51 @@ class VisorEVT(QWidget):
                 current_item.setForeground(QColor("red"))
         self.label_etiqueta_actual.setText(f"Etiqueta: {tipo}")
         self.actualizar_info_ultimo_sismo()
-        if tipo == "evento":
-            self.asignar_todos_automaticamente()
 
     def exportar_todos_evt(self, directorio_destino):
         if not self.archivos_evt:
             return False
         try:
             os.makedirs(directorio_destino, exist_ok=True)
+            self.ultimo_resumen_exportacion = []
             for ruta_original, sub, nombre_original, mtime in self.archivos_evt:
                 fecha_corr = self.corregir_fecha(mtime)
                 if fecha_corr is None:
                     continue
-                nombre_nuevo = fecha_corr.strftime("%Y%m%d_%H%M%S") + ".EVT"
+
+                etiqueta = self.etiquetas.get(ruta_original, "ruido")
+                sub_limpio = re.sub(r"[^A-Za-z0-9_-]+", "_", str(sub)).strip("_")
+                base_nombre = f"{fecha_corr.strftime('%Y%m%d_%H%M%S')}_{etiqueta}"
+                if sub_limpio:
+                    base_nombre = f"{base_nombre}_{sub_limpio}"
+
+                nombre_nuevo = base_nombre + ".EVT"
                 ruta_destino = os.path.join(directorio_destino, nombre_nuevo)
+                contador = 1
+                while os.path.exists(ruta_destino):
+                    nombre_nuevo = f"{base_nombre}_{contador:03d}.EVT"
+                    ruta_destino = os.path.join(directorio_destino, nombre_nuevo)
+                    contador += 1
+
                 shutil.copy2(ruta_original, ruta_destino)
+                marca_tiempo_corregida = fecha_corr.timestamp()
+                os.utime(ruta_destino, (marca_tiempo_corregida, marca_tiempo_corregida))
+                self.ultimo_resumen_exportacion.append([
+                    ruta_original,
+                    ruta_destino,
+                    etiqueta,
+                    fecha_corr.strftime("%Y-%m-%d %H:%M:%S"),
+                    sub,
+                    nombre_original,
+                ])
             return True
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No se pudo exportar: {e}")
             return False
 
-    def salir_guardar(self):
+    def guardar_eventos(self):
         if not self.archivos_evt:
             QMessageBox.warning(self, "Sin datos", "No hay archivos EVT para exportar.")
-            QApplication.quit()
             return
 
         if self.ruta_descarga_actual:
@@ -771,6 +804,15 @@ class VisorEVT(QWidget):
         if self.exportar_todos_evt(destino):
             QMessageBox.information(self, "Exportación", f"Archivos EVT exportados a:\n{destino}")
 
+        if getattr(self, "ultimo_resumen_exportacion", None):
+            archivo_resumen = os.path.join(destino, "evt_exportados_todos.csv")
+            try:
+                with open(archivo_resumen, "w", encoding="utf-8", newline="") as f:
+                    escritor = csv.writer(f, delimiter=";")
+                    escritor.writerow(["ruta_original", "ruta_exportada", "etiqueta", "fecha_corregida", "subcarpeta", "nombre_original"])
+                    escritor.writerows(self.ultimo_resumen_exportacion)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"No se pudo guardar resumen de exportacion: {e}")
         rutas_eventos = [ruta for ruta, tipo in self.etiquetas.items() if tipo == "evento"]
         if rutas_eventos:
             archivo_salida = os.path.join(destino, "eventos_sismos.txt")
@@ -790,6 +832,9 @@ class VisorEVT(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"No se pudo guardar asignaciones: {e}")
 
+        self.limpiar_interfaz()
+
+    def salir(self):
         QApplication.quit()
 
 
