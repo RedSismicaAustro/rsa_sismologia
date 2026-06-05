@@ -40,24 +40,24 @@ from datetime import datetime
 from datetime import timedelta
 from PyQt5.QtCore import QUrl
 
-dic_estaciones = {
+DICCIONARIO_ESTACIONES_EVT = {
     "CHB": "CHAB",
     "CHC": "CHAC",
     "MZB": "MABA",
-    "MZC": "MACI",    
+    "MZC": "MACI",
     "MZD": "MADE",
     "PABA": "DPBA",
     "PACI": "DPCI",
-    "ACC1": "EEAS",#Esta denominación está en varios lugares, EEAlSur,EEALNor,Miraflo    
+    "ACC1": "EEAS",#Esta denominación está en varios lugares, EEAlSur,EEALNor,Miraflo
     "": "",
     "": "",
     "UCET": "UCET",#Esta está marcada como unversidad de Cuenca
     "UDEC": "UCET"#Falta esta estación en la lista de estaciones, es la Universidad de Cuenca
-    
+
 }
 
 
-dic_estaciones_dir = {
+DICCIONARIO_ESTACIONES_DIRECTORIO = {
     "Azogues": "CICA",
     "CICA": "CICA",
     "ChanludBase":"CHAB",
@@ -77,13 +77,13 @@ dic_estaciones_dir = {
     "EEAlSur": "EEAS",
     "EEE-AltSur": "EEAS",
     "Huajibam": "AHUA",
-    "Huajibamba": "AHUA",    
-    "HUAJIBAM": "AHUA",    
-    "Huajibamba-SSA": "AHUA",    
+    "Huajibamba": "AHUA",
+    "HUAJIBAM": "AHUA",
+    "Huajibamba-SSA": "AHUA",
     "MazarBas": "MABA",
     "MazarBase": "MABA",
-    "MazarCim": "MACI",    
-    "MazarCima": "MACI",    
+    "MazarCim": "MACI",
+    "MazarCima": "MACI",
     "MazarDer": "MADE",
     "Miraflo": "MIRA",
     "Miraflor": "MIRA",
@@ -101,18 +101,18 @@ dic_estaciones_dir = {
     "UCcamp": "UCET",#
     "UCoficin": "UCAO",#
     "UDEC": "UCET"#Falta esta estación en la lista de estaciones, es la Universidad de Cuenca
-    
+
 }
 
 
-def obtener_estacion_dir(entrada):
-    return dic_estaciones_dir.get(entrada, entrada)
+def normalizar_codigo_estacion_desde_directorio(entrada):
+    return DICCIONARIO_ESTACIONES_DIRECTORIO.get(entrada, entrada)
 
-def obtener_estacion(entrada):
-    return dic_estaciones.get(entrada, entrada)
+def normalizar_codigo_estacion_desde_evt(entrada):
+    return DICCIONARIO_ESTACIONES_EVT.get(entrada, entrada)
 
 
-def ajustar_tiempos_stream_por_evento(eventos, stream, tolerancia_minutos):
+def ajustar_tiempos_stream_con_catalogo(eventos, stream, tolerancia_minutos):
     """
     Ajusta el starttime de cada traza del Stream para calzar con el evento más cercano
     dentro de una tolerancia dada. Devuelve el stream ajustado, una bandera de si hubo
@@ -124,7 +124,7 @@ def ajustar_tiempos_stream_por_evento(eventos, stream, tolerancia_minutos):
     - Se robusteció el parseo para aceptar tanto 15 caracteres como con extensión.
     """
     tr = stream[0]
-    estacion = obtener_estacion(str(tr.stats.station).strip().upper())
+    estacion = normalizar_codigo_estacion_desde_evt(str(tr.stats.station).strip().upper())
     inicio = tr.stats.starttime
 
     tiempo_stream = inicio.datetime
@@ -185,7 +185,7 @@ def ajustar_tiempos_stream_por_evento(eventos, stream, tolerancia_minutos):
 
 
 
-def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_equipo: str = None) -> list:
+def insertar_evento_en_catalogo(directorio_grabar: str, eventos: list, st: Stream, serial_equipo: str = None) -> list:
     """
     Inserta un evento en la lista de eventos, guardando el archivo MiniSEED
     y marcando en 'eventos' la columna correspondiente a la estación.
@@ -194,13 +194,13 @@ def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_eq
     """
     # Extrae desde el stream
     tr = st[0]
-    estacion = obtener_estacion(str(tr.stats.station).strip().upper())
+    estacion = normalizar_codigo_estacion_desde_evt(str(tr.stats.station).strip().upper())
     inicio = tr.stats.starttime
 
     # Nombre de salida .mseed; si hay serial, anteponerlo y crear subcarpeta
     prefijo = str(serial_equipo) if serial_equipo else estacion
     nombre_archivo = f"{prefijo}_{inicio.strftime('%Y%m%d_%H%M%S')}.mseed"
-    
+
     destino = directorio_grabar
     if serial_equipo:
         destino = os.path.join(directorio_grabar, str(serial_equipo))
@@ -256,7 +256,7 @@ def insertar_evento(directorio_grabar: str, eventos: list, st: Stream, serial_eq
 
 
 
-def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, bandera_insertar, directorio_destino=None, ventana_parent=None):
+def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, bandera_insertar, directorio_destino=None, ventana_parent=None):
     """
     Lee un archivo EVT (Kinemetrics), trata de calzarlo en el catálogo del día para ajustar tiempos,
     clasifica el evento y, si corresponde, inserta el .mseed y actualiza el CSV.
@@ -289,7 +289,7 @@ def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, b
     for d in directorios_almacenamiento:
         if not d:
             continue
-        partes_ruta_mapeadas.append(dic_estaciones_dir.get(d, d))
+        partes_ruta_mapeadas.append(DICCIONARIO_ESTACIONES_DIRECTORIO.get(d, d))
     directorio_estacion_almacenado = " / ".join(partes_ruta_mapeadas) if partes_ruta_mapeadas else "Sin ruta"
 
     # Variables de salida
@@ -339,7 +339,7 @@ def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, b
             pass
 
         # Normaliza código de estación
-        estacion = obtener_estacion(str(st[0].stats.station).strip().upper())
+        estacion = normalizar_codigo_estacion_desde_evt(str(st[0].stats.station).strip().upper())
 
         # Si se pide destino por serial, renombra y dirige a esa carpeta
         serial_para_nombre = str(equipo_serial) if directorio_destino else None
@@ -351,7 +351,7 @@ def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, b
             eventos = lectura_archivo(ruta_csv)
 
             # === Ajuste de tiempos contra el catálogo (tolerancia 5 min) ===
-            st, bandera_localizacion, tipo, archivo_mseed_nominal = ajustar_tiempos_stream_por_evento(
+            st, bandera_localizacion, tipo, archivo_mseed_nominal = ajustar_tiempos_stream_con_catalogo(
                 eventos, st, tolerancia_minutos=5
             )
 
@@ -426,7 +426,7 @@ def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, b
             # === Inserción en catálogo / escritura CSV ===
             if bandera_insertar and bandera_localizacion:
                 try:
-                    eventos = insertar_evento(directorio_final, eventos, st, serial_para_nombre)
+                    eventos = insertar_evento_en_catalogo(directorio_final, eventos, st, serial_para_nombre)
                     escritura_archivo(ruta_csv, eventos)
                     mensaje_1 = 'Insertado'
                 except Exception as e:
@@ -452,39 +452,73 @@ def transformar_copiar_EVT(archivo_evt, directorio_trabajo, bandera_verificar, b
     return datos_completos
 
 
-def transformar_copiar_lista_EVT(self, lista_rutas_evt):
-    datos_completos = []
-    datos=['archivo_evt', 'archivo_mseed', 'mensaje', 'archivo', 'insercion',
-                        'resultado_str', 'directorio_estacion_almacenado', 'estacion',
-                        'equipo_modelo', 'equipo_version', 'equipo_serial']
-    datos_completos.append(datos)
+def extraer_rutas_evt_desde_lista(filas_csv_o_rutas):
+    rutas_evt = []
+    for fila in filas_csv_o_rutas:
+        if isinstance(fila, (list, tuple)):
+            candidatos = [str(valor).strip() for valor in fila if str(valor).strip()]
+            ruta_evt = next((valor for valor in candidatos if valor.lower().endswith(".evt")), "")
+            if not ruta_evt and candidatos:
+                ruta_evt = candidatos[0]
+        else:
+            ruta_evt = str(fila).strip()
+
+        if ruta_evt:
+            rutas_evt.append(ruta_evt)
+    return rutas_evt
+
+
+def construir_fila_resumen_error(ruta_evt, mensaje_error):
+    return [
+        ruta_evt,
+        "",
+        f"Error inesperado: {mensaje_error}",
+        "",
+        "No insertado",
+        "",
+        "",
+        "Desconocido",
+        "Desconocido",
+        "Desconocida",
+        "Desconocido",
+    ]
+
+
+def procesar_lista_archivos_evt(ventana, lista_rutas_evt):
+    resumen_procesamiento = []
+    encabezado = ['archivo_evt', 'archivo_mseed', 'mensaje', 'archivo', 'insercion',
+                  'resultado_str', 'directorio_estacion_almacenado', 'estacion',
+                  'equipo_modelo', 'equipo_version', 'equipo_serial']
+    resumen_procesamiento.append(encabezado)
     total_archivos = len(lista_rutas_evt)
 
-    self.progressBar.setMaximum(total_archivos)
-    self.progressBar.setValue(0)
+    ventana.progressBar.setMaximum(total_archivos)
+    ventana.progressBar.setValue(0)
 
     for contador, archivo_evt in enumerate(lista_rutas_evt, start=1):
         print(archivo_evt)
-        datos = transformar_copiar_EVT(archivo_evt,
-                                       self.directorio_trabajo,
-                                       self.checkBox_verificacion.isChecked(),
-                                       self.checkBox_insercion.isChecked(),
-                                       self.directorio_destino,
-                                       self  # <-- importante para que no “desaparezcan” las figuras
-                                       )
+        try:
+            datos_archivo = procesar_archivo_evt(
+                archivo_evt,
+                ventana.directorio_trabajo,
+                ventana.checkBox_verificacion.isChecked(),
+                ventana.checkBox_insercion.isChecked(),
+                ventana.directorio_destino,
+                ventana,
+            )
+        except Exception as error:
+            datos_archivo = [construir_fila_resumen_error(archivo_evt, error)]
 
-        
-        datos_completos.extend(datos)
-        self.progressBar.setValue(contador)
+        resumen_procesamiento.extend(datos_archivo)
+        ventana.progressBar.setValue(contador)
         QtWidgets.QApplication.processEvents()
 
-    self.progressBar.setValue(total_archivos)
-    return datos_completos
+    ventana.progressBar.setValue(total_archivos)
+    return resumen_procesamiento
 
-
-class MyApp(QMainWindow):
+class VentanaInsercionEVT(QMainWindow):
     def __init__(self, parent=None):
-        super(MyApp, self).__init__(parent)
+        super(VentanaInsercionEVT, self).__init__(parent)
 
 
         # Cargar la interfaz desde el archivo .ui directamente en esta instancia
@@ -497,10 +531,11 @@ class MyApp(QMainWindow):
         self.directorio_trabajo = 'G:/Mi unidad/DIA/'
         self.progressBar.setValue(0)
 
-        self.Btn_drive.clicked.connect(self.seleccionar_drive)
-        self.Btn_directorio_datos.clicked.connect(self.Cargar_directorio)
-        self.Btn_iniciar.clicked.connect(self.Iniciar)
-        self.Btn_salir.clicked.connect(self.salir)
+        self.Btn_drive.clicked.connect(self.seleccionar_directorio_trabajo)
+        self.Btn_directorio_datos.clicked.connect(self.cargar_directorio_origen)
+        self.Btn_iniciar.clicked.connect(self.iniciar_procesamiento)
+        self.Btn_salir.clicked.connect(self.cerrar_ventana)
+        self.cmbx_eventos.currentTextChanged.connect(self.actualizar_subdirectorios_por_anio)
 
 
 
@@ -551,28 +586,24 @@ class MyApp(QMainWindow):
 
 
 
-    def Cargar_directorio(self, event):
+    def cargar_directorio_origen(self, event):
         if self.radioDirectorio1.isChecked():
             self.directorio_estacion = QtWidgets.QFileDialog.getExistingDirectory(None, 'Seleccione Directorio EVT')
-            aux_ = os.listdir(self.directorio_estacion)
-            self.directorio_principal = sorted(aux_)
+            if not self.directorio_estacion:
+                return
+
+            nombres_directorios = os.listdir(self.directorio_estacion)
+            self.directorio_principal = sorted(nombres_directorios)
+            self.cmbx_eventos.clear()
             self.cmbx_eventos.addItems(self.directorio_principal)
-            # Limpiar y llenar el combobox de subdirectorios
-            self.cmbx_subdirectorios.clear()
-            self.cmbx_subdirectorios.addItem("Todos")  # Opción por defecto
-            # Verifica que haya algo seleccionado
-            if self.directorio_principal:
-                primer_subdir = os.path.join(self.directorio_estacion, self.directorio_principal[0])
-                if os.path.isdir(primer_subdir):
-                        subdirectorios = [d for d in os.listdir(primer_subdir)
-                                      if os.path.isdir(os.path.join(primer_subdir, d))]
-                        self.cmbx_subdirectorios.addItems(sorted(subdirectorios))
+            self.actualizar_subdirectorios_por_anio(self.cmbx_eventos.currentText())
+
         if self.radioLista.isChecked():
             self.ruta_csv, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Seleccionar archivo CSV", "", "CSV Files (*.csv)")
+
         if self.radioDirectorio2.isChecked():
             self.directorio_evt_completo = QtWidgets.QFileDialog.getExistingDirectory(None, 'Seleccione Directorio EVT (completo)')
             if self.directorio_evt_completo:
-                # Recolectar todos los archivos .evt dentro de cualquier subdirectorio
                 self.lista_evt_directorio_completo = []
                 for raiz, _, archivos in os.walk(self.directorio_evt_completo):
                     for archivo in archivos:
@@ -580,9 +611,27 @@ class MyApp(QMainWindow):
                             self.lista_evt_directorio_completo.append(os.path.join(raiz, archivo))
                 QMessageBox.information(self, "Archivos encontrados", f"Se encontraron {len(self.lista_evt_directorio_completo)} archivos EVT.")
 
-            
 
-    def Iniciar(self):
+    def actualizar_subdirectorios_por_anio(self, directorio_anio):
+        self.cmbx_subdirectorios.clear()
+        self.cmbx_subdirectorios.addItem("Todos")
+
+        if not directorio_anio or not hasattr(self, "directorio_estacion"):
+            return
+
+        ruta_anio = os.path.join(self.directorio_estacion, directorio_anio)
+        if not os.path.isdir(ruta_anio):
+            return
+
+        subdirectorios = [
+            nombre
+            for nombre in os.listdir(ruta_anio)
+            if os.path.isdir(os.path.join(ruta_anio, nombre))
+        ]
+        self.cmbx_subdirectorios.addItems(sorted(subdirectorios))
+
+    def iniciar_procesamiento(self):
+        datos = None
         if self.radio_estacion_serial.isChecked():
             self.directorio_destino = QtWidgets.QFileDialog.getExistingDirectory(self, 'Seleccionar directorio destino por serial')
             if not self.directorio_destino:
@@ -601,35 +650,40 @@ class MyApp(QMainWindow):
             total_archivos = len(lista_evt)
             self.progressBar.setMaximum(total_archivos)
             self.progressBar.setValue(0)
-            datos =transformar_copiar_lista_EVT(self, lista_evt)
+            datos = procesar_lista_archivos_evt(self, lista_evt)
         if self.radioLista.isChecked():
-            rutas_evt=lectura_archivo(self.ruta_csv)
-            datos = transformar_copiar_lista_EVT(self, rutas_evt)
+            rutas_evt = extraer_rutas_evt_desde_lista(lectura_archivo(self.ruta_csv))
+            datos = procesar_lista_archivos_evt(self, rutas_evt)
         if self.radioDirectorio2.isChecked():
             if hasattr(self, "lista_evt_directorio_completo"):
                 lista_evt = self.lista_evt_directorio_completo
-                datos = transformar_copiar_lista_EVT(self, lista_evt)
+                datos = procesar_lista_archivos_evt(self, lista_evt)
             else:
                 QMessageBox.warning(self, "Error", "No se ha seleccionado ningún directorio.")
                 return
+        if datos is None:
+            QMessageBox.warning(self, "Error", "No hay datos para procesar.")
+            return
         salida=os.path.join(self.directorio_trabajo, 'procesados_desde_csv.csv')
         escritura_archivo(salida, datos)
         QMessageBox.information(self, "Proceso finalizado", f"Archivo generado:\n{salida}")
 
 
-    def seleccionar_drive(self):
+    def seleccionar_directorio_trabajo(self):
         folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Seleccionar carpeta de trabajo')
+        if not folderpath:
+            return
         if not folderpath.endswith('/'):
             folderpath += '/'
         self.directorio_trabajo = folderpath
         self.lbl_directorio_trabajo.setText("Directorio de trabajo:   "+self.directorio_trabajo)
 
 
-    def salir(self):
+    def cerrar_ventana(self):
         self.close()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = MyApp()
+    window = VentanaInsercionEVT()
     window.show()
     sys.exit(app.exec_())
