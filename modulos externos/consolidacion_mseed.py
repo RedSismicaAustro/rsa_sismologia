@@ -13,6 +13,8 @@ def extraer_hasta_directorio(ruta_completa, nombre_directorio):
 
 ruta_librerias = os.path.dirname(__file__)
 ruta_proyecto = extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
+if not ruta_proyecto:
+    raise RuntimeError('No se encontro la raiz del proyecto rsa_sismologia')
 ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
 ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
 # Insertar la ruta al inicio del sys.path
@@ -28,10 +30,11 @@ import shutil
 import numpy as np
 from pathlib import Path as _Path
 
-from rsa_io import leer_mseed,conversion_mseed,lectura_archivo,escritura_archivo
+from rsa_io import leer_mseed,lectura_archivo
 
 from rsa_utilidades import loc_cabecera
 from metodos_gestion import parametros_estaciones, obtencion_hora, obtener_directorios
+from rsa_dominio import obtenerTraza
 from datetime import datetime
 import obspy
 
@@ -52,30 +55,29 @@ from PyQt5.QtGui import QTextCursor
 
 def mensaje_lbl(Lbl_Mensajes, mensaje, borrar=False):
     """
-    Escribe en Lbl_Mensajes (QTextEdit).
-    - borrar=True: reemplaza el texto.
-    - borrar=False: agrega el mensaje en la siguiente línea.
+    Agrega mensajes con timestamp en Lbl_Mensajes y consola.
+    El historial no se borra aunque se reciba borrar=True.
     """
     try:
         Lbl_Mensajes.setAlignment(Qt.AlignLeft)
         Lbl_Mensajes.setLineWrapMode(QTextEdit.WidgetWidth)
 
         texto_nuevo = "" if mensaje is None else str(mensaje)
+        texto_nuevo = " | ".join(linea.strip() for linea in texto_nuevo.splitlines() if linea.strip())
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        texto_log = f"[{timestamp}] {texto_nuevo}"
+        print(texto_log)
 
-        if borrar:
-            Lbl_Mensajes.setPlainText(texto_nuevo)
-        else:
-            cursor = Lbl_Mensajes.textCursor()
-            cursor.movePosition(QTextCursor.End)
-            Lbl_Mensajes.setTextCursor(cursor)
-            if Lbl_Mensajes.toPlainText():
-                Lbl_Mensajes.insertPlainText("\n")
-            Lbl_Mensajes.insertPlainText(texto_nuevo)
+        cursor = Lbl_Mensajes.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        Lbl_Mensajes.setTextCursor(cursor)
+        if Lbl_Mensajes.toPlainText():
+            Lbl_Mensajes.insertPlainText("\n")
+        Lbl_Mensajes.insertPlainText(texto_log)
 
         QCoreApplication.processEvents()
     except Exception:
         pass
-
 def mostrar_advertencia(self):
     msg_box = QMessageBox(self)
     msg_box.setWindowTitle('Advertencia')
@@ -88,53 +90,6 @@ def mostrar_advertencia(self):
 # ==========================
 # Helpers de control/validación
 # ==========================
-
-def extraer_id_evento_desde_ruta(texto):
-    """
-    Obtiene AAAAMMDDhhmmss a partir de:
-    - .../AAAAMMDD_hhmmss.sis
-    - .../AAAAMMDDhhmmss...
-    - .../G:/Mi unidad/DIA/AAAAMMDDhhmmss
-    """
-    s = str(texto)
-    m = re.search(r'(\d{14})', s)
-    if m:
-        return m.group(1)
-    m2 = re.search(r'(\d{8})[^\d]?(\d{6})', s)
-    if m2:
-        return m2.group(1) + m2.group(2)
-    return ""
-
-def dia_de_id_evento(id_evt):
-    """ Devuelve AAAAMMDD a partir de AAAAMMDDhhmmss """
-    if not id_evt or len(id_evt) < 8:
-        return ""
-    return id_evt[:8]
-
-def lectura_ultima_fila_analogico(archivo_analogico):
-    """ Devuelve cabecera y última fila válida o valores por defecto si no existe. """
-    cab = ['Archivo', 'puntero', 'segundo_m', 'contador_s']
-    if not os.path.exists(archivo_analogico):
-        return cab, [ "", '0', '00000', '0' ]
-    try:
-        filas = lectura_archivo(archivo_analogico)
-        if not filas or len(filas) < 2:
-            return cab, [ "", '0', '00000', '0' ]
-        fila = filas[-1]
-        fila_ext = [
-            fila[0] if len(fila) > 0 else "",
-            fila[1] if len(fila) > 1 else "0",
-            fila[2] if len(fila) > 2 else "00000",
-            fila[3] if len(fila) > 3 else "0",
-        ]
-        return cab, fila_ext
-    except Exception:
-        return cab, [ "", '0', '00000', '0' ]
-
-def escribir_analogico(archivo_analogico, fila):
-    """ Escribe analogico.csv con cabecera + única fila (último estado). """
-    cab = ['Archivo', 'puntero', 'segundo_m', 'contador_s']
-    escritura_archivo(archivo_analogico, [cab, fila])
 
 def eliminar_mseeds_del_dia(directorio_registros, dia_yyyymmdd, Lbl_Mensajes):
     """
@@ -154,41 +109,6 @@ def eliminar_mseeds_del_dia(directorio_registros, dia_yyyymmdd, Lbl_Mensajes):
     except Exception as e:
         mensaje_lbl(Lbl_Mensajes, f"[RESET] No se pudo listar {directorio_registros}: {e}", False)
 
-def verificar_o_resetear_por_dia(directorio_trabajo, directorio_registros, archivo_base, Lbl_Mensajes):
-    """
-    Verifica si el día de trabajo (derivado de archivo_base) coincide con el día guardado en analogico.csv.
-    Si no coincide: reinicia analogico.csv y elimina MSEED del día actual.
-    Retorna (dia_actual, fila_analogico) tras la verificación (fila ya coherente con el día).
-    """
-    archivo_analogico = os.path.join(directorio_trabajo, "analogico.csv")
-    id_evt_actual = extraer_id_evento_desde_ruta(archivo_base)
-    dia_actual = dia_de_id_evento(id_evt_actual)
-
-    cab, fila = lectura_ultima_fila_analogico(archivo_analogico)
-    dia_guardado = dia_de_id_evento(extraer_id_evento_desde_ruta(fila[0]))
-
-    if dia_guardado and dia_actual and (dia_guardado != dia_actual):
-        # Reset requerido
-        mensaje_lbl(Lbl_Mensajes, f"[INFO] Día diferente: {dia_guardado} → {dia_actual}. Reiniciando control.", False)
-        try:
-            # reset analogico.csv
-            fila_reset = [ archivo_base, '0', '00000', '0' ]
-            escribir_analogico(archivo_analogico, fila_reset)
-            # eliminar MSEED del día actual
-            eliminar_mseeds_del_dia(directorio_registros, dia_actual, Lbl_Mensajes)
-            return dia_actual, fila_reset
-        except Exception as e:
-            mensaje_lbl(Lbl_Mensajes, f"[ERROR] No se pudo reiniciar analogico.csv: {e}", False)
-            # aun así intentar borrar mseeds del día para empezar limpio
-            eliminar_mseeds_del_dia(directorio_registros, dia_actual, Lbl_Mensajes)
-            return dia_actual, fila  # devuelve lo que había
-    else:
-        # Si no hay fila previa útil, asegura que esté alineada con el archivo_base actual
-        if not fila[0]:
-            fila = [ archivo_base, '0', '00000', '0' ]
-            escribir_analogico(archivo_analogico, fila)
-        return dia_actual, fila
-
 def escribir_atomico_mseed(stream, destino):
     """
     Escribe un Stream en formato MSEED de manera atómica (tmp + replace).
@@ -207,75 +127,50 @@ def escribir_atomico_mseed(stream, destino):
     # reemplazo atómico
     os.replace(tmp, destino)
 
-def verificar_mseed_contra_analogico(ruta_mseed, t0_esperado, contador_s, Lbl_Mensajes, carpeta_inconsistentes=None, fs_esperada=64.0, tolerancia_fs=1e-6):
+def conversion_mseed_bloque(canal, hab_canal, nombre_canal, fecha_, directorio, Lbl_Mensajes):
     """
-    Verifica que el MSEED existente esté alineado con el control:
-    - t0_real == t0_esperado
-    - sampling_rate ≈ 64 Hz
-    - npts == contador_s * 64
-    Si no cumple, mueve a inconsistentes (si se indica) y retorna False.
-    Si cumple retorna True.
+    Convierte un binario ya leido a MSEEDs por bloque, conservando la hora real
+    del archivo binario. No acumula ni rellena huecos.
     """
-    if not os.path.exists(ruta_mseed):
-        return True  # no hay nada que validar
+    trCanal = [[] for _ in range(16)]
+    hora_string = fecha_.strftime('%Y%m%d_%H%M%S')
 
-    try:
-        st = obspy.read(ruta_mseed)
-    except Exception as e:
-        mensaje_lbl(Lbl_Mensajes, f"[VERIF] No se pudo leer {ruta_mseed}: {e}", False)
-        return False
+    for i in range(16):
+        if str(hab_canal[i]) == "0":
+            continue
 
-    if len(st) == 0:
-        return True
+        datos = np.asarray(canal[i], dtype=np.int32)
+        if datos.size == 0:
+            mensaje_lbl(Lbl_Mensajes, f"[MSEED] {nombre_canal[i]} sin muestras para convertir", False)
+            continue
 
-    # t0_real del stream (mínimo de trazas)
-    try:
-        t0_real = min(tr.stats.starttime for tr in st)
-    except Exception:
-        t0_real = None
+        traza = obtenerTraza(
+            nombre_canal[i],
+            1,
+            datos,
+            fecha_.year,
+            fecha_.month,
+            fecha_.day,
+            fecha_.hour,
+            fecha_.minute,
+            fecha_.second,
+            0
+        )
+        traza.stats.sampling_rate = 64.0
+        traza.stats.starttime = obspy.UTCDateTime(
+            fecha_.year,
+            fecha_.month,
+            fecha_.day,
+            fecha_.hour,
+            fecha_.minute,
+            fecha_.second
+        )
+        stream = obspy.Stream(traces=[traza])
+        nombre_mseed = os.path.join(directorio, f"{nombre_canal[i]}_{hora_string}.mseed")
+        escribir_atomico_mseed(stream, nombre_mseed)
+        trCanal[i] = stream
 
-    # fs y npts por canal (si hay varias trazas, sumar)
-    fs_ok = True
-    npts_total = 0
-    try:
-        for tr in st:
-            if abs(float(tr.stats.sampling_rate) - fs_esperada) > tolerancia_fs:
-                fs_ok = False
-            npts_total += int(tr.stats.npts)
-    except Exception:
-        fs_ok = False
-
-    npts_esp = int(contador_s) * int(fs_esperada)
-
-    ok = True
-    if t0_real is not None and t0_real != obspy.UTCDateTime(t0_esperado):
-        ok = False
-    if not fs_ok:
-        ok = False
-    if npts_total != npts_esp:
-        ok = False
-
-    if not ok:
-        # mover a inconsistentes si se pidió
-        if carpeta_inconsistentes:
-            try:
-                os.makedirs(carpeta_inconsistentes, exist_ok=True)
-                base = os.path.basename(ruta_mseed)
-                marca = datetime.now().strftime('%Y%m%d_%H%M%S')
-                destino = os.path.join(carpeta_inconsistentes, f"{marca}_{base}")
-                shutil.move(ruta_mseed, destino)
-                mensaje_lbl(Lbl_Mensajes, f"[VERIF] MSEED incoherente movido a: {destino}", False)
-            except Exception as e:
-                mensaje_lbl(Lbl_Mensajes, f"[VERIF] No se pudo mover incoherente {ruta_mseed}: {e}", False)
-        else:
-            try:
-                os.remove(ruta_mseed)
-                mensaje_lbl(Lbl_Mensajes, f"[VERIF] MSEED incoherente eliminado: {ruta_mseed}", False)
-            except Exception as e:
-                mensaje_lbl(Lbl_Mensajes, f"[VERIF] No se pudo eliminar incoherente {ruta_mseed}: {e}", False)
-        return False
-
-    return True
+    return trCanal
 
 # ==========================
 # Lector binario (tu versión original, sin cambios de lógica interna)
@@ -288,7 +183,6 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
     """
     import os
     import csv
-    import re
     import numpy as np
     from PyQt5.QtCore import QCoreApplication
 
@@ -302,12 +196,6 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
     )
     bytes_cuerpo = 2048
 
-    def archivo_vacio(ruta):
-        try:
-            return (not os.path.exists(ruta)) or (os.path.getsize(ruta) == 0)
-        except Exception:
-            return True
-
     def es_segundo_ascii_valido(b):
         if b is None or len(b) != 5:
             return False
@@ -316,16 +204,6 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
         except Exception:
             return False
         return len(t) == 5 and t.isdigit()
-
-    def extraer_id_evento_desde_ruta_local(texto):
-        s = str(texto)
-        m = re.search(r'(\d{14})', s)
-        if m:
-            return m.group(1)
-        m2 = re.search(r'(\d{8})[^\d]?(\d{6})', s)
-        if m2:
-            return m2.group(1) + m2.group(2)
-        return ""
 
     # ------------------- Estructuras de salida --------------------------- #
     canal = [[] for _ in range(n_canales)]
@@ -346,52 +224,22 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
     except Exception:
         pass
 
-    # ------------------- Cargar analogico.csv (REANUDACIÓN) -------------- #
-    archivo_analogico = os.path.join(directorio_trabajo, "analogico.csv")
-    referencias = [['Archivo', 'puntero', 'segundo_m', 'contador_s']]
+    # La lectura siempre inicia desde la cabecera localizada del binario.
     contador_segundos = 0
-    puntero_guardado = 0
+    huecos = 0
+    segundo_anterior = None
 
-    id_evt_bin = extraer_id_evento_desde_ruta_local(archivo_binario)
-    id_dia_bin = (id_evt_bin or "")[:8]
-    filas = []
-    if os.path.exists(archivo_analogico):
+    def registrar_segundo_leido(texto_segundo):
+        nonlocal huecos, segundo_anterior
         try:
-            filas = lectura_archivo(archivo_analogico)
+            segundo_actual = int(texto_segundo)
         except Exception:
-            filas = []
-
-    if not filas or len(filas) < 2:
-        fila_sel = [id_evt_bin or archivo_binario, '0', '00000', '0']
-        referencias = [['Archivo', 'puntero', 'segundo_m', 'contador_s'], fila_sel]
-
-    else:
-        fila = filas[-1]
-        id_evt_csv = extraer_id_evento_desde_ruta_local(fila[0]) if len(fila) > 0 else ""
-
-
-        # Solo reanudar si es exactamente el mismo archivo binario
-        if id_evt_csv and id_evt_csv == id_evt_bin:
-            fila_sel = fila
-        else:
-            fila_sel = [id_evt_bin or archivo_binario, '0', '00000', '0']
-
-        referencias = [['Archivo', 'puntero', 'segundo_m', 'contador_s'], fila_sel]
-    try:
-        puntero_guardado = int(referencias[1][1])
-    except Exception:
-        puntero_guardado = 0
-        referencias[1][1] = '0'
-
-    try:
-        contador_segundos = int(referencias[1][3])
-    except Exception:
-        contador_segundos = 0
-        referencias[1][3] = '0'
-
-    seg_m = str(referencias[1][2]) if len(referencias[1]) > 2 else "00000"
-    ultimo_texto_segundo = seg_m if isinstance(seg_m, str) and len(seg_m) == 5 else "00000"
-
+            return
+        if segundo_anterior is not None:
+            salto = (segundo_actual - segundo_anterior) % 86400
+            if salto > 1:
+                huecos += salto - 1
+        segundo_anterior = segundo_actual
     with open(archivo_binario, 'rb') as f_loc:
         numero_segundo, configuracion, puntero_cabecera = loc_cabecera(f_loc)
     puntero_inicio_marca = max(0, int(puntero_cabecera) - 5)
@@ -400,10 +248,7 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
     try:
         tamano_archivo = os.path.getsize(archivo_binario)
 
-        if puntero_guardado > 0:
-            puntero_lectura = min(max(0, puntero_guardado), tamano_archivo)
-        else:
-            puntero_lectura = max(0, puntero_inicio_marca)
+        puntero_lectura = max(0, puntero_inicio_marca)
 
         f.seek(puntero_lectura)
         pre = f.read(4)
@@ -491,6 +336,7 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
                             if len(cuerpo_) < bytes_cuerpo:
                                 break
                             ultimo_texto_segundo = numero_segundo_b.decode('ascii')
+                            registrar_segundo_leido(ultimo_texto_segundo)
                             datos = np.frombuffer(cuerpo_, dtype='<i2')
                             try:
                                 datos = datos.reshape((sps, n_canales))
@@ -562,6 +408,7 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
                     canal[m].extend(datos[:, m].tolist())
 
                 ultimo_texto_segundo = numero_segundo_b.decode('ascii')
+                registrar_segundo_leido(ultimo_texto_segundo)
                 contador += 1
                 contador_m += 1
                 if contador_m == 3600:
@@ -575,15 +422,6 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
                     except Exception:
                         pass
 
-            puntero_siguiente = f.tell()
-            fila_actual = [
-                id_evt_bin or archivo_binario,
-                str(puntero_siguiente),
-                ultimo_texto_segundo,
-                str(contador_segundos)
-            ]
-            escritura_archivo(archivo_analogico, [['Archivo', 'puntero', 'segundo_m', 'contador_s'], fila_actual])
-
         finally:
             pass
 
@@ -593,7 +431,6 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
         except Exception:
             pass
 
-    huecos = 0
     try:
         mensaje_lbl(Lbl_Mensajes, f"Lectura terminada,\nSegundos leídos: {contador}\nSegundos faltantes: {huecos}", True)
     except Exception:
@@ -623,36 +460,44 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         super(MyApp,self).__init__(parent)
         QMainWindow.__init__(self)
         uic.loadUi(ruta_ui, self)
-        self.setWindowTitle("PROCESAMIENTO SISMICO")
+        self.setWindowTitle("CONSOLIDACION MSEED")
         self.btn_abrir.clicked.connect(self.Abrir_archivo)
         self.Btn_Salir.clicked.connect(self.Salir_)
         self.Btn_drive.clicked.connect(self.seleccionar_drive)
         self.dateEdit.dateChanged.connect(self.showDate)
 
         self.parametros = parametros_estaciones()
+        self.config_estaciones = {
+            clave: list(valor) if isinstance(valor, list) else valor
+            for clave, valor in self.parametros.items()
+        }
         self.inicializar_()
 
-        self.nombre_canal = self.parametros['CODIGO']
-        self.n_canales = self.parametros['CANALES']
-        self.hab_canal = self.parametros['HAB_CANAL']
-        self.componente = self.parametros['COMPONENTE']
-        self.grafico = self.parametros['HAB_GRAFICO']
-        self.hab_plt = self.parametros['HAB_GRAFICO']
-        self.gan_plt = self.parametros['GANANCIA']
-        self.diez_plt = self.parametros['DIEZMADO_PLT']
-        self.bits_ = self.parametros['FACTOR_MUL']
+        self.nombre_canal = list(self.config_estaciones['CODIGO'])
+        self.n_canales = list(self.config_estaciones['CANALES'])
+        self.hab_canal = list(self.config_estaciones['HAB_CANAL'])
+        self.componente = list(self.config_estaciones['COMPONENTE'])
+        self.grafico = list(self.config_estaciones['HAB_GRAFICO'])
+        self.hab_plt = list(self.config_estaciones['HAB_GRAFICO'])
+        self.gan_plt = list(self.config_estaciones['GANANCIA'])
+        self.diez_plt = list(self.config_estaciones['DIEZMADO_PLT'])
+        self.bits_ = list(self.config_estaciones['FACTOR_MUL'])
+        self.tipo_canal = list(self.config_estaciones['CANAL'])
+        archivo_digitales = os.path.join(ruta_proyecto, 'datos', "digitales.csv")
+        self.est_digitales_ = lectura_archivo(archivo_digitales)
 
         now = datetime.now()
         fecha = QDate(now.year, now.month, now.day)
         directorio_trabajo = os.path.abspath(os.getcwd())
         aux = len(directorio_trabajo)
         self.directorio_trabajo = 'G:/Mi unidad/DIA/'
+        self.directorio_binario = os.path.join(self.directorio_trabajo, "Datos Estaciones") + os.sep
         d = datetime.today()
         d = QDate(d.year, d.month, d.day)
         self.dateEdit.setDate(d)
         self.dia = fecha.toString('yyMMdd')
         self.showDate(d)
-        mensaje_lbl(self.Lbl_Mensajes, "AUTOMATICO:", False)
+        mensaje_lbl(self.Lbl_Mensajes, "CONSOLIDACION MSEED:", False)
 
         if os.path.exists('R:'):
             self.bandera_drive_r = 1
@@ -672,8 +517,199 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         if folderpath[-1] != '/':
             folderpath = folderpath + '/'
         self.directorio_trabajo = folderpath
+        self.directorio_binario = os.path.join(self.directorio_trabajo, "Datos Estaciones") + os.sep
         mensaje_lbl(self.Lbl_Mensajes, self.directorio_trabajo, True)
         self.showDate(self.date)
+
+    def validar_fila_digital(self, fila, numero_fila):
+        if len(fila) < 2:
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] digitales.csv fila {numero_fila} incompleta - omitida", False)
+            return None
+
+        nombre_carpeta = fila[0].strip()
+        numero_estacion = fila[1].strip()
+        if not nombre_carpeta:
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] digitales.csv fila {numero_fila} sin carpeta - omitida", False)
+            return None
+
+        try:
+            num_estacion = int(numero_estacion)
+        except ValueError:
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] digitales.csv fila {numero_fila} con numero invalido '{numero_estacion}' - omitida", False)
+            return None
+
+        limites = (
+            len(self.config_estaciones['HAB_CANAL']),
+            len(self.config_estaciones['NOMBRE']),
+            len(self.config_estaciones['CODIGO']),
+            len(self.config_estaciones['COMPONENTE']),
+            len(self.config_estaciones['CANAL']),
+        )
+        if num_estacion < 0 or any(num_estacion >= limite for limite in limites):
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] digitales.csv fila {numero_fila} referencia estacion {num_estacion} fuera de rango - omitida", False)
+            return None
+
+        return nombre_carpeta, num_estacion
+
+    def filas_digitales_validas(self):
+        filas_validas = []
+        for numero_fila, fila in enumerate(self.est_digitales_[1:], start=2):
+            datos_fila = self.validar_fila_digital(fila, numero_fila)
+            if datos_fila is not None:
+                filas_validas.append((numero_fila, fila, datos_fila[0], datos_fila[1]))
+        return filas_validas
+
+    def registrar_huecos_stream(self, stream, codigo_estacion, momento):
+        huecos = stream.get_gaps()
+        if not huecos:
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: sin huecos detectados {momento}", False)
+            return
+
+        mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: {len(huecos)} huecos/solapes detectados {momento}", False)
+        for hueco in huecos[:5]:
+            red, estacion, ubicacion, canal, inicio, fin, delta, muestras = hueco
+            id_traza = ".".join(parte for parte in (red, estacion, ubicacion, canal) if parte)
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {id_traza}: {inicio} a {fin}, delta={delta:.4f}s, muestras={muestras}", False)
+        if len(huecos) > 5:
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] ... {len(huecos) - 5} huecos/solapes adicionales", False)
+
+    def seleccionar_traza_png_digital(self, stream, num_estacion, codigo_estacion):
+        canal_idx = int(self.config_estaciones['COMPONENTE'][num_estacion]) - 1
+        if canal_idx < 0:
+            canal_idx = 0
+
+        stream_ordenado = stream.copy()
+        stream_ordenado.sort(keys=['network', 'station', 'location', 'channel', 'starttime'])
+
+        orientaciones = str(self.config_estaciones['CANAL'][num_estacion]).strip().upper()
+        if canal_idx < len(orientaciones):
+            componente = orientaciones[canal_idx]
+            for traza in stream_ordenado:
+                canal = str(traza.stats.channel).upper()
+                if canal.endswith(componente):
+                    mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: PNG usando canal {traza.id} por componente {componente}", False)
+                    return traza
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: no se encontro componente {componente}; fallback por indice", False)
+
+        if len(stream_ordenado) > canal_idx:
+            traza = stream_ordenado[canal_idx]
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: PNG usando canal {traza.id} por indice {canal_idx + 1}", False)
+            return traza
+
+        return None
+
+    def procesar_digitales(self):
+        mensaje_lbl(self.Lbl_Mensajes, "=== PROCESANDO ESTACIONES DIGITALES ===", False)
+
+        if not os.path.isdir(self.directorio_binario):
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] No existe el directorio: {self.directorio_binario}", False)
+            return []
+
+        dia_yyyymmdd = self.date.toString('yyyyMMdd')
+        archivo_evento = dia_yyyymmdd + "_000000"
+        patron_mseed_dia = re.compile(r'^([A-Za-z0-9]{4})_(\d{8})_(\d{6}).*\.mseed$', re.IGNORECASE)
+        estaciones_procesadas = 0
+        png_pendientes = []
+
+        for numero_fila, estacion_digital, nombre_carpeta, num_estacion in self.filas_digitales_validas():
+            if self.config_estaciones['HAB_CANAL'][num_estacion] != '1':
+                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] Estacion {self.config_estaciones['NOMBRE'][num_estacion]} no habilitada - omitida", False)
+                continue
+
+            codigo_estacion = self.config_estaciones['CODIGO'][num_estacion]
+            ruta_carpeta = os.path.join(self.directorio_binario, nombre_carpeta)
+            if not os.path.isdir(ruta_carpeta):
+                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: carpeta no existe: {ruta_carpeta}", False)
+                continue
+
+            archivos_mseed = []
+            archivos_otro_codigo = 0
+            try:
+                for archivo in os.listdir(ruta_carpeta):
+                    match = patron_mseed_dia.match(archivo)
+                    if not match or match.group(2) != dia_yyyymmdd:
+                        continue
+                    codigo_archivo = match.group(1).upper()
+                    if codigo_archivo != codigo_estacion.upper():
+                        archivos_otro_codigo += 1
+                        continue
+                    archivos_mseed.append(os.path.join(ruta_carpeta, archivo))
+            except Exception as e:
+                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: error al listar {ruta_carpeta}: {e}", False)
+                continue
+
+            if archivos_otro_codigo:
+                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: {archivos_otro_codigo} archivos del dia ignorados por otro codigo", False)
+
+            if not archivos_mseed:
+                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: no hay MSEED para este dia", False)
+                continue
+
+            mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: {len(archivos_mseed)} archivos encontrados", False)
+
+            archivos_con_tiempo = []
+            archivos_sin_tiempo = []
+            for ruta in archivos_mseed:
+                try:
+                    st = obspy.read(ruta, headonly=True)
+                    t0 = min(tr.stats.starttime for tr in st)
+                    archivos_con_tiempo.append((t0, ruta))
+                except Exception as e:
+                    archivos_sin_tiempo.append(ruta)
+                    mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: sin cabecera legible {os.path.basename(ruta)}: {e}", False)
+
+            archivos_con_tiempo.sort(key=lambda x: x[0])
+            rutas_ordenadas = [r for _, r in archivos_con_tiempo] + archivos_sin_tiempo
+
+            stream_unido = obspy.Stream()
+            for ruta in rutas_ordenadas:
+                try:
+                    stream_unido += obspy.read(ruta)
+                except Exception as e:
+                    mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: error al leer {os.path.basename(ruta)}: {e}", False)
+
+            if len(stream_unido) == 0:
+                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: no se pudo leer ningun dato", False)
+                continue
+
+            self.registrar_huecos_stream(stream_unido, codigo_estacion, "antes de unir")
+            stream_unido.merge(method=1, fill_value=None)
+            stream_unido = stream_unido.split()
+            self.registrar_huecos_stream(stream_unido, codigo_estacion, "despues de unir")
+
+            archivo_salida = os.path.join(self.directorio_registros, f"{codigo_estacion}_{archivo_evento}.mseed")
+            try:
+                escribir_atomico_mseed(stream_unido, archivo_salida)
+                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] Unido: {codigo_estacion}_{archivo_evento}.mseed", False)
+                png_pendientes.append((archivo_salida, num_estacion, codigo_estacion, archivo_evento))
+            except Exception as e:
+                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: error al guardar: {e}", False)
+                continue
+
+            estaciones_procesadas += 1
+            QCoreApplication.processEvents()
+
+        mensaje_lbl(self.Lbl_Mensajes, f"=== DIGITALES COMPLETADO: {estaciones_procesadas} estaciones ===", False)
+        return png_pendientes
+
+    def imprimir_png_digitales(self, png_pendientes):
+        if not png_pendientes:
+            return
+
+        mensaje_lbl(self.Lbl_Mensajes, "Imprimiendo PNGs digitales:", False)
+        for archivo_salida, num_estacion, codigo_estacion, archivo_evento in png_pendientes:
+            try:
+                stream_unido = obspy.read(archivo_salida)
+                traza_png = self.seleccionar_traza_png_digital(stream_unido, num_estacion, codigo_estacion)
+                if traza_png is not None:
+                    png_salida = os.path.join(self.directorio, f"{codigo_estacion}_{archivo_evento}.png")
+                    traza_png.plot(type='dayplot', outfile=png_salida, dpi=200, size=(2400, 1800), linewidth=0.2, show=False)
+                    mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] PNG: {codigo_estacion}_{archivo_evento}.png", False)
+                else:
+                    mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: no existe canal valido para PNG", False)
+            except Exception as e:
+                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: error al generar PNG: {e}", False)
+            QCoreApplication.processEvents()
 
     def Abrir_archivo(self):
         lista_archivos = []
@@ -722,37 +758,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.archivo = self.directorio_trabajo + (lista_archivos[0] if lista_archivos else self.dia + '000000')
         self.definir_dia()
 
-        dia_actual, fila_analogico = verificar_o_resetear_por_dia(
-            self.directorio_trabajo,
-            self.directorio_registros,
-            self.archivo,
-            self.Lbl_Mensajes
-        )
-
-        try:
-            contador_s = int(fila_analogico[3]) if len(fila_analogico) > 3 else 0
-        except Exception:
-            contador_s = 0
-
-        dt0 = obtencion_hora(self.archivo)
-        t0_esperado = obspy.UTCDateTime(dt0)
-        carpeta_inconsistentes = os.path.join(self.directorio_registros, "_inconsistentes")
-
-        for i in range(0, 16):
-            if str(self.hab_canal[i]) != "0":
-                hora_string_primera = dt0.strftime('%y%m%d_%H%M%S')
-                nombreMseed_destino = os.path.join(
-                    self.directorio_registros,
-                    f"{self.nombre_canal[i]}_20{hora_string_primera}.mseed"
-                )
-                verificar_mseed_contra_analogico(
-                    nombreMseed_destino,
-                    t0_esperado,
-                    contador_s,
-                    self.Lbl_Mensajes,
-                    carpeta_inconsistentes=carpeta_inconsistentes
-                )
-
+        eliminar_mseeds_del_dia(self.directorio_registros, self.dia, self.Lbl_Mensajes)
         for archivo_ in lista_archivos:
             self.inicializar_()
             self.archivo = self.directorio_trabajo + archivo_
@@ -764,6 +770,9 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.archivo_binario, _ = QFileDialog.getOpenFileName(
                     None, "Seleccionar archivo", "", f"{nombre_archivo} ({nombre_archivo})"
                 )
+                if not self.archivo_binario:
+                    mensaje_lbl(self.Lbl_Mensajes, "Seleccion manual cancelada. Se omite el archivo.", False)
+                    continue
 
             self.canal, huecos = Leer_binario_comun(
                 self.directorio_trabajo,
@@ -783,116 +792,17 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             self.fecha_ = obtencion_hora(self.archivo)
             mensaje_lbl(self.Lbl_Mensajes, self.archivo, False)
             self.trCanal = leer_mseed(self.archivo, 0)
+            png_digitales = self.procesar_digitales()
             self.imprimir_png()
+            self.imprimir_png_digitales(png_digitales)
             mensaje_lbl(self.Lbl_Mensajes, "Terminado:", True)
         else:
             self.archivo = self.directorio_trabajo + self.dia + '000000'
-            mensaje_lbl(self.Lbl_Mensajes, "No hay registros para ese día..\nArchivo buscado: " + self.archivo, True)
-
-
-
-    def Abrir_archivo__(self):
-        lista_archivos = []
-        directorio_origen = 'R:'
-        try:
-            archivos_auxiliar = os.listdir(directorio_origen)
-            archivos_filtrados = [f for f in archivos_auxiliar
-                                  if re.fullmatch(r'\d{6}(?:000000|235959)', Path(f).stem)
-                                  and Path(f).suffix == '']
-            for archivo_copiar in archivos_filtrados:
-                if archivo_copiar[0:6] == self.dia[2:]:
-                    arch_aux = '20' + archivo_copiar
-                    archivo_origen = 'R:/' + archivo_copiar
-                    archivo_destino = self.directorio_trabajo + '20' + archivo_copiar
-                    if archivo_copiar[6:12] == "235959":
-                        archivo_destino = self.directorio_trabajo + '20' + archivo_copiar[0:6] + "000000"
-                        arch_aux = '20' + archivo_copiar[0:6] + "000000"
-                    lista_archivos.append(arch_aux)
-                    mensaje_lbl(self.Lbl_Mensajes, "Copiando archivos:\n " + archivo_origen + ' en ' + archivo_destino, True)
-                    shutil.copy(archivo_origen, archivo_destino)
-        except FileNotFoundError:
-            auxiliar = self.dia + '000000'
-            lista_archivos.append(auxiliar)
-
-        lista_archivos.sort()
-        mensaje_lbl(self.Lbl_Mensajes, str(lista_archivos), False)
-
-        # ====== Control de día & reset seguro antes de leer/convertir ======
-        # Preparar rutas del día
-        self.inicializar_()
-        self.archivo = self.directorio_trabajo + (lista_archivos[0] if lista_archivos else self.dia + '000000')
-        self.definir_dia()
-
-        # Verificar día vs analogico.csv y resetear si corresponde
-        dia_actual, fila_analogico = verificar_o_resetear_por_dia(
-            self.directorio_trabajo,
-            self.directorio_registros,
-            self.archivo,
-            self.Lbl_Mensajes
-        )
-
-        # Antes de leer nada, si existen MSEED destino por canal, validar contra analogico.csv
-        # (Si no pasa verificación, se mueven a inconsistentes para forzar reconstrucción)
-        try:
-            contador_s = int(fila_analogico[3]) if len(fila_analogico) > 3 else 0
-        except Exception:
-            contador_s = 0
-
-        # t0_esperado = obtencion_hora(self.archivo) en UTCDateTime
-        dt0 = obtencion_hora(self.archivo)         # datetime de tu helper
-        t0_esperado = obspy.UTCDateTime(dt0)       # convertir a UTCDateTime
-        carpeta_inconsistentes = os.path.join(self.directorio_registros, "_inconsistentes")
-
-        for i in range(0, 16):
-            if str(self.hab_canal[i]) != "0":
-                hora_string_primera = dt0.strftime('%y%m%d_%H%M%S')
-                nombreMseed_destino = os.path.join(
-                    self.directorio_registros,
-                    f"{self.nombre_canal[i]}_20{hora_string_primera}.mseed"
-                )
-                verificar_mseed_contra_analogico(
-                    nombreMseed_destino,
-                    t0_esperado,
-                    contador_s,
-                    self.Lbl_Mensajes,
-                    carpeta_inconsistentes=carpeta_inconsistentes
-                )
-
-        # ================== Loop de lectura/conversión =====================
-        for archivo_ in lista_archivos:
-            self.inicializar_()
-            self.archivo = self.directorio_trabajo + archivo_
             self.definir_dia()
-            self.archivo_binario = self.directorio_trabajo + archivo_
-            if not os.path.exists(self.archivo_binario):
-                nombre_archivo = self.archivo_binario[-12:]
-                self.archivo_binario, _ = QFileDialog.getOpenFileName(
-                    None, "Seleccionar archivo", "", f"{nombre_archivo} ({nombre_archivo})"
-                )
+            png_digitales = self.procesar_digitales()
+            self.imprimir_png_digitales(png_digitales)
+            mensaje_lbl(self.Lbl_Mensajes, "No hay registros analogicos para ese dia. Archivo buscado: " + self.archivo, True)
 
-            self.canal, huecos = Leer_binario_comun(
-                self.directorio_trabajo,
-                self.archivo_binario,
-                self.progressBar,
-                self.Lbl_Mensajes
-            )
-            mensaje_lbl(self.Lbl_Mensajes, "Lectura terminada, \n Segundos faltantes " + str(huecos), True)
-            self.Btn_Mseed()
-
-        # ====== Unión incremental segura (primero con el primer archivo de la lista) ======
-        for i in range(1, len(lista_archivos)):
-            self.unir_mseed(lista_archivos[0], lista_archivos[i])
-
-        if lista_archivos:
-            self.archivo = self.directorio_trabajo + lista_archivos[0]
-            self.fecha_ = obtencion_hora(self.archivo)
-            mensaje_lbl(self.Lbl_Mensajes, self.archivo, False)
-            self.trCanal = leer_mseed(self.archivo, 0)
-            self.imprimir_png()
-            mensaje_lbl(self.Lbl_Mensajes, "Terminado:", True)
-        else:
-            self.archivo = self.directorio_trabajo + self.dia + '000000'
-            mensaje_lbl(self.Lbl_Mensajes, "No hay registros para ese día..\nArchivo buscado: " + self.archivo, True)
 
     def inicializar_(self):
         self.canal_np = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
@@ -931,7 +841,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         hora_string = self.fecha_.strftime('%y%m%d_%H%M%S')
         mensaje = ""
         contador = 0
-        for i in range(0, 100):
+        for i in range(0, len(self.nombre_canal)):
             nombreMseed = os.path.join(self.directorio_registros, f"{self.nombre_canal[i]}_20{hora_string}.mseed")
             try:
                 with open(nombreMseed, 'rb'):
@@ -950,7 +860,6 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         mensaje_lbl(self.Lbl_Mensajes, mensaje, True)
 
     def Btn_Mseed(self):
-        self.canal_np = np.asarray(self.canal)
         mensaje_lbl(self.Lbl_Mensajes, "Grabando Mseed... ", True)
         try:
             estaciones_completo = lectura_archivo(self.estaciones)
@@ -960,8 +869,14 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         except Exception:
             pass
 
-        # conversion_mseed escribe cada canal en self.directorio_registros (tu función)
-        self.trCanal = conversion_mseed(self.canal_np, self.hab_canal, self.nombre_canal, self.fecha_, self.directorio_registros)
+        self.trCanal = conversion_mseed_bloque(
+            self.canal,
+            self.hab_canal,
+            self.nombre_canal,
+            self.fecha_,
+            self.directorio_registros,
+            self.Lbl_Mensajes
+        )
         mensaje_lbl(self.Lbl_Mensajes, "Grabación Mseed Terminada ", False)
 
     def unir_mseed(self, archivo_1, archivo_2):
@@ -993,7 +908,14 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
                 mensaje_lbl(self.Lbl_Mensajes, f"Uniendo archivo: {nombreMseed_1} + {nombreMseed_2}", False)
                 st1 += st2
-                st1.merge(method=0, fill_value='latest')
+                huecos_antes = st1.get_gaps()
+                if huecos_antes:
+                    mensaje_lbl(self.Lbl_Mensajes, f"[UNION] {self.nombre_canal[i]}: {len(huecos_antes)} huecos/solapes antes de unir", False)
+                st1.merge(method=1, fill_value=None)
+                st1 = st1.split()
+                huecos_despues = st1.get_gaps()
+                if huecos_despues:
+                    mensaje_lbl(self.Lbl_Mensajes, f"[UNION] {self.nombre_canal[i]}: {len(huecos_despues)} huecos preservados", False)
 
                 try:
                     escribir_atomico_mseed(st1, nombreMseed_1)

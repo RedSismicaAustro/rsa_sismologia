@@ -6,9 +6,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>392</width>
-    <height>535</height>
+    <width>720</width>
+    <height>680</height>
    </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>720</width>
+    <height>680</height>
+   </size>
   </property>
   <property name="windowTitle">
    <string>REGISTRO CONTINUO              ...RSA</string>
@@ -17,9 +23,9 @@
    <widget class="Line" name="line_2">
     <property name="geometry">
      <rect>
-      <x>60</x>
+      <x>40</x>
       <y>20</y>
-      <width>231</width>
+      <width>640</width>
       <height>16</height>
      </rect>
     </property>
@@ -30,9 +36,9 @@
    <widget class="Line" name="line_3">
     <property name="geometry">
      <rect>
-      <x>60</x>
+      <x>40</x>
       <y>100</y>
-      <width>231</width>
+      <width>640</width>
       <height>16</height>
      </rect>
     </property>
@@ -43,10 +49,10 @@
    <widget class="QDateEdit" name="dateEdit">
     <property name="geometry">
      <rect>
-      <x>150</x>
+      <x>370</x>
       <y>50</y>
-      <width>131</width>
-      <height>22</height>
+      <width>170</width>
+      <height>28</height>
      </rect>
     </property>
     <property name="showGroupSeparator" stdset="0">
@@ -62,10 +68,10 @@
    <widget class="QPushButton" name="btn_abrir">
     <property name="geometry">
      <rect>
-      <x>66</x>
+      <x>190</x>
       <y>50</y>
-      <width>71</width>
-      <height>21</height>
+      <width>120</width>
+      <height>28</height>
      </rect>
     </property>
     <property name="text">
@@ -75,10 +81,10 @@
    <widget class="QPushButton" name="Btn_Salir">
     <property name="geometry">
      <rect>
-      <x>70</x>
-      <y>430</y>
-      <width>81</width>
-      <height>23</height>
+      <x>170</x>
+      <y>610</y>
+      <width>120</width>
+      <height>32</height>
      </rect>
     </property>
     <property name="text">
@@ -88,10 +94,10 @@
    <widget class="QPushButton" name="Btn_drive">
     <property name="geometry">
      <rect>
-      <x>240</x>
-      <y>430</y>
-      <width>75</width>
-      <height>23</height>
+      <x>430</x>
+      <y>610</y>
+      <width>120</width>
+      <height>32</height>
      </rect>
     </property>
     <property name="text">
@@ -101,10 +107,10 @@
    <widget class="QProgressBar" name="progressBar">
     <property name="geometry">
      <rect>
-      <x>60</x>
+      <x>40</x>
       <y>120</y>
-      <width>271</width>
-      <height>30</height>
+      <width>640</width>
+      <height>32</height>
      </rect>
     </property>
     <property name="value">
@@ -114,10 +120,10 @@
    <widget class="QTextEdit" name="Lbl_Mensajes">
     <property name="geometry">
      <rect>
-      <x>20</x>
+      <x>40</x>
       <y>160</y>
-      <width>331</width>
-      <height>261</height>
+      <width>640</width>
+      <height>430</height>
      </rect>
     </property>
    </widget>
