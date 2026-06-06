@@ -1,0 +1,12 @@
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800125\FS003.EVT;19
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800126\FS005.EVT;41
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800126\FS007.EVT;47
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800126\FS008.EVT;59
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800126\FS009.EVT;60
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800126\FS010.EVT;68
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800126\FS011.EVT;9
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800126\FS012.EVT;10
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800127\FS013.EVT;81
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800206\FS015.EVT;13
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800215\FS019.EVT;7
+I:/Mi unidad/Acel-Reg todos/ChaBase/2026/20260108\800220\FS021.EVT;7

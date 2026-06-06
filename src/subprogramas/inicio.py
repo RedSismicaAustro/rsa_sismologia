@@ -21,29 +21,18 @@ if ruta_librerias not in sys.path:
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, 
-                             QLabel, QMessageBox, QCheckBox)
+from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget)
 from PyQt5 import uic
 from PyQt5 import QtWidgets,QtCore
 from metodos_rsa import (lectura_archivo)
 
-from metodos_gestion import lectura_eventos,parametros_estaciones,obtener_directorios
+from metodos_gestion import parametros_estaciones
 
 datos_sismo={}
-
-from PyQt5.QtWidgets import (QDialog,QSpinBox)
 
 import matplotlib.pyplot as plt
 from datetime import datetime
 from PyQt5.QtCore import QDate
-import csv
-#import obspy.realtime #obspy.realtime.signal.offset
-import copy
-
-#from obspy import read, UTCDateTime
-import gc
-import psutil
-from obspy.core.trace import Trace
 from PyQt5.QtCore import pyqtSignal
  
 class Inicio_proceso(QMainWindow):

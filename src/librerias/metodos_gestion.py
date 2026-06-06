@@ -1,4 +1,3 @@
-import sys
 import os
 from pathlib import Path
 def extraer_hasta_directorio(ruta_completa, nombre_directorio):
@@ -18,7 +17,8 @@ import csv
 import json
 import obspy
 import subprocess
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar,QMessageBox
+from PyQt5.QtCore import Qt, QCoreApplication
 
 def lectura_archivo(archivo):
     """
@@ -52,29 +52,6 @@ def lectura_archivo(archivo):
     print("No se pudo leer el archivo con ninguna de las codificaciones conocidas.")
     return []
 
-def lectura_archivo____(archivo):
-
-    import codecs
-    codificaciones_posibles = ['utf-8', 'latin-1', 'cp1252']
-    valores = []
-    for codificacion in codificaciones_posibles:
-        try:
-            with codecs.open(archivo, 'r', encoding=codificacion, errors='strict') as file:
-                for linea in file:
-                    elementos = linea.strip().split(';')
-                    if elementos != ['']:
-                        valores.append(elementos)
-            return valores  # Si se logra leer correctamente, retornamos aquí
-        except UnicodeDecodeError:
-            continue  # Intenta con la siguiente codificación
-        except FileNotFoundError:
-            print(f"El archivo {archivo} no fue encontrado.")
-            return None
-        except Exception as e:
-            print(f"Ocurrió un error al leer el archivo con codificación {codificacion}: {e}")
-            return []
-    print("No se pudo leer el archivo con ninguna de las codificaciones conocidas.")
-    return []
 
 
 def lectura_eventos(archivo):
@@ -345,6 +322,8 @@ def obtener_directorios(ruta_archivo: str) -> dict:
     archivo_marcas          = directorio_base / f"{prefijo_fecha}000000_marcas.json"
     archivo_auxiliar        = directorio_base / f"{prefijo_fecha}_aux.csv"
     archivo_proc            = directorio_procesamiento / f"{prefijo_fecha}_{hora}{minuto}{segundo}_proc.csv"
+    archivo_analogico       = directorio_base / f"{prefijo_fecha}_analogico.csv"
+    archivo_digital         = directorio_base / f"{prefijo_fecha}_digital.csv"
     archivo_referencia      = timestamp_largo if usar_4digitos else timestamp_corto
 
     # ---------------------------- salida ----------------------------------- #
@@ -373,6 +352,8 @@ def obtener_directorios(ruta_archivo: str) -> dict:
         "archivo_procesamiento":        str(archivo_proc),
         "archivo_comportamiento":       str(archivo_comportamiento),
         "archivo_reporte_dia":          str(archivo_reporte_dia),
+        "archivo_analogico":            str(archivo_analogico),
+        "archivo_digital":              str(archivo_digital),
         "anio":                         str(anio_largo)
     }
 
@@ -520,9 +501,6 @@ def habilitar_escritura(ruta_archivo):
     except Exception as e:
         print(f"Ha ocurrido un error: {e}")
 
-from PyQt5.QtWidgets import QApplication, QMessageBox
-import sys
-
 def revisar_csv(eventos):
     """
     Ordena una lista de listas por una columna específica (nombre de archivo),
@@ -539,7 +517,6 @@ def revisar_csv(eventos):
     indice_columna_archivo = 1  # Columna de archivos (.sis)
     indice_columna_tipo_evento = 2  # Columna de tipo de evento (columna 3)
     # Creamos la aplicación Qt (es necesario para los diálogos)
-    app = QApplication(sys.argv)
     # Usamos un diccionario para eliminar duplicados, conservando el primer registro encontrado
     eventos_unicos = {}
     for fila in eventos:
@@ -582,9 +559,6 @@ def revisar_csv(eventos):
     # Retornamos la lista ajustada y ordenada
     print("Saliendo revisar csv")
     return eventos_filtrados
-
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar
-from PyQt5.QtCore import Qt, QCoreApplication
 
 class VentanaProgreso(QDialog):
     def __init__(self, mensaje="Procesando...", maximo=100, parent=None):

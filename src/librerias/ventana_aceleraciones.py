@@ -19,8 +19,11 @@ if ruta_librerias not in sys.path:
 from PyQt5.QtWidgets import QDialog, QLabel, QCheckBox
 from PyQt5 import uic
 import matplotlib.pyplot as plt
-from metodos_rsa import leer_mseed,correccion
-from metodos_graficos_rsa import impresion_reporte_acelerograma
+
+from rsa_dominio import correccion
+from rsa_io import leer_mseed
+
+from rsa_pdf_reportes import impresion_reporte_acelerograma
 from metodos_gestion import parametros_estaciones,obtener_directorios
 class Subventana_aceleraciones(QDialog):
     def __init__(self, archivo, catalogo, evento):

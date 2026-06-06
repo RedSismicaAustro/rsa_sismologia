@@ -22,9 +22,12 @@ if ruta_datos not in sys.path:
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-from metodos_rsa import leer_mseed,grafico_evento_int,calidad_estacion,cargar_evento,cargar_dia
-from metodos_rsa import insertar_evento_otras_redes,Guardar_dia
-from metodos_graficos_rsa import reporte_resumen
+from rsa_io import leer_mseed,Guardar_dia
+from rsa_dominio import calidad_estacion
+
+from metodos_rsa import grafico_evento_int,cargar_evento,cargar_dia
+from metodos_rsa import insertar_evento_otras_redes
+from rsa_pdf_catalogo import reporte_resumen_modos
 from metodos_gestion import parametros_estaciones,obtener_directorios
 from metodos_reportes_individuales import generar_reporte_sismo,generar_reporte_acelerograma
 import csv
@@ -50,6 +53,18 @@ from PyQt5.QtCore import pyqtSignal
 # fsample: Frecuencia de muestreo
 # calidad: Indicador de calidad de datos, 'D', 'R' o 'Q', D es calidad indeterminada
 # Tiempo de inicio en el orden: anio, mes, dia, horas, minuto210618000000210618000000s, segundos, microsegundos
+
+# =========================
+#  MODOS DE REPORTE (1–7)
+# =========================
+MODO_PERIODO_FRANJAS          = 1   # M1 – Período por franjas (00–12, 12–18, 18–24) – Control interno
+MODO_DIARIO_REVISION          = 2   # M2 – Diario de revisión (día/ad-hoc) con detalle y dummies locales
+MODO_OFICIAL_DETALLADO        = 3   # M3 – Oficial detallado (solo catálogo) + página/resumen de responsables
+MODO_OFICIAL_RESUMEN          = 4   # M4 – Oficial resumen (solo catálogo, sin detalle)
+MODO_FACULTAD_RESUMEN         = 5   # M5 – Institucional resumen (Facultad/redes), sin detalle
+MODO_INSTITUCIONAL_DETALLADO  = 6   # M6 – Institucional detallado (solo catálogo), sin extras ni responsables
+MODO_INSTITUCIONAL_RESUMEN    = 7   # M7 – Institucional, sin detalle
+
 
 def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaciones_eventos,hab_grafico,bandera_marcas,pagina):
     #parametros=(nombre_canal_total_,nombre_canal,tipo_canal_,n_canales_,hab_canal)
@@ -209,7 +224,28 @@ class Reporte_diario(QMainWindow):
     def Guardar_(self):
         Guardar_dia(self.eventos_reporte,self.catalogo,self.eventos,self.root,self.responsables,self.resumen,self.directorios)
         tree = ET.ElementTree(self.root)
-        reporte_resumen(self.directorios['archivo_reporte_dia'], self.dia_reporte,self.fecha_ini,self.fecha_ini,self.catalogo,self.resumen,    1,       0,         (0,0,0,0),      self.estaciones_eventos,self.directorio_trabajo,tree,0,self.eventos_reporte,1)
+        mapa_=1
+        tipo_mapa=0
+        modo_reporte=MODO_DIARIO_REVISION
+        bandera_firma=False
+        bandera_relleno=True
+        reporte_resumen_modos(
+            self.directorios['archivo_reporte_dia'], 
+            self.dia_reporte,
+            self.fecha_ini,
+            self.fecha_ini,
+            self.catalogo,
+            self.resumen,
+            mapa_,
+            tipo_mapa,
+            modo_reporte,
+            self.estaciones_eventos,
+            self.directorio_trabajo,
+            tree,
+            self.responsables,
+            self.eventos_reporte,
+            bandera_firma,
+            bandera_relleno)
         QMessageBox.information(self,self.tr("Aviso"),self.tr("¡Archivos Guardados!")) 
 
     def estacion_calidad(self):

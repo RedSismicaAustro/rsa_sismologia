@@ -24,13 +24,20 @@ if ruta_datos not in sys.path:
 from PyQt5.QtWidgets import (QMessageBox, QFileDialog)
 from PyQt5 import uic, QtWidgets
 from PyQt5.QtCore import QDate
-from obspy import read, UTCDateTime
+from obspy import read
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 
-from metodos_gestion import obtener_directorios
-from metodos_rsa import lectura_archivo, extraccion, escritura_archivo,obtencion_hora,ordenar_y_eliminar_duplicados
+from metodos_gestion import obtener_directorios,obtencion_hora
+
+
+from rsa_io import lectura_archivo,escritura_archivo
+from rsa_procesamiento import ordenar_y_eliminar_duplicados
+from rsa_utilidades import extraccion
+
+
+
 
 
 # Cargar la interfaz desde el archivo .ui directamente en esta instancia
@@ -133,7 +140,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                         evento_anterior = eventos_ordenados[i - 1][0]
                         dt_anterior = datetime.strptime(evento_anterior.replace(".sis", ""), "%Y%m%d_%H%M%S")
                         segundos = int((dt_evento - dt_anterior).total_seconds())
-                        caudal = int(3500000 / segundos) if segundos > 0 else 0
+                        caudal = int(1.214*3500000 / segundos) if segundos > 0 else 0  #1.214 es el ajuste por errores cometidos en el cálculo
                     else:
                         caudal = 0
                     nuevos_caudales.append([evento, str(caudal), bandera])
@@ -176,6 +183,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         fig, ax = plt.subplots()
         tiempo = self.tr_segmento.times("matplotlib")
         datos = self.tr_segmento.data
+
         ax.plot(tiempo, datos, label=f"{self.tr_segmento.id} (x{factor_diezmado})")
 
         # === Eventos CONTROL del día gráfico ===
@@ -312,6 +320,17 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         ax.set_ylim(bottom=0)
         fig.autofmt_xdate()
         plt.show()
+
+        # === Guardar caudales graficados en caudales_periodo.csv (en días matplotlib, sin encabezados) ===
+        ruta_salida = os.path.join(self.directorio_trabajo, "caudales_periodo.csv")
+
+        t0 = mdates.date2num(fechas[0])
+        with open(ruta_salida, "w") as f:
+            for fecha, valor in zip(fechas, valores):
+                t_rel_dias = mdates.date2num(fecha) - t0
+                f.write(f"{t_rel_dias},{valor}\n")
+
+        
 
 
     def cargar_eventos_control(self):

@@ -40,6 +40,8 @@ datos/
 # Archivos de IDE
 .vscode/
 .idea/
+.spyproject/
+rsa_sismologia/
 *.code-workspace
 
 # Builds y empaquetados

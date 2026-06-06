@@ -18,7 +18,7 @@ if ruta_librerias not in sys.path:
 
 
 from metodos_gis_rsa import catalogo_gis
-from metodos_graficos_rsa import impresion_reporte_sismo
+from rsa_pdf_reportes import impresion_reporte_sismo
 from PyQt5.QtWidgets import QMessageBox
 from ventana_aceleraciones import Subventana_aceleraciones
 def generar_reporte_sismo(catalogo, evento_escogido, canales, tr_canal, archivo_rep,directorio_trabajo):

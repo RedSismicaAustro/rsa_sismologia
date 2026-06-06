@@ -20,7 +20,6 @@ if ruta_librerias not in sys.path:
 
 
 import geopandas as gpd
-import pandas as pd
 import os
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, Polygon
@@ -30,6 +29,11 @@ from metodos_rsa import lectura_archivo
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
+import warnings
+from shapely.errors import ShapelyDeprecationWarning
+
+warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
 def catalogo_gis(catalogo):
@@ -138,10 +142,6 @@ def catalogo_gis_(catalogo,indice):
                 s = 30)
     mapa_ec.plot(ax=ax,alpha=0.3,color="white",edgecolor="black",linewidth=0.4)
     return 
-
-
-
-
 
 def proceso_gis(widget, procesamiento, archivo_estaciones):
     ax = widget.figure.add_subplot(111)
@@ -278,7 +278,7 @@ def graficar_catalogo_gis(catalogo):
   ax.legend(loc="best")
 
   # Mostrar el mapa
-  plt.show()
+  #plt.show()
 
 
 def cobertura_red(archivo,distancia):

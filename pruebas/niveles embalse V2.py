@@ -1,14 +1,38 @@
-import sys
-import os
-from pathlib import Path
+
 import matplotlib
 matplotlib.use('Qt5Agg')  # Seguridad en entornos PyQt5
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 from datetime import datetime
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog, QLabel
-from metodos_rsa import lectura_archivo, escritura_archivo
 
+
+
+
+
+import sys
+import os
+from pathlib import Path
+def extraer_hasta_directorio(ruta_completa, nombre_directorio):
+    partes = Path(ruta_completa).parts
+    if nombre_directorio in partes:
+        indice = partes.index(nombre_directorio)
+        ruta_recortada = Path(*partes[:indice + 1])
+        return str(ruta_recortada) + '/'
+    else:
+        return ''
+ruta_librerias=os.path.dirname(__file__)
+ruta_proyecto=extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
+ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
+ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
+# Insertar la ruta al inicio del sys.path
+if ruta_librerias not in sys.path:
+    sys.path.insert(0, ruta_librerias)
+if ruta_datos not in sys.path:
+    sys.path.insert(0, ruta_datos)
+
+
+from rsa_io import lectura_archivo, escritura_archivo
 
 # ========================
 # Utilitario de proyecto
@@ -25,6 +49,7 @@ def extraer_hasta_directorio(ruta_completa, nombre_directorio):
         return str(ruta_recortada) + '/'
     else:
         return ''
+
 
 
 # Resolver rutas de librerías/datos (opcional; si no las usas, no pasa nada)

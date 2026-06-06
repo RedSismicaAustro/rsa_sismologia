@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-Estructura de directorios → Texto (simple, sin hilos, PyQt5)
-Requisitos: pip install PyQt5
-"""
+
+import json
 
 import sys, os
 from pathlib import Path
@@ -58,101 +55,160 @@ class VentanaPrincipal(QMainWindow):
         if ruta:
             self.edt_ruta.setText(ruta)
 
+
     def escanear(self):
         ruta_texto = self.edt_ruta.text().strip()
         ruta = Path(ruta_texto)
+
         if not ruta.exists() or not ruta.is_dir():
             QMessageBox.critical(self, "Ruta inválida", "La ruta no existe o no es un directorio.")
             return
 
-        # ÚNICA FUNCIÓN LARGA: recorre todo y construye el árbol
-        def construir_estructura_arbol(ruta_raiz: Path) -> str:
-            """
-            Recorre el árbol de directorios desde ruta_raiz y devuelve un texto
-            con formato de árbol usando ├──, └── y │. Maneja excepciones de permisos
-            sin detener el proceso, y evita seguir enlaces simbólicos para no crear bucles.
-            """
+        # Guardamos el directorio realmente escaneado
+        self.directorio_escaneado = ruta
+
+        def construir_estructura_arbol(ruta_raiz: Path):
             lineas = []
-            encabezado = f"{ruta_raiz.resolve()}/"
-            lineas.append(encabezado)
+            raiz_json = {
+                "nombre": ruta_raiz.name,
+                "tipo": "directorio",
+                "contenido": []
+            }
+
+            lineas.append(f"{ruta_raiz.resolve()}/")
             lineas.append(f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             lineas.append("")
 
-            # Usaremos una pila para recorrido en profundidad (iterativo),
-            # almacenando (path, prefijo, listado_hecho).
-            # listado_hecho= False -> aún no listamos hijos; True -> ya listados.
-            pila = [(ruta_raiz, "", False)]
+            def listar_entradas(directorio: Path):
+                try:
+                    with os.scandir(directorio) as it:
+                        entradas = []
+                        for e in it:
+                            try:
+                                if e.is_dir(follow_symlinks=False) or e.is_file(follow_symlinks=False):
+                                    entradas.append(e)
+                            except Exception:
+                                continue
+                    entradas.sort(key=lambda x: x.name.lower())
+                    return entradas, None
+                except Exception as e:
+                    return [], e
+
+            entradas_raiz, err = listar_entradas(ruta_raiz)
+            if err is not None:
+                lineas.append(f"└── [Error: {err}]")
+                return "\n".join(lineas), raiz_json
+
+            # Frame: (directorio, prefijo, nodo_json, entradas, indice)
+            pila = [(ruta_raiz, "", raiz_json, entradas_raiz, 0)]
 
             while pila:
-                ruta_actual, prefijo, listado_hecho = pila.pop()
+                directorio_actual, prefijo, nodo_json, entradas, i = pila.pop()
 
-                # Listar contenido del directorio actual una única vez
-                if not listado_hecho:
+                if i >= len(entradas):
+                    continue
+
+                entrada = entradas[i]
+                es_ultimo = (i == len(entradas) - 1)
+                ramal = "└── " if es_ultimo else "├── "
+                ruta_entrada = Path(entrada.path)
+
+                # Re-apilamos el estado actual para continuar luego
+                pila.append((directorio_actual, prefijo, nodo_json, entradas, i + 1))
+
+                if entrada.is_dir(follow_symlinks=False):
+                    lineas.append(f"{prefijo}{ramal}{entrada.name}/")
+
+                    nodo_dir = {
+                        "nombre": entrada.name,
+                        "tipo": "directorio",
+                        "contenido": []
+                    }
+                    nodo_json["contenido"].append(nodo_dir)
+
+                    prefijo_hijo = prefijo + ("    " if es_ultimo else "│   ")
+                    entradas_hijo, err_hijo = listar_entradas(ruta_entrada)
+
+                    if err_hijo is not None:
+                        lineas.append(f"{prefijo_hijo}└── [Error: {err_hijo}]")
+                    else:
+                        pila.append((ruta_entrada, prefijo_hijo, nodo_dir, entradas_hijo, 0))
+
+                else:
                     try:
-                        dirs, files = [], []
-                        with os.scandir(ruta_actual) as it:
-                            for entrada in it:
-                                # ignoramos enlaces simbólicos para evitar ciclos
-                                try:
-                                    if entrada.is_dir(follow_symlinks=False):
-                                        dirs.append(entrada)
-                                    else:
-                                        files.append(entrada)
-                                except Exception:
-                                    # Si no podemos determinar el tipo, lo omitimos
-                                    continue
-                        # orden alfabético, insensible a mayúsculas
-                        clave = lambda e: e.name.lower()
-                        dirs.sort(key=clave)
-                        files.sort(key=clave)
+                        st = ruta_entrada.stat()
+                        creado = datetime.fromtimestamp(st.st_ctime).strftime("%Y-%m-%d %H:%M:%S")
+                        modificado = datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        creado = modificado = None
 
-                        # Para dibujar bien los ramales, procesamos en orden natural
-                        hijos = [(True, d) for d in dirs] + [(False, f) for f in files]
+                    lineas.append(
+                        f"{prefijo}{ramal}{entrada.name} "
+                        f"(creado: {creado}, modificado: {modificado})"
+                    )
 
-                        # Empujamos un marcador para no volver a listar esta carpeta
-                        # (no vamos a imprimir la carpeta actual aquí; la impresión
-                        # se hace al subir el item desde el padre).
-                        # En la raíz sí queremos listar sus hijos directamente.
-                        # Insertamos hijos en la pila en orden inverso para que salgan en orden.
-                        for i in range(len(hijos) - 1, -1, -1):
-                            es_dir, entrada = hijos[i]
-                            es_ultimo = (i == len(hijos) - 1)
-                            ramal = "└── " if es_ultimo else "├── "
-                            if es_dir:
-                                lineas.append(f"{prefijo}{ramal}{entrada.name}/")
-                                prefijo_hijo = prefijo + ("    " if es_ultimo else "│   ")
-                                pila.append((Path(entrada.path), prefijo_hijo, False))
-                            else:
-                                lineas.append(f"{prefijo}{ramal}{entrada.name}")
-                    except PermissionError:
-                        lineas.append(f"{prefijo}└── [Permiso denegado]")
-                    except FileNotFoundError:
-                        lineas.append(f"{prefijo}└── [No encontrado]")
-                    except OSError as e:
-                        lineas.append(f"{prefijo}└── [Error: {e}]")
+                    nodo_json["contenido"].append({
+                        "nombre": entrada.name,
+                        "tipo": "archivo",
+                        "creado": creado,
+                        "modificado": modificado
+                    })
 
-            return "\n".join(lineas)
+            return "\n".join(lineas), raiz_json
 
-        texto = construir_estructura_arbol(ruta)
+        texto, self.estructura_json = construir_estructura_arbol(ruta)
         self.salida.setPlainText(texto)
+
 
     def guardar_txt(self):
         contenido = self.salida.toPlainText()
+
         if not contenido.strip():
             QMessageBox.information(self, "Sin contenido", "No hay texto para guardar. Escanea primero.")
             return
+
+        if not hasattr(self, "directorio_escaneado"):
+            QMessageBox.warning(self, "Sin escaneo", "No hay un directorio escaneado.")
+            return
+
+        directorio = self.directorio_escaneado
+        nombre_base = directorio.name
+        ruta_sugerida = str(directorio / f"{nombre_base}.txt")
+
         nombre, _ = QFileDialog.getSaveFileName(
-            self, "Guardar estructura como...", f"estructura_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            self,
+            "Guardar estructura como...",
+            ruta_sugerida,
             "Archivo de texto (*.txt)"
         )
+
         if not nombre:
             return
+
         try:
             with open(nombre, "w", encoding="utf-8", newline="\n") as f:
                 f.write(contenido)
-            QMessageBox.information(self, "Guardado", f"Se guardó:\n{nombre}")
+
+            ruta_json = os.path.splitext(nombre)[0] + ".json"
+            with open(ruta_json, "w", encoding="utf-8") as f:
+                json.dump(self.estructura_json, f, indent=2, ensure_ascii=False)
+
+            QMessageBox.information(
+                self,
+                "Guardado",
+                f"Se guardaron:\n{nombre}\n{ruta_json}"
+            )
+
         except Exception as e:
-            QMessageBox.critical(self, "Error al guardar", f"No se pudo guardar el archivo:\n{e}")
+            QMessageBox.critical(
+                self,
+                "Error al guardar",
+                f"No se pudo guardar el archivo:\n{e}"
+            )
+
+
+
+
 
 def main():
     app = QApplication(sys.argv)

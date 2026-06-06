@@ -20,32 +20,22 @@ if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
 
-
-from metodos_graficos_rsa import reporte_resumen
-from metodos_rsa import lectura_resumen,parametros_estaciones,escritura_archivo,lectura_archivo,correccion,cargar_dia,obtener_datos_reporte,extraer_hasta_directorio
+from rsa_io import lectura_resumen,lectura_archivo,escritura_archivo
+from rsa_dominio import correccion
+from rsa_utilidades import obtener_datos_reporte
+from rsa_pdf_catalogo import reporte_resumen_modos
+from metodos_rsa import parametros_estaciones,cargar_dia,extraer_hasta_directorio
 from metodos_gestion import obtener_directorios
-#from reportlab.graphics.charts.linecharts import HorizontalLineChart
-from reportlab.graphics.shapes import *
-from reportlab.graphics import shapes
-from reportlab.graphics.charts.textlabels import Label
-from reportlab.lib.colors import *
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.graphics.shapes import Drawing, Rect
-from reportlab.graphics.charts.barcharts import VerticalBarChart
+
 import csv
 from PyQt5 import uic, QtWidgets#Importamos módulo uic y Qtwidgets
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, time, timedelta
 from PyQt5.QtCore import QDate
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QMessageBox,QFileDialog)
-import obspy
+from PyQt5.QtWidgets import ( QMainWindow, QMessageBox,QFileDialog)
 import sys
-from pathlib import Path
 import xml.etree.ElementTree as ET
 import copy
-#import time
 from obspy import read
-import numpy as np
 import calendar
 import os
 from PyQt5.QtCore import pyqtSignal
@@ -66,7 +56,16 @@ IDX_POSICION_X,IDX_POSICION_Y,IDX_ANCHO,IDX_ALTO,=0,1,2,3
 #resumen
 #bandera_dia variable que habilita o no la impresión del reporte diario de eventos (esto es para deshabilitar en el reporte diario)
 
-
+# =========================
+#  MODOS DE REPORTE (1–7)
+# =========================
+MODO_PERIODO_FRANJAS          = 1   # M1 – Período por franjas (00–12, 12–18, 18–24) – Control interno
+MODO_DIARIO_REVISION          = 2   # M2 – Diario de revisión (día/ad-hoc) con detalle y dummies locales
+MODO_OFICIAL_DETALLADO        = 3   # M3 – Oficial detallado (solo catálogo) + página/resumen de responsables
+MODO_OFICIAL_RESUMEN          = 4   # M4 – Oficial resumen (solo catálogo, sin detalle)
+MODO_FACULTAD_RESUMEN         = 5   # M5 – Institucional resumen (Facultad/redes), sin detalle
+MODO_INSTITUCIONAL_DETALLADO  = 6   # M6 – Institucional detallado (solo catálogo), sin extras ni responsables
+MODO_INSTITUCIONAL_RESUMEN    = 7   # M7 – Institucional, sin detalle
 
 class VentanaEstaciones(QtWidgets.QDialog):
     def __init__(self, parametros, parent=None):
@@ -259,6 +258,36 @@ class Reporte_periodo(QMainWindow):
         self.cmbx_n_estaciones.currentIndexChanged.connect(self.Cargar_catalogo)
 
 
+    def resolver_modo_desde_controles(self) -> int:
+        """
+        Devuelve el MODO_* (M1..M7) en función de:
+            - cmbx_zona: 'Region', 'Ecuador', 'Facultad', 'Fuentes', 'Reportes', 'Chanlud', ...
+            - ck_box_reporte: marcado = 'detallado', desmarcado = 'resumen' (cuando aplica)
+        Nota: M1 y M2 no se generan aquí (período por franjas y diario de revisión).
+        """
+        zona = (self.cmbx_zona.currentText() if self.cmbx_zona else "").strip()
+        zona_l = zona.lower()
+        reporte_marcado = bool(self.ck_box_reporte.isChecked()) if self.ck_box_reporte else False
+
+        # No generables en este módulo
+        if zona_l in {"region", "región", "fuentes", "reportes"}:
+            return 0  # 0 = no generable aquí
+
+        # Ecuador → Oficial (detallado/resumen)
+        if zona_l == "ecuador":
+            return MODO_OFICIAL_DETALLADO if reporte_marcado else MODO_OFICIAL_RESUMEN
+
+        # Facultad → siempre resumen institucional/redes
+        if zona_l == "facultad":
+            return MODO_FACULTAD_RESUMEN
+
+        # A partir de 'Chanlud' → Institucional (detallado/resumen)
+        # (Si no es Ecuador/Facultad/Región/Fuentes/Reportes, lo tratamos como institucional)
+        return MODO_INSTITUCIONAL_DETALLADO if reporte_marcado else MODO_INSTITUCIONAL_RESUMEN
+
+
+
+
     def inicializar_variables(self):
         self.eventos=[]
         self.eventos_reporte=[["Nº","Fecha; Hora (UTC)","Evento","Magn.","Prof.(km)","Lat.","Long.","Ubicación"]]
@@ -267,7 +296,7 @@ class Reporte_periodo(QMainWindow):
         self.resumen=[["DIA","SISMO","FF","FC","TELESISMO","Evento Local","INDEFINIDO","Ruido"]]
         # Cargar el primer archivo XML
 
-        ruta_ =  os.path.join(ruta_proyecto,"datos", 'archivo.xml')
+        ruta_ =  os.path.join(ruta_datos, 'archivo.xml')
         archivo = os.path.abspath(ruta_)
 
         self.arbol = ET.parse(archivo)
@@ -389,19 +418,13 @@ class Reporte_periodo(QMainWindow):
 #               Reporte en pdf                   
 #################################################################################
 
-        if self.ck_box_reporte.checkState()==2:
-            bandera_reporte=1
-        else:
-            bandera_reporte=0
         if self.ck_box_firma.checkState()==2:
-            bandera_firma=1
+            bandera_firma=True
         else:
-            bandera_firma=0        
-        banderas=(1,bandera_reporte,bandera_firma)
+            bandera_firma=False        
         bandera_relleno=self.ck_box_relleno.isChecked()
-
-        #             reporte_resumen(archivo,              subtitulo,           fecha_ini,      fecha_fin,      catalogo,      resumen,          mapa_,                          detalle,                  banderas,estaciones,     directorio          ,arbol,    resumen responsables) 
-        acelerogramas=reporte_resumen(self.archivo_1_pdf,
+        modo_actual = self.resolver_modo_desde_controles()
+        acelerogramas=reporte_resumen_modos(self.archivo_1_pdf,
                                       self.periodo_reporte,
                                       self.fecha_ini,
                                       self.fecha_fin, 
@@ -409,12 +432,13 @@ class Reporte_periodo(QMainWindow):
                                       self.resumen,
                                       self.cmbx_zona.currentIndex(),
                                       self.cmbx_mapa.currentIndex(),     
-                                      banderas,       
+                                      modo_actual,
                                       0      ,  
                                       self.directorio_trabajo,
                                       self.arbol,
                                       self.reporte_total,
                                       self.eventos,
+                                      bandera_firma,
                                       bandera_relleno)
         registro1=[]
         registro2=[]
