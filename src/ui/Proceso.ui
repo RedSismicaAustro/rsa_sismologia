@@ -237,14 +237,14 @@
    <widget class="QLabel" name="label_6">
     <property name="geometry">
      <rect>
-      <x>30</x>
+      <x>60</x>
       <y>90</y>
-      <width>81</width>
+      <width>51</width>
       <height>20</height>
      </rect>
     </property>
     <property name="text">
-     <string>Tipo de evento</string>
+     <string>Cambiar a:</string>
     </property>
    </widget>
    <widget class="QPushButton" name="Btn_procesar">
@@ -276,14 +276,14 @@
    <widget class="QLabel" name="label_8">
     <property name="geometry">
      <rect>
-      <x>25</x>
+      <x>20</x>
       <y>16</y>
-      <width>81</width>
+      <width>100</width>
       <height>20</height>
      </rect>
     </property>
     <property name="text">
-     <string>Escoger tipo</string>
+     <string>Desplegar por tipo:</string>
     </property>
    </widget>
    <widget class="QComboBox" name="cmbx_t_evento">
