@@ -1,5 +1,4 @@
 # Contexto del Programa: `Insercion de estaciones EVT.py`
-
 ## Alcance de este contexto
 
 Este documento describe el comportamiento real del script `Insercion de estaciones EVT.py` y sirve como contexto de trabajo para cualquier agente de revisión o corrección de código. El objetivo no es reescribir completamente el programa, sino permitir que un agente entienda su propósito, su flujo operativo y los puntos reproducibles que deben verificarse antes de modificarlo.
@@ -78,7 +77,7 @@ Al iniciar el programa:
 2. Se construyen rutas hacia `src/librerias` y `datos`.
 3. Se agregan esas rutas a `sys.path`.
 4. Se carga la interfaz gráfica desde `src/ui/Insertar_evt.ui`.
-5. Se carga la ayuda HTML desde `datos/ayuda_insercion_evt.html`.
+5. Se carga la ayuda HTML desde `ayuda/ayuda_insercion_evt.html`; si no existe, se usa `datos/ayuda_insercion_evt.html` como respaldo.
 6. Se establece el directorio de trabajo por defecto: `G:/Mi unidad/DIA/`.
 7. Se inicializa la barra de progreso en cero.
 8. Se conectan los botones de la interfaz a sus métodos.
@@ -272,24 +271,18 @@ Si `bandera_verificar` está activada:
 - Se guarda una referencia a la figura en la ventana principal para evitar que se cierre prematuramente.
 - Se limita el número de figuras mantenidas a 5.
 
-## Punto reproducible: el gráfico se muestra, pero no se guarda como PNG
+## Punto verificado: el grafico se muestra, pero no se guarda como PNG
 
-El contexto original indicaba que se generaban gráficos de verificación y hablaba de imagen guardada. En el script actual no se observa una llamada a `savefig()` ni se genera un archivo PNG de verificación.
+La verificacion grafica muestra una figura Matplotlib. En el script actual no se llama a `savefig()` ni se genera un archivo PNG de verificacion.
 
-Además, el mensaje de confirmación al usuario dice:
+Ademas, el mensaje de confirmacion al usuario dice:
 
 ```text
-Se guardó una imagen de verificación.
-¿Deseas insertar este evento en la estructura de datos?
+Se abrio la figura de verificacion.
+Deseas insertar este evento en la estructura de datos?
 ```
 
-Pero el script solo muestra la figura, no la guarda.
-
-El agente debe decidir si:
-
-- cambia el mensaje para que diga que se mostró una figura de verificación; o
-- implementa realmente el guardado de PNG antes de preguntar al usuario.
-
+El mensaje es coherente con la accion real: el script muestra la figura, no la guarda.
 ## Punto reproducible: confirmación gráfica e inserción son opciones distintas
 
 Si `bandera_verificar` está activada y el evento calza, el script pregunta al usuario si desea insertar el evento. Esto ocurre aunque el checkbox de inserción no esté activado.
@@ -552,3 +545,183 @@ El objetivo de las correcciones no debe ser cambiar la lógica general del progr
 ---
 
 *Este documento describe el comportamiento real del script según su flujo de ejecución verificado y añade puntos reproducibles para que un agente pueda corregir el código sin reinterpretar el objetivo original del programa.*
+
+## Actualizacion 2026-06-06
+
+Cambios aplicados para coherencia entre codigo, interfaz y ayuda:
+
+- El script valida tempranamente que exista la raiz `rsa_sismologia`.
+- La ayuda HTML se carga primero desde `ayuda/ayuda_insercion_evt.html` y luego, por compatibilidad, desde `datos/ayuda_insercion_evt.html`.
+- Se creo una copia versionable de la ayuda en `ayuda/`, porque `datos/` esta excluido por `.gitignore`.
+- Se retiro del HTML un script externo inyectado por Kaspersky.
+- La verificacion grafica queda documentada como visualizacion de figura Matplotlib; no guarda PNG.
+- El mensaje de confirmacion ahora dice que se abrio la figura de verificacion, no que se guardo una imagen.
+- La barra de progreso del UI inicia en `0`.
+- Se deshabilitaron controles que existen en la interfaz pero no tienen accion operativa implementada: estacion por almacenamiento, coherencia metadatos/almacenamiento y guardado en un solo directorio.
+- Se agregaron validaciones para evitar iniciar procesamiento sin seleccionar directorio fuente o lista CSV.
+
+## Actualizacion 2026-06-06: Inventario para Directorio Completo
+
+El modo `radioDirectorio2` ahora funciona como barrido con inventario previo:
+
+- recorre recursivamente la carpeta seleccionada;
+- detecta archivos `.evt`;
+- calcula una huella `SHA1` por archivo;
+- genera `inventario_evt_directorio_completo.csv` en el directorio de trabajo;
+- marca duplicados exactos con `procesar=0`;
+- procesa automaticamente solo la primera aparicion de cada archivo exacto.
+
+Columnas principales del inventario:
+
+| Columna | Uso |
+|---|---|
+| `procesar` | `1` para procesar, `0` para omitir |
+| `ruta_evt` | Ruta completa del EVT |
+| `nombre` | Nombre del archivo |
+| `tamano_bytes` | Tamano del archivo |
+| `mtime_iso` | Fecha de modificacion en formato legible |
+| `sha1` | Huella del contenido para detectar duplicados exactos |
+| `duplicado_de` | Ruta del primer archivo equivalente |
+| `estacion_sugerida` | Codigo inferido desde nombres de carpeta cuando existe homologacion |
+| `evt_legible` | `1` si ObsPy pudo leer el EVT; `0` si fallo |
+| `requiere_vm` | `1` si probablemente requiere conversion externa/VM |
+| `estacion_evt` | Estacion reportada en los metadatos EVT |
+| `estacion_evt_homologada` | Estacion EVT normalizada por diccionario |
+| `serial` | Numero serial del equipo cuando existe en metadatos |
+| `inicio_evt` | Hora inicial leida desde el EVT |
+| `clave_organizacion` | Clave priorizando serial, luego estacion EVT, luego ruta |
+| `clave_evento` | `clave_organizacion + inicio_evt`, util para detectar repeticiones probables |
+| `posible_repetido_de` | Primer EVT con la misma clave de evento, aunque no sea duplicado exacto |
+| `error_lectura` | Error al leer EVT, si existe |
+
+El modo `radioLista` reconoce inventarios con encabezado `ruta_evt` y respeta la columna `procesar`. Esto permite generar el inventario desde `Directorio 2`, revisarlo manualmente y luego cargarlo como lista.
+
+El nombre del archivo EVT se conserva solo como dato descriptivo. No se usa como clave unica porque muchos equipos pueden generar nombres repetidos como `FF001.EVT`.
+
+La prioridad de organizacion para inventario es:
+
+1. serial del equipo;
+2. estacion de metadatos EVT homologada;
+3. estacion sugerida por ruta/carpeta;
+4. `SIN_CLAVE`.
+
+## Actualizacion 2026-06-06: Validacion para Directorio Ordenado
+
+El modo `radioDirectorio1` valida la estructura ordenada antes de cargar los años disponibles.
+
+La estructura esperada es:
+
+```text
+ESTACION/
+  AAAA/
+    AAAAMMDD/   fecha de bajada
+      AAAAMMDD/ dia del EVT
+        *.EVT
+```
+
+Al seleccionar la carpeta de estacion:
+
+- se revisan años con formato `AAAA`;
+- se revisan fechas de bajada con formato `AAAAMMDD`;
+- se revisan dias EVT con formato `AAAAMMDD`;
+- se cuentan los EVT encontrados;
+- se registran advertencias solo por archivos `.EVT` ubicados fuera de la estructura esperada;
+- la validacion se hace en memoria, sin generar reporte CSV;
+- solo se cargan en `cmbx_eventos` los años si no existe ninguna advertencia o error.
+
+Si no existe ningun año valido, o si existe cualquier anomalia, el programa muestra advertencia, vacia los combos y no permite continuar con el modo ordenado.
+
+Esta validacion estricta aplica solo a `radioDirectorio1`. El modo `radioDirectorio2` no exige estructura de carpetas: genera inventario sobre cualquier arbol de directorios.
+
+## Actualizacion 2026-06-07: Validacion estricta solo sobre EVT
+
+La validacion de `radioDirectorio1` se hace exclusivamente sobre archivos con extension `.EVT`.
+Cualquier otro archivo o extension dentro del arbol de la estacion se ignora.
+
+Cada archivo EVT encontrado debe estar exactamente bajo esta forma:
+
+```text
+ESTACION/
+  AAAA/
+    AAAAMMDD/
+      AAAAMMDD/
+        archivo.EVT
+```
+
+Donde `AAAA` es el anio, `AAAAMMDD` es la fecha de bajada y el ultimo `AAAAMMDD` es el dia del EVT.
+Si cualquier EVT aparece fuera de esa estructura, el programa muestra advertencia, limpia los combos de anios y subdirectorios, y no continua con el modo ordenado.
+
+Esta validacion no genera reporte CSV. El inventario CSV queda reservado para `radioDirectorio2`, que acepta carpetas completas con organizacion libre.
+
+## Actualizacion 2026-06-07: Mensaje de anomalias
+
+Cuando `radioDirectorio1` encuentra errores en la estructura, el cuadro de advertencia muestra:
+
+- la carpeta seleccionada;
+- la estructura esperada: `AAAA/AAAAMMDD/AAAAMMDD/*.EVT` o `ESTACION/AAAA/AAAAMMDD/AAAAMMDD/*.EVT`;
+- el numero de EVT encontrados;
+- el numero de advertencias;
+- las primeras anomalias con ruta completa y detalle.
+
+Todas las anomalias tambien se imprimen en consola para poder ubicar archivos fuera de formato sin generar reporte CSV.
+
+## Actualizacion 2026-06-07: Directorio DIA y origen EVT
+
+Regla de diseno:
+
+- `directorio_trabajo` apunta a `...\DIA\`, la estructura de datos sismica y catalogo de trabajo;
+- `DIA` se usa para construir rutas de destino cuando un EVT ya fue procesado e identificado;
+- `DIA` no participa en la validacion de la estructura de origen de los EVT;
+- `Btn_directorio_datos` selecciona el origen de los EVT;
+- los modos de origen EVT (`radioDirectorio1`, `radioDirectorio2`, `radioLista`) trabajan sobre las carpetas o listas seleccionadas por el usuario.
+
+En `radioDirectorio1` se aceptan dos niveles de seleccion para fuentes ordenadas:
+
+```text
+FUENTE_ESTACION/
+    AAAA/
+    AAAAMMDD/
+      AAAAMMDD/
+        archivo.EVT
+
+FUENTE_RAIZ/
+  ESTACION/
+    AAAA/
+      AAAAMMDD/
+        AAAAMMDD/
+          archivo.EVT
+```
+
+El combo principal carga `AAAA` si se selecciono una carpeta de estacion, o `ESTACION/AAAA` si se selecciono una raiz que contiene estaciones.
+
+## Actualizacion 2026-06-07: Retiro de validacion estricta en Directorio 1
+
+Esta nota reemplaza las notas anteriores sobre validacion estricta de `radioDirectorio1`.
+
+Comportamiento actual:
+
+- `Btn_drive` conserva su funcion historica: escoger `...\DIA\`, la estructura de datos sismica y catalogo de trabajo;
+- `Btn_directorio_datos` selecciona el origen de los EVT;
+- `radioDirectorio1` no valida nombres ni niveles de carpetas;
+- al seleccionar un origen, se cargan sus subdirectorios inmediatos en `cmbx_eventos`;
+- si no hay subdirectorios, se carga la opcion `Todos`;
+- al iniciar, se recolectan recursivamente todos los archivos `.EVT` bajo el directorio escogido;
+- cualquier otra extension se ignora;
+- no se bloquea la carga por anomalias de estructura.
+
+El modo `radioDirectorio2` conserva el inventario CSV para carpetas completas o desordenadas.
+
+## Actualizacion 2026-06-07: Restauracion del flujo de Iniciar y correccion 1980
+
+Se restauro el flujo de `Iniciar` en `radioDirectorio1` para usar nuevamente `recolectar_evt()` de `metodos_rsa`.
+El retiro de la validacion de estructura no debe cambiar el proceso de lectura, verificacion grafica ni decision de insercion que ya existia al presionar `Iniciar`.
+
+La casilla `checkBox_verificacion` sigue controlando la visualizacion de la senial EVT para revisar si corresponde a evento o ruido.
+
+Cuando ObsPy lee un EVT con `starttime` en 1980, el script corrige el dia antes de construir `archivo` y antes de buscar el CSV del catalogo:
+
+1. usa primero una fecha `AAAAMMDD` encontrada en la ruta del EVT;
+2. si no encuentra una fecha valida en la ruta, usa la fecha de modificacion del archivo EVT;
+3. conserva la hora, minuto y segundo leidos del EVT.
+
+Esto evita que el MiniSEED nominal y la busqueda del catalogo queden anclados en 1980 cuando el equipo se reseteo.
