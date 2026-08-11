@@ -330,7 +330,7 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False, mod
         elif existe_siguiente or os.path.exists(rutas_fast_siguiente[1]):
             rutas_fast_elegidas = rutas_fast_siguiente
         else:
-            if segundo_evento > 50:
+            if segundo_evento >= 50:
                 rutas_fast_elegidas = rutas_fast_siguiente
             else:
                 rutas_fast_elegidas = rutas_fast_real

@@ -2,35 +2,38 @@
 
 ## Archivos analizados
 
-28 archivos Python
+33 archivos Python
 
 ## Archivos grandes
 
-- librerias/metodos_graficos_rsa.py : 2457 líneas
-- subprogramas/procesamiento_integrado.py : 1621 líneas
-- librerias/metodos_rsa.py : 1195 líneas
-- subprogramas/reporte_acumulado.py : 1077 líneas
+- subprogramas/procesamiento_integrado.py : 1785 líneas
+- subprogramas/reporte_acumulado.py : 1078 líneas
 - subprogramas/extraer_integrado.py : 998 líneas
-- librerias/rsa_procesamiento.py : 701 líneas
+- librerias/rsa_pdf_catalogo.py : 937 líneas
+- librerias/rsa_procesamiento.py : 916 líneas
+- librerias/metodos_rsa.py : 864 líneas
+- librerias/rsa_pdf_graficos.py : 856 líneas
 - programa_integrado.py : 692 líneas
+- librerias/rsa_utilidades.py : 675 líneas
+- librerias/rsa_pdf_reportes.py : 642 líneas
 - programa_integrado_alt.py : 629 líneas
-- librerias/metodos_gestion.py : 609 líneas
+- librerias/metodos_gestion.py : 586 líneas
 - subprogramas/reporte_diario.py : 547 líneas
-- librerias/rsa_utilidades.py : 520 líneas
-- subprogramas/marcar_eventos.py : 411 líneas
+- subprogramas/marcar_eventos.py : 410 líneas
 
 ## Uso de Qt dentro del proyecto
 
-- auditor_arquitectura_rsa.py
 - programa_integrado.py
 - programa_integrado_alt.py
 - librerias/estaciones.py
 - librerias/lectura_datos.py
 - librerias/metodos_gestion.py
 - librerias/metodos_gis_rsa.py
-- librerias/metodos_graficos_rsa.py
 - librerias/metodos_reportes_individuales.py
 - librerias/metodos_rsa.py
+- librerias/rsa_pdf_graficos.py
+- librerias/rsa_pdf_reportes.py
+- librerias/rsa_utilidades.py
 - librerias/ventana_aceleraciones.py
 - librerias/ventana_estaciones.py
 - subprogramas/extraer_integrado.py
@@ -65,39 +68,41 @@
 
 ## Posibles puntos de refactorización
 
-- librerias/metodos_graficos_rsa.py : módulo muy grande (2457 líneas)
-- subprogramas/procesamiento_integrado.py : módulo muy grande (1621 líneas)
-- librerias/metodos_rsa.py : módulo muy grande (1195 líneas)
-- subprogramas/reporte_acumulado.py : módulo muy grande (1077 líneas)
+- subprogramas/procesamiento_integrado.py : módulo muy grande (1785 líneas)
+- subprogramas/reporte_acumulado.py : módulo muy grande (1078 líneas)
 - subprogramas/extraer_integrado.py : módulo muy grande (998 líneas)
+- librerias/rsa_pdf_catalogo.py : módulo muy grande (937 líneas)
+- librerias/rsa_procesamiento.py : módulo muy grande (916 líneas)
+- librerias/metodos_rsa.py : módulo muy grande (864 líneas)
+- librerias/rsa_pdf_graficos.py : módulo muy grande (856 líneas)
 
 ## Dependencias internas
 
 ### programa_integrado.py
-- subprogramas/otras_redes.py
-- subprogramas/reporte_acumulado.py
-- subprogramas/fases.py
-- subprogramas/inicio.py
-- subprogramas/procesamiento_integrado.py
-- subprogramas/extraer_integrado.py
 - subprogramas/marcar_eventos.py
 - subprogramas/reporte_diario.py
-
-### programa_integrado_alt.py
-- subprogramas/inicio.py
+- subprogramas/otras_redes.py
 - subprogramas/fases.py
+- subprogramas/inicio.py
+- subprogramas/reporte_acumulado.py
 - subprogramas/procesamiento_integrado.py
 - subprogramas/extraer_integrado.py
+
+### programa_integrado_alt.py
 - subprogramas/marcar_eventos.py
+- subprogramas/fases.py
+- subprogramas/inicio.py
+- subprogramas/procesamiento_integrado.py
+- subprogramas/extraer_integrado.py
 
 ### subprogramas/fases.py
-- librerias/metodos_gestion.py
-- librerias/metodos_rsa.py
-- librerias/gestor_fases.py
 - librerias/metodos_sismicos.py
+- librerias/gestor_fases.py
+- librerias/metodos_rsa.py
+- librerias/metodos_gestion.py
 
 ### subprogramas/marcar_eventos.py
-- librerias/metodos_gestion.py
-- librerias/metodos_rsa.py
 - librerias/metodos_sismicos.py
+- librerias/metodos_rsa.py
+- librerias/metodos_gestion.py
 

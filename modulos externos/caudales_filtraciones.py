@@ -238,6 +238,8 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         fig.canvas.mpl_connect('button_press_event', on_right_click)
         plt.show()
 
+
+
     def guardar_marcas(self):
         if len(self.marcas_usuario) != 2:
             QMessageBox.warning(self, "Error", "Debes seleccionar exactamente 2 marcas.")

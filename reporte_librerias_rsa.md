@@ -113,7 +113,6 @@ Imports:
 - PyQt5.QtCore
 - PyQt5.QtWidgets
 - codecs
-- codecs
 - csv
 - json
 - obspy
@@ -151,66 +150,21 @@ Imports:
 - warnings
 
 
-## librerias/metodos_graficos_rsa.py
-
-Categorías detectadas:
-
-- graficos
-- io
-- numerico
-- qt
-- rsa
-
-Imports:
-
-- PyQt5.QtCore
-- copy
-- csv
-- datetime
-- math
-- math
-- matplotlib.pyplot
-- metodos_gestion
-- metodos_gis_rsa
-- metodos_rsa
-- metodos_rsa
-- numpy
-- os
-- os
-- pathlib
-- reportlab.graphics.charts.barcharts
-- reportlab.graphics.charts.linecharts
-- reportlab.graphics.charts.lineplots
-- reportlab.graphics.charts.textlabels
-- reportlab.graphics.shapes
-- reportlab.graphics.shapes
-- reportlab.lib
-- reportlab.lib.colors
-- reportlab.lib.pagesizes
-- reportlab.pdfbase.pdfmetrics
-- reportlab.pdfgen
-- reportlab.rl_config
-- rsa_dominio
-- rsa_io
-- rsa_utilidades
-- scipy.fft
-- sys
-
-
 ## librerias/metodos_reportes_individuales.py
 
 Categorías detectadas:
 
 - io
 - qt
+- rsa
 
 Imports:
 
 - PyQt5.QtWidgets
 - metodos_gis_rsa
-- metodos_graficos_rsa
 - os
 - pathlib
+- rsa_pdf_reportes
 - sys
 - ventana_aceleraciones
 
@@ -229,7 +183,6 @@ Categorías detectadas:
 Imports:
 
 - PyQt5.QtWidgets
-- csv
 - datetime
 - matplotlib
 - matplotlib.pyplot
@@ -318,9 +271,10 @@ Imports:
 - rsa_dominio
 - shutil
 - sys
+- xml.etree.ElementTree
 
 
-## librerias/rsa_procesamiento.py
+## librerias/rsa_pdf_catalogo.py
 
 Categorías detectadas:
 
@@ -330,8 +284,101 @@ Categorías detectadas:
 Imports:
 
 - csv
+- metodos_gestion
+- os
+- pathlib
+- reportlab.graphics.shapes
+- reportlab.lib
+- reportlab.lib.pagesizes
+- reportlab.pdfgen
+- rsa_dominio
+- rsa_io
+- rsa_pdf_graficos
+- rsa_pdf_reportes
+- sys
+
+
+## librerias/rsa_pdf_graficos.py
+
+Categorías detectadas:
+
+- graficos
+- io
+- numerico
+- qt
+- rsa
+
+Imports:
+
+- PyQt5.QtCore
+- csv
+- datetime
+- math
+- math
+- matplotlib.pyplot
+- metodos_gestion
+- metodos_gis_rsa
+- numpy
+- os
+- pathlib
+- reportlab.graphics.charts.barcharts
+- reportlab.graphics.charts.linecharts
+- reportlab.graphics.charts.lineplots
+- reportlab.graphics.charts.textlabels
+- reportlab.graphics.shapes
+- reportlab.lib
+- reportlab.lib.colors
+- reportlab.lib.pagesizes
+- reportlab.pdfbase.pdfmetrics
+- reportlab.pdfgen
+- reportlab.rl_config
+- rsa_dominio
+- rsa_procesamiento
+- scipy.fft
+- sys
+
+
+## librerias/rsa_pdf_reportes.py
+
+Categorías detectadas:
+
+- io
+- qt
+- rsa
+
+Imports:
+
+- PyQt5.QtCore
+- copy
 - datetime
 - metodos_gestion
+- metodos_rsa
+- os
+- pathlib
+- reportlab.graphics.charts.textlabels
+- reportlab.graphics.shapes
+- reportlab.lib
+- reportlab.lib.pagesizes
+- reportlab.pdfgen
+- rsa_io
+- rsa_pdf_graficos
+- sys
+
+
+## librerias/rsa_procesamiento.py
+
+Categorías detectadas:
+
+- io
+- numerico
+- rsa
+
+Imports:
+
+- csv
+- datetime
+- metodos_gestion
+- numpy
 - os
 - os
 - pathlib
@@ -386,11 +433,11 @@ Imports:
 - PyQt5.QtWidgets
 - matplotlib.pyplot
 - metodos_gestion
-- metodos_graficos_rsa
 - os
 - pathlib
 - rsa_dominio
 - rsa_io
+- rsa_pdf_reportes
 - sys
 
 
@@ -516,6 +563,7 @@ Imports:
 - os
 - pathlib
 - psutil
+- rsa_io
 - rsa_procesamiento
 - sys
 
@@ -553,7 +601,6 @@ Categorías detectadas:
 - graficos
 - io
 - qt
-- sismologia
 
 Imports:
 
@@ -562,20 +609,14 @@ Imports:
 - PyQt5.QtCore
 - PyQt5.QtCore
 - PyQt5.QtWidgets
-- PyQt5.QtWidgets
-- copy
-- csv
 - datetime
-- gc
 - matplotlib.backends.backend_qt5agg
 - matplotlib.figure
 - matplotlib.pyplot
 - metodos_gestion
 - metodos_rsa
-- obspy.core.trace
 - os
 - pathlib
-- psutil
 - sys
 
 
@@ -592,8 +633,6 @@ Categorías detectadas:
 Imports:
 
 - PyQt5
-- PyQt5
-- PyQt5.QtCore
 - PyQt5.QtCore
 - PyQt5.QtCore
 - PyQt5.QtWidgets
@@ -615,7 +654,6 @@ Categorías detectadas:
 
 - graficos
 - io
-- numerico
 - qt
 - rsa
 
@@ -623,25 +661,17 @@ Imports:
 
 - PyQt5
 - PyQt5.QtCore
-- PyQt5.QtCore
 - PyQt5.QtWidgets
-- csv
 - datetime
 - matplotlib.backends.backend_qt5agg
 - matplotlib.figure
-- matplotlib.pyplot
 - metodos_gestion
-- metodos_graficos_rsa
-- metodos_reportes_individuales
 - metodos_rsa
-- numpy
 - os
 - pathlib
-- rsa_dominio
 - rsa_io
 - rsa_procesamiento
 - sys
-- xml.etree.ElementTree
 
 
 ## subprogramas/procesamiento_integrado.py
@@ -656,8 +686,6 @@ Categorías detectadas:
 Imports:
 
 - PyQt5
-- PyQt5
-- PyQt5.QtCore
 - PyQt5.QtCore
 - PyQt5.QtCore
 - PyQt5.QtCore
@@ -672,14 +700,13 @@ Imports:
 - matplotlib.figure
 - metodos_gestion
 - metodos_gis_rsa
-- metodos_graficos_rsa
 - metodos_reportes_individuales
 - metodos_rsa
 - os
 - os
 - pathlib
-- rsa_dominio
 - rsa_io
+- rsa_pdf_catalogo
 - rsa_procesamiento
 - sys
 - time
@@ -706,7 +733,6 @@ Imports:
 - csv
 - datetime
 - metodos_gestion
-- metodos_graficos_rsa
 - metodos_rsa
 - obspy
 - os
@@ -714,6 +740,7 @@ Imports:
 - pathlib
 - rsa_dominio
 - rsa_io
+- rsa_pdf_catalogo
 - rsa_utilidades
 - sys
 - sys
@@ -741,7 +768,6 @@ Imports:
 - matplotlib.figure
 - matplotlib.pyplot
 - metodos_gestion
-- metodos_graficos_rsa
 - metodos_reportes_individuales
 - metodos_rsa
 - metodos_rsa
@@ -750,6 +776,7 @@ Imports:
 - pathlib
 - rsa_dominio
 - rsa_io
+- rsa_pdf_catalogo
 - sys
 - xml.etree.ElementTree
 
