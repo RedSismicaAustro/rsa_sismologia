@@ -495,8 +495,9 @@
             <li class="nav-item"><a href="#ejecucion">Ejecución de Tareas</a></li>
             <li class="nav-item"><a href="#auditoria">Arquitectura y Métricas</a></li>
         </ul>
-        <div class="sidebar-footer">
-            <span style="font-size: 12px; color: var(--text-muted);">v3.0 (Agosto 2026)</span>
+        <div class="sidebar-footer" style="display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
+            <a href="guia_uso_agente.html" style="font-size: 12px; color: var(--accent-primary); text-decoration: none; font-weight: 600;">🤖 Guía de Uso del Agente →</a>
+            <span style="font-size: 11px; color: var(--text-muted);">v3.0 (Agosto 2026)</span>
         </div>
     </aside>
 
@@ -592,18 +593,18 @@
                     <tbody>
                         <tr>
                             <td><code>modulos externos/caudales_filtraciones.py</code></td>
-                            <td><a href="file:///c:/proyectos/rsa_sismologia/modulos%20externos/caudales_contx.md" class="link-file">caudales_contx.md</a></td>
+                            <td><a href="file:///c:/proyectos/rsa_sismologia/modulos%20externos/caudales_filtraciones_contx.md" class="link-file">caudales_filtraciones_contx.md</a></td>
                             <td>Análisis de caudales a partir de eventos sísmicos CONTROL.</td>
                         </tr>
                         <tr>
-                            <td><code>modulos externos/acelerografo.py</code></td>
-                            <td><a href="file:///c:/proyectos/rsa_sismologia/modulos%20externos/acelerografo_contx.md" class="link-file">acelerografo_contx.md</a></td>
-                            <td>Procesamiento y descarga de registros de acelerógrafos.</td>
+                            <td><code>obsoletos/modulos externos/acelerografo.py</code></td>
+                            <td><a href="file:///c:/proyectos/rsa_sismologia/obsoletos/modulos%20externos/acelerografo_contx.md" class="link-file">acelerografo_contx.md</a></td>
+                            <td>[Respaldo] Procesamiento de acelerógrafos (unificado en consolidación).</td>
                         </tr>
                         <tr>
-                            <td><code>modulos externos/automatico.py</code></td>
-                            <td><a href="file:///c:/proyectos/rsa_sismologia/modulos%20externos/automatico_contx.md" class="link-file">automatico_contx.md</a></td>
-                            <td>Inserción y descarga automatizada de datos en tiempo real.</td>
+                            <td><code>obsoletos/modulos externos/automatico.py</code></td>
+                            <td><a href="file:///c:/proyectos/rsa_sismologia/obsoletos/modulos%20externos/automatico_contx.md" class="link-file">automatico_contx.md</a></td>
+                            <td>[Respaldo] Telemetría analógica de red R: (unificado en consolidación).</td>
                         </tr>
                         <tr>
                             <td><code>modulos externos/consolidacion_mseed.py</code></td>
@@ -612,12 +613,12 @@
                         </tr>
                         <tr>
                             <td><code>modulos externos/Corrección de EVT por reseteo.py</code></td>
-                            <td><a href="file:///c:/proyectos/rsa_sismologia/modulos%20externos/Correccion_EVT_reseteo_contx.md" class="link-file">Correccion_EVT_reseteo_contx.md</a></td>
+                            <td><a href="file:///c:/proyectos/rsa_sismologia/modulos%20externos/Correcci%C3%B3n%20de%20EVT%20por%20reseteo_contx.md" class="link-file">Corrección de EVT por reseteo_contx.md</a></td>
                             <td>Corrección temporal del reset en el contador interno.</td>
                         </tr>
                         <tr>
                             <td><code>modulos externos/Insercion de estaciones EVT.py</code></td>
-                            <td><a href="file:///c:/proyectos/rsa_sismologia/modulos%20externos/Insercion_estaciones_contx.md" class="link-file">Insercion_estaciones_contx.md</a></td>
+                            <td><a href="file:///c:/proyectos/rsa_sismologia/modulos%20externos/Insercion%20de%20estaciones%20EVT_contx.md" class="link-file">Insercion de estaciones EVT_contx.md</a></td>
                             <td>Inserción estructurada de archivos de eventos EVT.</td>
                         </tr>
                         <tr>
@@ -683,10 +684,18 @@
         <!-- Sección 4: Reglas de Agentes -->
         <section id="reglas">
             <h3>🤖 4. Directivas de Agentes (Codex & Antigravity)</h3>
-            <p>Se ha creado un archivo global unificado en la raíz del proyecto para gobernar las modificaciones automáticas del agente:</p>
+            <p>Se ha definido un marco normativo global en <code>AGENTS.md</code> en la raíz del proyecto para gobernar cualquier asistencia del agente:</p>
             
+            <div class="callout" style="border-left: 4px solid #ef4444; background-color: var(--warning-bg); color: var(--warning-text);">
+                <div class="callout-title" style="color: #b91c1c;">🚨 REGLAS MADRES INSALVABLES</div>
+                <ul style="padding-left: 18px; margin-top: 6px;">
+                    <li><strong>Prohibición Absoluta de Ejecutar Commits (Solo Redactar):</strong> El agente <strong>NUNCA</strong> tiene permitido ejecutar <code>git commit</code> ni <code>git push</code>. Su labor ante solicitudes de commit es <strong>únicamente redactar y proponer</strong> el mensaje detallado para que el usuario lo ejecute manualmente.</li>
+                    <li><strong>Cero Acceso a Información de GitHub:</strong> El agente no tiene acceso a GitHub, repositorios remotos, credenciales ni PRs. De la administración y sincronización con GitHub se encarga <strong>exclusivamente el usuario</strong>.</li>
+                </ul>
+            </div>
+
             <div class="callout">
-                <div class="callout-title">⚠️ Regla de Oro</div>
+                <div class="callout-title">⚠️ Regla de Oro Documental</div>
                 Nunca comiences un cambio sin antes haber abierto y analizado el <code>_contx.md</code> del archivo que vas a modificar. Esto previene alterar variables críticas como nombres de widgets (PyQt5) y firmas de funciones internas.
             </div>
 
@@ -695,7 +704,6 @@
                 <li><strong>Preservación de estructuras JSON:</strong> Los esquemas de configuración de estaciones y fases no deben cambiarse para no dañar los scripts existentes.</li>
                 <li><strong>Compatibilidad de Rutas:</strong> Evitar barras diagonales codificadas a mano. Usar siempre `os.path.join` o `pathlib.Path` para asegurar que el código funcione tanto en entornos de desarrollo de Windows como en servidores.</li>
                 <li><strong>Traducciones idiomáticas prohibidas:</strong> Respeta el idioma establecido en cada archivo (español o inglés). No intentes "corregir" o traducir nombres de variables ya declaradas.</li>
-                <li><strong>Control de Commits (Regla <code>GENERA COMMIT</code>):</strong> El agente no realizará commits de manera automática. Solo agrupará y confirmará los cambios en un commit integral y contextualizado cuando el usuario escriba explícitamente la frase clave <strong><code>GENERA COMMIT</code></strong>.</li>
             </ul>
         </section>
 

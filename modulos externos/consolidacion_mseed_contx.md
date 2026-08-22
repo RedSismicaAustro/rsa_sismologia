@@ -1,142 +1,101 @@
-# Contexto del Programa: `consolidacion_mseed.py`
+---
+proyecto: rsa_sismologia
+tipo: contexto_tecnico
+archivo: modulos externos/consolidacion_mseed.py
+temas: [consolidacion_hibrida, analogicos, digitales, mseed, obspy, pyqt5, dayplot]
+generado: 2026-08-21
+---
 
-## Alcance
+# `consolidacion_mseed.py` — Contexto Técnico para Agentes IA
 
-`consolidacion_mseed.py` es el programa integrado para consolidar MiniSEED diarios.
+> Aplicación integral en PyQt5 que consolida en una sola operación tanto los registros de telemetría analógica continua (desde unidad `R:`) como los registros de acelerógrafos digitales (desde `Datos Estaciones` vía `digitales.csv`), generando volúmenes diarios MiniSEED y gráficos de control `dayplot`.
 
-Combina las responsabilidades seguras de:
+**Ruta**: `c:/proyectos/rsa_sismologia/modulos externos/consolidacion_mseed.py`  
+**LOC**: 972 líneas | **Lenguaje**: Python 3 (PyQt5, ObsPy, NumPy, Matplotlib)  
+**Fuentes de Entrada**: Unidad de red `R:/` (telemetría continua) y carpeta `Datos Estaciones` (acelerógrafos digitales)  
 
-- `automatico.py`: estructura diaria y registro continuo analogico desde `R:`;
-- `acelerografo.py`: union e incorporacion de estaciones digitales/acelerograficas desde `Datos Estaciones`.
+---
 
-Los programas originales quedan separados para poder ejecutar cada flujo de forma independiente.
+## 1. Identidad, Alcance y Propósito
 
-## Proposito
+`consolidacion_mseed.py` unifica las capacidades de `automatico.py` y `acelerografo.py` en un pipeline único para facilitar la jornada operativa diaria del operador sismológico.
 
-Generar la estructura diaria de informacion sismica si no existe, regenerar los MiniSEED analogicos del dia y agregar las estaciones digitales a la misma estructura.
+### Objetivos Clave:
+1. **Flujo Híbrido Completo**: Procesa en una sola ejecución las estaciones analógicas transmitidas por radioenlace y las estaciones digitales descargadas en disco.
+2. **Procesamiento de Estaciones Digitales (`procesar_digitales`)**:
+   - Lee `datos/digitales.csv` y busca carpetas locales correspondientes.
+   - Filtra fragmentos `XXXX_AAAAMMDD_HHMMSS*.mseed` garantizando que el código coincida con el catálogo.
+   - Ordena por tiempo de inicio real (`stats.starttime`), une las trazas y escribe el archivo diario consolidado en `Directorio_registros`.
+3. **Procesamiento de Estaciones Analógicas (`Abrir_archivo`)**:
+   - Detecta archivos continuos en `R:/` con formato `AAMMDDhhmmss`.
+   - Decodifica tramas binarias de 2077 bytes/s a 64 sps.
+   - Realiza escritura atómica en `.tmp` y posterior reemplazo con `os.replace`.
+4. **Ploteo Consolidado de Dayplots**: Genera gráficos PNG de 24 horas para todos los canales habilitados tanto analógicos como digitales.
 
-## Entradas
+---
 
-### Analogicas
+## 2. Diagrama de Arquitectura y Flujo de Datos
 
-- Fuente: unidad `R:`.
-- Nombre esperado: `AAMMDDhhmmss`.
-- Los archivos se copian al directorio diario de trabajo con prefijo de siglo: `20AAMMDDhhmmss`.
-
-### Digitales
-
-- Fuente: `directorio_trabajo/Datos Estaciones/`.
-- Configuracion: `datos/digitales.csv`.
-- Cada fila valida indica la carpeta digital y el indice de estacion en `parametros_estaciones()`.
-
-## Supuestos Operativos
-
-- Los codigos de estacion/canal tienen siempre 4 caracteres.
-- El registro analogico tiene 16 canales y 64 muestras por segundo.
-- `analogico.csv` no se usa como puntero ni como control de reanudacion.
-- La carpeta de trabajo por defecto es `G:/Mi unidad/DIA/`.
-- La carpeta digital por defecto es `G:/Mi unidad/DIA/Datos Estaciones/`.
-- Si no hay analogicos, el programa puede igualmente crear la estructura diaria y procesar digitales.
-
-## Flujo General
-
-1. Se inicia la interfaz PyQt5 reutilizando `src/ui/automatico.ui`.
-2. Se carga `parametros_estaciones()`.
-3. Se lee `datos/digitales.csv`.
-4. Se selecciona la fecha del dia a consolidar.
-5. Se buscan y copian los binarios analogicos desde `R:`.
-6. Se crea la estructura diaria con `definir_dia()`.
-7. Se eliminan los MiniSEED existentes del dia en `mseed/registros`.
-8. Se convierten los binarios analogicos a MiniSEED.
-9. Si hay varios bloques analogicos, se unen por canal.
-10. Se procesan las estaciones digitales configuradas.
-11. Se generan los MiniSEED digitales en la misma estructura diaria.
-12. Se generan los PNG al final, cuando los MiniSEED analogicos y digitales ya estan en su directorio definitivo.
-
-## Logging
-
-`mensaje_lbl()`:
-
-- antepone `[HH:MM:SS]`;
-- imprime en consola;
-- conserva el historial;
-- compacta saltos de linea con ` | `;
-- deja visible el final del registro.
-
-Ejemplo:
-
-```text
-[14:36:14] Lectura terminada, | Segundos leidos: 62077 | Segundos faltantes: 0
+```mermaid
+flowchart TD
+    A[Inicio: Consolidacion] --> B[Cargar UI e inicializar parámetros]
+    B --> C[Verificar unidad R:/ y carpeta Datos Estaciones]
+    C --> D[Usuario selecciona Fecha y Directorio DIA]
+    D --> E[Click Iniciar Procesamiento]
+    E --> F[Paso 1: procesar_digitales]
+    F --> G[Iterar digitales.csv -> buscar XXXX_AAAAMMDD_*.mseed]
+    G --> H[Merge de fragmentos y guardado en mseed/]
+    H --> I[Paso 2: Abrir_archivo analógicos]
+    I --> J[Copiar desde R:/ -> Decodificar binario de 16 canales]
+    J --> K[conversion_mseed_bloque + unir_mseed]
+    K --> L[Paso 3: Ploteo de Dayplots PNG]
+    L --> M[imprimir_png analógicos + imprimir_png_digitales]
+    M --> N[Consolidación Diaria Finalizada]
 ```
 
-## Procesamiento Analogico
+---
 
-La lectura binaria:
+## 3. Contratos de Datos y Configuración
 
-- localiza la cabecera con `loc_cabecera()`;
-- lee desde el inicio util del archivo;
-- valida marca fija, segundo, cabecera y cuerpo;
-- resta linea base por archivo;
-- reporta segundos faltantes segun saltos del contador.
+### 3.1. Esquema de Entradas
+1. **Unidad `R:/`**: Archivos de telemetría analógica sin extensión (`YYMMDDhhmmss`).
+2. **`directorio_trabajo/Datos Estaciones/<Carpeta>/`**: Archivos MiniSEED digitales (`XXXX_YYYYMMDD_HHMMSS*.mseed`).
+3. **`datos/digitales.csv`**: Tabla de correspondencia entre subcarpeta e índice en `parametros_estaciones()`.
 
-La conversion:
+### 3.2. Esquema de Salidas en `Directorio_registros` (`.../AAAAMMDD/mseed/`)
+* Canales analógicos: `<NOMBRE_CANAL>_20YYMMDD_000000.mseed`
+* Estaciones digitales: `<CODIGO_ESTACION>_YYYYMMDD_000000.mseed`
+* Gráficos en `Directorio_base` (`.../AAAAMMDD/`): Archivos `.png` de 24 horas a 200 DPI.
 
-- usa `conversion_mseed_bloque()`;
-- conserva la hora real de cada archivo;
-- escribe MiniSEED con `STEIM1`, `reclen=512` y `sampling_rate = 64.0`;
-- usa escritura atomica.
+---
 
-La union de bloques analogicos:
+## 4. Métodos y Funciones Principales
 
-```python
-merge(method=1, fill_value=None)
-split()
-```
+| Método / Función | Responsabilidad |
+|---|---|
+| `MyApp.procesar_digitales()` | Procesa todas las estaciones digitales habilitadas en `digitales.csv`, une sus trazas y retorna la lista de PNGs pendientes. |
+| `MyApp.imprimir_png_digitales(...)` | Genera los dayplots PNG para cada archivo digital consolidado según el canal/componente configurado. |
+| `MyApp.Abrir_archivo()` | Gestiona el ciclo completo de descarga y decodificación de la telemetría continua desde la unidad `R:`. |
+| `MyApp.unir_mseed(arch1, arch2)` | Une pares de archivos MiniSEED analógicos por canal conservando discontinuidades reales con `split()`. |
+| `MyApp.validar_fila_digital(fila, idx)` | Valida límites y tipos de datos en filas de `digitales.csv`. |
+| `MyApp.seleccionar_traza_png_digital(...)` | Prioriza la traza vertical (`Z`) según la cadena de orientación o componente configurada. |
+| `Leer_binario_comun(...)` | Decodifica la trama binaria multiplexada de 16 canales y 2077 bytes por segundo. |
+| `escribir_atomico_mseed(stream, dest)` | Escritura de seguridad mediante archivo temporal `.tmp`, `fsync` y reemplazo atómico `os.replace`. |
 
-Esto mantiene los espacios sin senal como huecos reales, sin rellenarlos con el ultimo valor.
+---
 
-## Procesamiento Digital
+## 5. Deuda Técnica y Riesgos Críticos
 
-`procesar_digitales()`:
+1. **Doble Dependencia de Almacenamiento**: Requiere acceso simultáneo a la unidad de red `R:` y a la ruta local/nube `Datos Estaciones`. Si `R:` no está disponible, el módulo digital puede ejecutarse de forma aislada, pero el usuario debe confirmar la advertencia.
+2. **Volumen de Logs en UI**: Dado que procesa tanto analógicos como digitales, el buffer de `Lbl_Mensajes` recibe cientos de líneas de log; se usa `QCoreApplication.processEvents()` para mantener la fluidez de la ventana sin congelar el hilo principal de Qt.
+3. **Escritura Atómica en Unidades Mapeadas**: Se debe asegurar que las carpetas de destino admitan `os.replace` sin bloqueos de antivirus o permisos de red en Windows.
 
-- valida cada fila de `datos/digitales.csv`;
-- consulta la habilitacion y los codigos desde una copia intacta de `parametros_estaciones()`;
-- ubica la carpeta de la estacion dentro de `Datos Estaciones`;
-- lee archivos MiniSEED del dia seleccionado;
-- filtra trazas por codigo de estacion;
-- revisa huecos y solapes antes y despues de unir;
-- fusiona con `merge(method=1, fill_value=None)` y luego `split()`;
-- escribe un MiniSEED diario por estacion.
+---
 
-La configuracion digital se mantiene separada de las listas mutables usadas por la conversion analogica. Esto evita que `Btn_Mseed()` altere `HAB_CANAL` o `CODIGO` antes de procesar estaciones digitales como `TENG`.
+## 6. Checklist de Regresión
 
-## Generacion de PNG
-
-Los PNG se generan como etapa final:
-
-- primero se consolidan todos los MiniSEED analogicos y digitales;
-- luego se generan los PNG analogicos;
-- finalmente se generan los PNG digitales.
-
-Los PNG digitales se generan leyendo nuevamente el MiniSEED final desde `mseed/registros`, no desde el `Stream` temporal usado durante la union.
-
-El nombre de salida digital mantiene el formato:
-
-```text
-CODIGO_AAAAMMDD_000000.mseed
-CODIGO_AAAAMMDD_000000.png
-```
-
-## Salidas
-
-Todas las salidas se ubican en la estructura del dia creada por `obtener_directorios()`:
-
-- MiniSEED analogicos y digitales en `mseed/registros`;
-- PNG de revision en la carpeta base del dia;
-- archivo de estaciones del dia cuando corresponde.
-
-## Separacion de Responsabilidades
-
-- Usar `automatico.py` cuando solo se quiera procesar el continuo analogico desde `R:`.
-- Usar `acelerografo.py` cuando solo se quiera unir estaciones digitales/acelerograficas.
-- Usar `consolidacion_mseed.py` cuando se quiera construir el dia completo en una sola corrida.
+Antes de validar cualquier modificación en `consolidacion_mseed.py`, verificar:
+- [ ] La aplicación maneja adecuadamente tanto la presencia como la ausencia de la unidad `R:`.
+- [ ] Las estaciones digitales se ordenan estrictamente por `stats.starttime` antes de ejecutar `merge()`.
+- [ ] La compresión de salida en todos los archivos `.mseed` es `STEIM1` con longitud de registro `512`.
+- [ ] Los dayplots PNG para estaciones analógicas y digitales se generan en las rutas canónicas del día sin sobreescribirse entre sí.

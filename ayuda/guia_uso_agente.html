@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Guía interactiva de ayuda para el uso óptimo y seguro del Agente de IA en el repositorio rsa_sismologia.">
+    <title>Guía de Uso del Agente — RSA Sismología</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Light Mode Variables */
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f1f5f9;
+            --bg-card: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+            --accent-primary: #0f766e;       /* Deep Teal */
+            --accent-secondary: #0284c7;     /* Sky Blue */
+            --accent-gradient: linear-gradient(135deg, #0f766e 0%, #0284c7 100%);
+            --accent-gradient-glow: linear-gradient(135deg, rgba(15,118,110,0.15) 0%, rgba(2,132,199,0.15) 100%);
+            --border-color: #e2e8f0;
+            --border-focus: #0f766e;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --card-shadow-hover: 0 12px 20px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+            --code-bg: #0f172a;
+            --code-text: #e2e8f0;
+            --badge-green-bg: #dcfce7;
+            --badge-green-text: #166534;
+            --badge-blue-bg: #e0f2fe;
+            --badge-blue-text: #075985;
+            --badge-amber-bg: #fef3c7;
+            --badge-amber-text: #92400e;
+            --badge-red-bg: #fee2e2;
+            --badge-red-text: #991b1b;
+            --badge-purple-bg: #f3e8ff;
+            --badge-purple-text: #6b21a8;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="dark"] {
+            /* Dark Mode Variables */
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-tertiary: #1f293d;
+            --bg-card: #151d30;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --accent-primary: #2dd4bf;
+            --accent-secondary: #38bdf8;
+            --accent-gradient: linear-gradient(135deg, #14b8a6 0%, #38bdf8 100%);
+            --accent-gradient-glow: linear-gradient(135deg, rgba(20,184,166,0.2) 0%, rgba(56,189,248,0.2) 100%);
+            --border-color: #24324d;
+            --border-focus: #2dd4bf;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+            --card-shadow-hover: 0 12px 24px -3px rgba(0, 0, 0, 0.6), 0 6px 8px -4px rgba(0, 0, 0, 0.4);
+            --code-bg: #070b14;
+            --code-text: #e2e8f0;
+            --badge-green-bg: #064e3b;
+            --badge-green-text: #a7f3d0;
+            --badge-blue-bg: #0c4a6e;
+            --badge-blue-text: #bae6fd;
+            --badge-amber-bg: #78350f;
+            --badge-amber-text: #fde68a;
+            --badge-red-bg: #7f1d1d;
+            --badge-red-text: #fecaca;
+            --badge-purple-bg: #581c87;
+            --badge-purple-text: #e9d5ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            display: flex;
+            min-height: 100vh;
+            line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Sidebar Navigation */
+        aside {
+            width: 290px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 24px 18px;
+            z-index: 1000;
+            overflow-y: auto;
+            transition: var(--transition);
+        }
+
+        .logo-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--accent-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 22px;
+            font-weight: 800;
+            box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
+            flex-shrink: 0;
+        }
+
+        .logo-text h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 17px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .logo-text span {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            display: block;
+            margin-top: 2px;
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 10px 12px 6px;
+        }
+
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .nav-item a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 13.5px;
+            transition: var(--transition);
+        }
+
+        .nav-item a:hover {
+            background-color: var(--bg-tertiary);
+            color: var(--accent-primary);
+            transform: translateX(3px);
+        }
+
+        .nav-item.active a {
+            background: var(--accent-gradient);
+            color: #ffffff;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .quick-links {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-link {
+            flex: 1;
+            padding: 8px 10px;
+            font-size: 12px;
+            text-align: center;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 600;
+            border: 1px solid var(--border-color);
+            transition: var(--transition);
+        }
+
+        .btn-link:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        /* Main Container */
+        main {
+            margin-left: 290px;
+            flex-grow: 1;
+            padding: 40px 50px 80px;
+            max-width: 1200px;
+        }
+
+        /* Header Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 36px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .header-title h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: -0.8px;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+
+        .header-title p {
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .top-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .theme-toggle-btn {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+        }
+
+        .theme-toggle-btn:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow-hover);
+        }
+
+        /* Hero Banner */
+        .hero-banner {
+            background: var(--accent-gradient-glow);
+            border: 1px solid var(--border-color);
+            border-left: 5px solid var(--accent-primary);
+            border-radius: 14px;
+            padding: 24px 28px;
+            margin-bottom: 36px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .hero-content h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--accent-primary);
+            margin-bottom: 6px;
+        }
+
+        .hero-content p {
+            color: var(--text-secondary);
+            font-size: 14.5px;
+            margin-bottom: 0;
+        }
+
+        .hero-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* Section Container */
+        section {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 36px;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition);
+        }
+
+        section:hover {
+            box-shadow: var(--card-shadow-hover);
+        }
+
+        section h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 23px;
+            font-weight: 800;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        section h3 .section-icon {
+            font-size: 24px;
+        }
+
+        p {
+            color: var(--text-secondary);
+            font-size: 14.5px;
+            margin-bottom: 16px;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-green { background-color: var(--badge-green-bg); color: var(--badge-green-text); }
+        .badge-blue { background-color: var(--badge-blue-bg); color: var(--badge-blue-text); }
+        .badge-amber { background-color: var(--badge-amber-bg); color: var(--badge-amber-text); }
+        .badge-red { background-color: var(--badge-red-bg); color: var(--badge-red-text); }
+        .badge-purple { background-color: var(--badge-purple-bg); color: var(--badge-purple-text); }
+
+        /* Grid Layouts */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 18px;
+            margin-top: 20px;
+        }
+
+        /* Cards */
+        .card {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            border-color: var(--accent-primary);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .card-header h4 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card p {
+            font-size: 13.5px;
+            margin-bottom: 10px;
+        }
+
+        .card ul {
+            padding-left: 20px;
+            margin-bottom: 0;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .card ul li {
+            margin-bottom: 6px;
+        }
+
+        /* Alert Callouts */
+        .alert-box {
+            border-radius: 12px;
+            padding: 18px 22px;
+            margin: 20px 0;
+            border-left: 5px solid;
+            font-size: 14px;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
+        .alert-icon {
+            font-size: 22px;
+            line-height: 1;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .alert-content strong {
+            display: block;
+            font-size: 15px;
+            margin-bottom: 4px;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .alert-important {
+            background-color: var(--badge-amber-bg);
+            border-color: #d97706;
+            color: var(--badge-amber-text);
+        }
+
+        .alert-danger {
+            background-color: var(--badge-red-bg);
+            border-color: #dc2626;
+            color: var(--badge-red-text);
+        }
+
+        .alert-info {
+            background-color: var(--badge-blue-bg);
+            border-color: #0284c7;
+            color: var(--badge-blue-text);
+        }
+
+        .alert-success {
+            background-color: var(--badge-green-bg);
+            border-color: #16a34a;
+            color: var(--badge-green-text);
+        }
+
+        /* Tables */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13.5px;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            padding: 12px 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: var(--bg-tertiary);
+        }
+
+        /* Search Filter Input */
+        .filter-wrapper {
+            margin: 16px 0;
+            position: relative;
+        }
+
+        .filter-input {
+            width: 100%;
+            padding: 12px 16px 12px 42px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .filter-input:focus {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+        }
+
+        .filter-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 16px;
+        }
+
+        /* Interactive Prompts / Command Boxes */
+        .prompt-card {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            position: relative;
+        }
+
+        .prompt-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .prompt-title {
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .prompt-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .prompt-code {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            word-break: break-word;
+        }
+
+        .copy-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .copy-btn:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            transform: scale(1.04);
+        }
+
+        .copy-btn.copied {
+            background: #16a34a !important;
+            border-color: #16a34a !important;
+        }
+
+        /* Flow Steps */
+        .step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .step-item {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--accent-gradient);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 14px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 8px rgba(15, 118, 110, 0.25);
+        }
+
+        .step-text {
+            flex-grow: 1;
+            padding-top: 4px;
+        }
+
+        .step-text strong {
+            color: var(--text-primary);
+            font-size: 14.5px;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .step-text p {
+            margin-bottom: 0;
+            font-size: 13.5px;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+            padding-top: 30px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 40px;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            aside {
+                display: none;
+            }
+            main {
+                margin-left: 0;
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Navigation -->
+    <aside>
+        <div class="logo-box">
+            <div class="logo-icon">🤖</div>
+            <div class="logo-text">
+                <h1>RSA Sismología</h1>
+                <span>Guía del Agente</span>
+            </div>
+        </div>
+
+        <div class="nav-label">Navegación Rápida</div>
+        <ul class="nav-menu">
+            <li class="nav-item active"><a href="#reglas-madres">🚨 Reglas Madres</a></li>
+            <li class="nav-item"><a href="#inicio">📌 1. Inicio y Contexto</a></li>
+            <li class="nav-item"><a href="#regla-oro">🌟 2. Regla de Oro (_contx)</a></li>
+            <li class="nav-item"><a href="#protocolo-sesion">🔄 3. Protocolo de Sesión y Skills</a></li>
+            <li class="nav-item"><a href="#restricciones">⛔ 4. Restricciones Críticas</a></li>
+            <li class="nav-item"><a href="#commits">✍️ 5. Redacción de Commits</a></li>
+            <li class="nav-item"><a href="#slash-commands">⚡ 6. Slash Commands</a></li>
+            <li class="nav-item"><a href="#prompts-utiles">💡 7. Prompts Recomendados</a></li>
+            <li class="nav-item"><a href="#buenas-practicas">🛠️ 8. Buenas Prácticas</a></li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <div class="nav-label" style="padding:0 0 6px 0;">Otros Documentos</div>
+            <div class="quick-links">
+                <a href="manual_repositorio.html" class="btn-link">📁 Repositorio</a>
+                <a href="ayuda_insercion_evt.html" class="btn-link">🛰️ Inserción EVT</a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main>
+        <!-- Top Bar -->
+        <div class="top-bar" id="inicio">
+            <div class="header-title">
+                <h2>Guía de Ayuda para el Agente IA</h2>
+                <p>Instrucciones, contratos de trabajo, flujo de comandos y reglas de operación para Antigravity y Codex.</p>
+            </div>
+            <div class="top-controls">
+                <button class="theme-toggle-btn" id="themeToggle" onclick="toggleTheme()">
+                    <span id="themeIcon">🌙</span> <span id="themeLabel">Modo Oscuro</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- REGLAS MADRES INSALVABLES -->
+        <div id="reglas-madres" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(185, 28, 28, 0.18) 100%); border: 2px solid #ef4444; border-left: 8px solid #dc2626; border-radius: 14px; padding: 24px 28px; margin-bottom: 32px; box-shadow: var(--card-shadow);">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                <span style="font-size:26px;">🚨</span>
+                <h3 style="margin:0; border:none; padding:0; font-family:'Outfit', sans-serif; font-size:22px; font-weight:900; color:#dc2626;">REGLAS MADRES INSALVABLES (Jerarquía Suprema)</h3>
+            </div>
+            <p style="color:var(--text-primary); font-size:14.5px; font-weight:600; margin-bottom:14px;">
+                Estas directivas son de cumplimiento absoluto, estricto y sin excepción para cualquier agente de IA (Codex, Antigravity, o subagentes):
+            </p>
+            <div class="grid-2" style="margin-top:0;">
+                <div style="background:var(--bg-card); border:1px solid rgba(239,68,68,0.3); border-radius:10px; padding:16px;">
+                    <div style="font-weight:800; font-size:15px; color:#dc2626; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                        <span>🚫</span> 1. Prohibido Ejecutar Commits (Solo Redactar)
+                    </div>
+                    <p style="font-size:13.5px; margin:0; color:var(--text-secondary);">
+                        El agente <strong>NUNCA TIENE PERMITIDO EJECUTAR COMMITS</strong> (<code>git commit</code>, <code>git push</code>, etc.). Su función es exclusivamente <strong>analizar y redactar la propuesta de commit</strong> con un formato claro y descriptivo. La ejecución real de Git queda en manos exclusivas del usuario.
+                    </p>
+                </div>
+                <div style="background:var(--bg-card); border:1px solid rgba(239,68,68,0.3); border-radius:10px; padding:16px;">
+                    <div style="font-weight:800; font-size:15px; color:#dc2626; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                        <span>🔒</span> 2. Cero Acceso a Información de GitHub
+                    </div>
+                    <p style="font-size:13.5px; margin:0; color:var(--text-secondary);">
+                        El agente <strong>NO TIENE ACCESO A GITHUB</strong> ni a información remota, credenciales o repositorios externos. La administración, integración y sincronización de GitHub es responsabilidad <strong>única y exclusiva del usuario</strong>.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hero Status Banner -->
+        <div class="hero-banner">
+            <div class="hero-content">
+                <h3>Red Sísmica de Alerta — Entorno de Desarrollo Asistido</h3>
+                <p>Esta guía sintetiza las directrices de <code>AGENTS.md</code> y las habilidades especializadas para interactuar de forma segura y eficiente con el agente de Inteligencia Artificial.</p>
+            </div>
+            <div class="hero-badges">
+                <span class="badge badge-green">Python 3</span>
+                <span class="badge badge-blue">PyQt5 UI</span>
+                <span class="badge badge-purple">ObsPy</span>
+                <span class="badge badge-amber">VS Code</span>
+                <span class="badge badge-green">Validación por Resultados</span>
+            </div>
+        </div>
+
+        <!-- 1. Identidad y Filosofía de Operación -->
+        <section id="identidad">
+            <h3><span class="section-icon">📌</span> 1. Identidad y Filosofía de Operación (Ingeniero de Software)</h3>
+            <p>El agente opera como un <strong>Ingeniero de Software Senior especializado en Sismología e Instrumentación</strong> (experto en Python y C), enfocado en la depuración, optimización algorítmica y creación de código eficiente, claro y robusto.</p>
+            
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>🇪🇸 Código en Español</h4>
+                        <span class="badge badge-green">Legibilidad</span>
+                    </div>
+                    <p>Nombres de variables, funciones, métodos y comentarios siempre en <strong>español</strong>, altamente descriptivos de la física y la lógica sismológica.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>📏 Lógica y Métodos Cohesivos</h4>
+                        <span class="badge badge-blue">Estructura</span>
+                    </div>
+                    <p>Prioridad a métodos continuos (>20 líneas) cuando sea necesario para mantener la coherencia del flujo de datos, evitando divisiones artificiales.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>⚡ Optimización y Rendimiento</h4>
+                        <span class="badge badge-purple">Eficiencia</span>
+                    </div>
+                    <p>Control estricto de complejidad algorítmica, memoria y estructuras de control para procesar grandes volúmenes de series de tiempo.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>📊 Dominio de ObsPy, PyQt5 y C</h4>
+                        <span class="badge badge-amber">Librerías</span>
+                    </div>
+                    <p>Conocimiento profundo de tratamiento sísmico con <strong>ObsPy</strong> (streams, trazas, gaps, MiniSEED, EVT), GUI con <strong>PyQt5</strong> y firmware en <strong>C</strong>.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>🛡️ Excepciones y PEP 8</h4>
+                        <span class="badge badge-green">Robustez</span>
+                    </div>
+                    <p>Manejo granular de excepciones (<code>try/except/finally</code>), validaciones preventivas en Windows y respeto por estándares de estilo.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>📝 Explicaciones Detalladas</h4>
+                        <span class="badge badge-blue">Claridad</span>
+                    </div>
+                    <p>Código profusamente documentado y explicaciones técnicas detalladas que facilitan el mantenimiento por el equipo de desarrollo.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. Regla de Oro: Archivos de Contexto -->
+        <section id="regla-oro">
+            <h3><span class="section-icon">🌟</span> 2. Regla de Oro: Prioridad de Archivos de Contexto (<code>_contx.md</code>)</h3>
+            <p>Antes de inspeccionar, modificar o depurar cualquier script en el repositorio, el agente <strong>DEBE leer y respetar su archivo de contexto técnico asociado</strong> (con sufijo <code>_contx.md</code>).</p>
+
+            <div class="alert-box alert-important">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-content">
+                    <strong>Prevalencia Documental Obligatoria</strong>
+                    Los archivos <code>_contx.md</code> prevalecen sobre cualquier suposición del modelo de lenguaje. Si existe discrepancia entre el código y el contexto, se respeta la lógica de negocio documentada y se propone una corrección conservadora.
+                </div>
+            </div>
+
+            <div class="filter-wrapper">
+                <span class="filter-icon">🔍</span>
+                <input type="text" id="contextSearch" class="filter-input" placeholder="Buscar correspondencia de script o contexto (ej. acelerografo, fases, reporte)..." onkeyup="filterContextTable()">
+            </div>
+
+            <div class="table-responsive">
+                <table id="contextTable">
+                    <thead>
+                        <tr>
+                            <th>Script Python</th>
+                            <th>Archivo de Contexto Asignado</th>
+                            <th>Ubicación</th>
+                            <th>Propósito Principal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>obsoletos/modulos externos/acelerografo.py</code></td>
+                            <td><span class="badge badge-amber">acelerografo_contx.md</span></td>
+                            <td><code>obsoletos/modulos externos/</code></td>
+                            <td>[Respaldo] Adquisición y visualización de señales de acelerógrafos (unificado en consolidación).</td>
+                        </tr>
+                        <tr>
+                            <td><code>obsoletos/modulos externos/automatico.py</code></td>
+                            <td><span class="badge badge-amber">automatico_contx.md</span></td>
+                            <td><code>obsoletos/modulos externos/</code></td>
+                            <td>[Respaldo] Flujos de telemetría analógica de red R: (unificado en consolidación).</td>
+                        </tr>
+                        <tr>
+                            <td><code>modulos externos/caudales_filtraciones.py</code></td>
+                            <td><span class="badge badge-blue">caudales_filtraciones_contx.md</span></td>
+                            <td><code>modulos externos/</code></td>
+                            <td>Lectura y cálculo de caudales/filtraciones en presas.</td>
+                        </tr>
+                        <tr>
+                            <td><code>modulos externos/consolidacion_mseed.py</code></td>
+                            <td><span class="badge badge-blue">consolidacion_mseed_contx.md</span></td>
+                            <td><code>modulos externos/</code></td>
+                            <td>Consolidación y merge de archivos MiniSEED continuos.</td>
+                        </tr>
+                        <tr>
+                            <td><code>modulos externos/Corrección de EVT por reseteo.py</code></td>
+                            <td><span class="badge badge-blue">Corrección de EVT por reseteo_contx.md</span></td>
+                            <td><code>modulos externos/</code></td>
+                            <td>Ajuste de tiempos y cabeceras en registros EVT reseteados.</td>
+                        </tr>
+                        <tr>
+                            <td><code>modulos externos/Insercion de estaciones EVT.py</code></td>
+                            <td><span class="badge badge-blue">Insercion de estaciones EVT_contx.md</span></td>
+                            <td><code>modulos externos/</code></td>
+                            <td>Inyección y mapeo de estaciones en cabeceras binarias EVT.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/programa_integrado.py</code></td>
+                            <td><span class="badge badge-purple">programa_integrado_contx.md</span></td>
+                            <td><code>src/</code></td>
+                            <td>Núcleo de la interfaz principal de RSA Sismología.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/librerias/gestor_fases.py</code></td>
+                            <td><span class="badge badge-purple">gestor_fases_contx.md</span></td>
+                            <td><code>src/librerias/</code></td>
+                            <td>Motor central de cálculo, picado y guardado de fases P y S.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/librerias/estaciones.py</code></td>
+                            <td><span class="badge badge-purple">estaciones_contx.md</span></td>
+                            <td><code>src/librerias/</code></td>
+                            <td>Gestión de metadatos, coordenadas y canales de la red sísmica.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/librerias/analizar metodos_rsa.py</code></td>
+                            <td><span class="badge badge-purple">analizar_metodos_rsa_contx.md</span></td>
+                            <td><code>src/librerias/</code></td>
+                            <td>Herramienta de análisis estático de métodos y firmas del repo.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/subprogramas/extraer_integrado.py</code></td>
+                            <td><span class="badge badge-green">extraer_integrado_contx.md</span></td>
+                            <td><code>src/subprogramas/</code></td>
+                            <td>Módulo de extracción y recorte de ventanas de eventos sísmicos.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/subprogramas/fases.py</code></td>
+                            <td><span class="badge badge-green">fases_contx.md</span></td>
+                            <td><code>src/subprogramas/</code></td>
+                            <td>Interfaz gráfica de picado y revisión manual de fases sísmicas.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/subprogramas/inicio.py</code></td>
+                            <td><span class="badge badge-green">inicio_contx.md</span></td>
+                            <td><code>src/subprogramas/</code></td>
+                            <td>Pantalla de inicio y selector de proyectos/estaciones.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/subprogramas/marcar_eventos.py</code></td>
+                            <td><span class="badge badge-green">marcar_eventos_contx.md</span></td>
+                            <td><code>src/subprogramas/</code></td>
+                            <td>Detección visual y marcado de eventos en sismogramas continuos.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/subprogramas/procesamiento_integrado.py</code></td>
+                            <td><span class="badge badge-green">procesamiento_integrado_contx.md</span></td>
+                            <td><code>src/subprogramas/</code></td>
+                            <td>Filtrado espectral, corrección instrumental y cálculo FFT/PSD.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/subprogramas/reporte_acumulado.py</code></td>
+                            <td><span class="badge badge-green">reporte_acumulado_contx.md</span></td>
+                            <td><code>src/subprogramas/</code></td>
+                            <td>Generación de boletines acumulados por rango de fechas.</td>
+                        </tr>
+                        <tr>
+                            <td><code>src/subprogramas/reporte_diario.py</code></td>
+                            <td><span class="badge badge-green">reporte_diario_contx.md</span></td>
+                            <td><code>src/subprogramas/</code></td>
+                            <td>Boletín sísmico diario automatizado con mapas y tablas.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 3. Protocolo de Ciclo de Vida de Sesión y Skills -->
+        <section id="protocolo-sesion">
+            <h3><span class="section-icon">🔄</span> 3. Protocolo de Ciclo de Vida de Sesión y Suite de Skills</h3>
+            <p>Para maximizar la precisión, evitar modificaciones accidentales y garantizar trazabilidad absoluta, el repositorio cuenta con un protocolo estandarizado de <strong>Inicio (Scope Lock)</strong> y <strong>Cierre en 5 pasos</strong> impulsado por la suite de <code>.agents/skills</code>.</p>
+
+            <!-- A. Prompt de Inicio de Sesión -->
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-left: 5px solid #10b981; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; box-shadow: var(--card-shadow);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div style="font-family:'Outfit', sans-serif; font-size:17px; font-weight:800; color:#10b981; display:flex; align-items:center; gap:8px;">
+                        <span>🟢</span> A. Prompt Inicial de Sesión (Scope Lock y Lectura Previa)
+                    </div>
+                    <span class="badge badge-green">Inicio de Jornada</span>
+                </div>
+                <p style="font-size:13.5px; color:var(--text-secondary); margin-bottom:12px;">
+                    Pega este mensaje al comenzar a trabajar para fijar el directorio exclusivo de trabajo y evitar que el agente edite archivos antes de tiempo:
+                </p>
+                <div class="prompt-card" style="margin:0;">
+                    <div class="prompt-code" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                        <span style="white-space: pre-wrap; font-size:13px; line-height:1.5;">Considera las reglas y skills definidos en .agents/rules y .agents/skills.
+Para esta sesión, nuestro directorio de trabajo exclusivo será [DIRECTORIO]. No modifiques ni busques archivos fuera de esta ruta a menos que te lo pida. 
+Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto actual del proyecto. Todavia no modifiques ni crees ningun archivo.</span>
+                        <div style="display:flex; justify-content:flex-end;">
+                            <button class="copy-btn" onclick="copyText('Considera las reglas y skills definidos en .agents/rules y .agents/skills.\nPara esta sesión, nuestro directorio de trabajo exclusivo será [DIRECTORIO]. No modifiques ni busques archivos fuera de esta ruta a menos que te lo pida.\nRevisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto actual del proyecto. Todavia no modifiques ni crees ningun archivo.', this)">📋 Copiar Prompt Inicial</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- B. Las 4 Skills Oficiales -->
+            <h4 style="font-size:16px; margin: 24px 0 12px 0; color:var(--text-primary); font-family:'Outfit', sans-serif;">🛠️ Suite Oficial de Habilidades (<code>.agents/skills/</code>)</h4>
+            <div class="grid-2" style="margin-top:0;">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>📄 1. Generar Contexto</h4>
+                        <span class="badge badge-purple">generar_contexto.md</span>
+                    </div>
+                    <p>Audita el código y crea/actualiza los archivos <code>_contx.md</code> con sus 6 secciones (flujo Mermaid, contratos, métodos, riesgos y checklist).</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>🏛️ 2. Extraer ADR</h4>
+                        <span class="badge badge-blue">extraer_adr.md</span>
+                    </div>
+                    <p>Registra <em>Architectural Decision Records</em> en <code>docs/adr/</code> explicando el porqué de decisiones estructurales o unificaciones de módulos.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>🤝 3. Transición Técnica</h4>
+                        <span class="badge badge-amber">crear_transicion_tecnica.md</span>
+                    </div>
+                    <p>Genera un documento de relevo (<em>handover</em>) en <code>docs/transiciones/</code> con el estado exacto del proyecto para reanudar sesiones futuras.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4>📝 4. Volcado de Bitácora</h4>
+                        <span class="badge badge-green">volcado_bitacora.md</span>
+                    </div>
+                    <p>Actualiza de forma incremental el histórico cronológico de actividades en <code>docs/bitacora/bitacora_trabajo.md</code>.</p>
+                </div>
+            </div>
+
+            <!-- C. Prompts de Cierre de Sesión -->
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-left: 5px solid var(--accent-primary); border-radius: 12px; padding: 20px 24px; margin-top: 24px; box-shadow: var(--card-shadow);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div style="font-family:'Outfit', sans-serif; font-size:17px; font-weight:800; color:var(--accent-primary); display:flex; align-items:center; gap:8px;">
+                        <span>🔴</span> C. Prompts de Cierre de Sesión (Ejecución en 5 Pasos)
+                    </div>
+                    <button class="copy-btn" style="background:var(--accent-primary); color:#fff; border:none; padding:6px 14px; border-radius:8px;" onclick="copyText('1. Genera o actualiza el contexto tecnico de los archivos que fueron modificados durante la sesión, según la skill generar_contexto.md.\n2. Extrae o actualiza el ADR de las decisiones tomadas durante la sesión, según la skill extraer_adr.md.\n3. Genera la transición técnica de esta sesión según la skill crear_transicion_tecnica.md.\n4. Ejecuta el volcado de bitácora de esta sesión según la skill volcado_bitacora.md.\n5. Genera el texto de los commits para los repositorio modificados en las ultimas 4 intrucciones (modificacioens de la documentacion)', this)">📋 Copiar Protocolo Completo</button>
+                </div>
+                <p style="font-size:13.5px; color:var(--text-secondary); margin-bottom:14px;">
+                    Al terminar tu jornada de trabajo, envía estos comandos secuencialmente o en bloque para consolidar la memoria técnica del repositorio:
+                </p>
+
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div class="prompt-card" style="margin:0;">
+                        <div class="prompt-code">
+                            <span><strong>Paso 1:</strong> Genera o actualiza el contexto tecnico de los archivos que fueron modificados durante la sesión, según la skill generar_contexto.md.</span>
+                            <button class="copy-btn" onclick="copyText('Genera o actualiza el contexto tecnico de los archivos que fueron modificados durante la sesión, según la skill generar_contexto.md.', this)">Copiar</button>
+                        </div>
+                    </div>
+
+                    <div class="prompt-card" style="margin:0;">
+                        <div class="prompt-code">
+                            <span><strong>Paso 2:</strong> Extrae o actualiza el ADR de las decisiones tomadas durante la sesión, según la skill extraer_adr.md.</span>
+                            <button class="copy-btn" onclick="copyText('Extrae o actualiza el ADR de las decisiones tomadas durante la sesión, según la skill extraer_adr.md.', this)">Copiar</button>
+                        </div>
+                    </div>
+
+                    <div class="prompt-card" style="margin:0;">
+                        <div class="prompt-code">
+                            <span><strong>Paso 3:</strong> Genera la transición técnica de esta sesión según la skill crear_transicion_tecnica.md.</span>
+                            <button class="copy-btn" onclick="copyText('Genera la transición técnica de esta sesión según la skill crear_transicion_tecnica.md.', this)">Copiar</button>
+                        </div>
+                    </div>
+
+                    <div class="prompt-card" style="margin:0;">
+                        <div class="prompt-code">
+                            <span><strong>Paso 4:</strong> Ejecuta el volcado de bitácora de esta sesión según la skill volcado_bitacora.md.</span>
+                            <button class="copy-btn" onclick="copyText('Ejecuta el volcado de bitácora de esta sesión según la skill volcado_bitacora.md.', this)">Copiar</button>
+                        </div>
+                    </div>
+
+                    <div class="prompt-card" style="margin:0;">
+                        <div class="prompt-code">
+                            <span><strong>Paso 5:</strong> Genera el texto de los commits para los repositorio modificados en las ultimas 4 intrucciones (modificacioens de la documentacion)</span>
+                            <button class="copy-btn" onclick="copyText('Genera el texto de los commits para los repositorio modificados en las ultimas 4 intrucciones (modificacioens de la documentacion)', this)">Copiar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Restricciones Críticas -->
+        <section id="restricciones">
+            <h3><span class="section-icon">⛔</span> 4. Restricciones Críticas (Prohibiciones sin Autorización)</h3>
+            <p>Para proteger la estabilidad del software en operación diaria, el agente tiene prohibido ejecutar las siguientes acciones de forma autónoma:</p>
+
+            <div class="grid-2">
+                <div class="alert-box alert-danger" style="margin:0;">
+                    <div class="alert-icon">🚫</div>
+                    <div class="alert-content">
+                        <strong>No Alterar Estructuras de Datos Fundamentales</strong>
+                        Prohibido modificar esquemas JSON de configuración, el formato de la matriz de eventos o la lógica interna de <code>GestorFases</code> sin orden expresa.
+                    </div>
+                </div>
+
+                <div class="alert-box alert-danger" style="margin:0;">
+                    <div class="alert-icon">🚫</div>
+                    <div class="alert-content">
+                        <strong>No Renombrar Widgets de PyQt5</strong>
+                        Prohibido cambiar nombres de objetos (ej. <code>self.btn_procesar</code>, <code>self.tableWidget</code>) vinculados a archivos <code>.ui</code> o llamados dinámicamente.
+                    </div>
+                </div>
+
+                <div class="alert-box alert-danger" style="margin:0;">
+                    <div class="alert-icon">🚫</div>
+                    <div class="alert-content">
+                        <strong>Mantener Firmas de Métodos</strong>
+                        Las firmas de métodos existentes no deben cambiar sus argumentos requeridos ni el tipo de retorno para evitar roturas en cadena entre submódulos.
+                    </div>
+                </div>
+
+                <div class="alert-box alert-danger" style="margin:0;">
+                    <div class="alert-icon">🚫</div>
+                    <div class="alert-content">
+                        <strong>No Refactorizaciones Masivas / Idiomáticas</strong>
+                        No traducir nombres de variables de español a inglés (ni viceversa) ni reescribir módulos enteros bajo pretextos estilísticos.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Control y Redacción de Commits -->
+        <section id="commits">
+            <h3><span class="section-icon">✍️</span> 5. Control y Redacción de Commits (Solo Redacción, Prohibido Ejecutar)</h3>
+            <p>De acuerdo a las <strong>Reglas Madres Insalvables</strong>, el agente tiene prohibido ejecutar <code>git commit</code> o <code>git push</code>. Su tarea consiste exclusivamente en auditar los cambios y redactar la propuesta estructurada para el usuario:</p>
+
+            <div class="alert-box alert-danger">
+                <div class="alert-icon">🚫</div>
+                <div class="alert-content">
+                    <strong>Regla Inviolable de Control de Versiones</strong>
+                    El agente <strong>NUNCA ejecuta el commit</strong>. Al recibir la instrucción <strong><code>REDACTA COMMIT</code></strong> o <strong><code>GENERA COMMIT</code></strong>, únicamente analizará las modificaciones y generará el texto del mensaje en un bloque de código para que el usuario lo ejecute manualmente.
+                </div>
+            </div>
+
+            <div class="step-list">
+                <div class="step-item">
+                    <div class="step-number">1</div>
+                    <div class="step-text">
+                        <strong>Auditoría de Archivos Modificados</strong>
+                        <p>El agente inspecciona los archivos editados durante la sesión de trabajo y verifica su coherencia técnica.</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number">2</div>
+                    <div class="step-text">
+                        <strong>Redacción del Mensaje Descriptivo e Integral</strong>
+                        <p>El agente elabora una propuesta de mensaje clara, categorizada y detallando los componentes modificados.</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number">3</div>
+                    <div class="step-text">
+                        <strong>Entrega de la Propuesta al Usuario</strong>
+                        <p>El agente muestra el mensaje en pantalla dentro de un bloque de código listo para copiar.</p>
+                    </div>
+                </div>
+                <div class="step-item">
+                    <div class="step-number">4</div>
+                    <div class="step-text">
+                        <strong>Ejecución y Sincronización Manual por el Usuario</strong>
+                        <p>El usuario revisa la propuesta, realiza el <code>git commit</code> y gestiona el repositorio en GitHub según su propio criterio.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="prompt-card" style="margin-top: 20px;">
+                <div class="prompt-card-header">
+                    <span class="prompt-title">Instrucción para Solicitar Redacción de Commit</span>
+                    <span class="badge badge-green">Solo Redacción</span>
+                </div>
+                <div class="prompt-code">
+                    <span>REDACTA COMMIT</span>
+                    <button class="copy-btn" onclick="copyText('REDACTA COMMIT', this)">Copiar</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. Slash Commands -->
+        <section id="slash-commands">
+            <h3><span class="section-icon">⚡</span> 6. Slash Commands en Antigravity</h3>
+            <p>Atajos especiales disponibles en la interfaz del chat para activar flujos de trabajo avanzados:</p>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h4><code>/goal</code></h4>
+                        <span class="badge badge-purple">Larga Duración</span>
+                    </div>
+                    <p>Ideal para tareas complejas o auditorías que requieren múltiples iteraciones y no deben detenerse hasta completar el objetivo.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4><code>/grill-me</code></h4>
+                        <span class="badge badge-amber">Alineación</span>
+                    </div>
+                    <p>Inicia una sesión interactiva de preguntas para definir decisiones de diseño antes de escribir código.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4><code>/learn</code></h4>
+                        <span class="badge badge-blue">Memoria</span>
+                    </div>
+                    <p>Permite consolidar una corrección o regla aprendida para que el agente la recuerde en sesiones futuras.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4><code>/schedule</code></h4>
+                        <span class="badge badge-green">Automatización</span>
+                    </div>
+                    <p>Programa recordatorios o ejecuciones periódicas en segundo plano.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4><code>/browser</code></h4>
+                        <span class="badge badge-blue">Navegación</span>
+                    </div>
+                    <p>Activa navegación web para consultar documentación técnica externa o librerías.</p>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h4><code>/teamwork-preview</code></h4>
+                        <span class="badge badge-purple">Multi-Agente</span>
+                    </div>
+                    <p>Despliega un equipo de agentes especializados para proyectos de gran envergadura.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. Prompts Recomendados (Cheat Sheet) -->
+        <section id="prompts-utiles">
+            <h3><span class="section-icon">💡</span> 7. Plantillas de Prompts Recomendados</h3>
+            <p>Copia y pega estas instrucciones preconfiguradas para obtener respuestas óptimas del agente:</p>
+
+            <div class="prompt-card">
+                <div class="prompt-card-header">
+                    <span class="prompt-title">🐛 1. Depuración de Error en Interfaz PyQt5</span>
+                    <span class="badge badge-amber">Debug</span>
+                </div>
+                <div class="prompt-desc">Úsalo cuando una ventana de PyQt5 falle al pulsar un botón o cargar datos.</div>
+                <div class="prompt-code">
+                    <span>Revisa el archivo de contexto asociado, depura el error [describir error] en src/subprogramas/[archivo].py sin modificar nombres de widgets ni firmas públicas, y verifica la compatibilidad.</span>
+                    <button class="copy-btn" onclick="copyText('Revisa el archivo de contexto asociado, depura el error [describir error] en src/subprogramas/[archivo].py sin modificar nombres de widgets ni firmas públicas, y verifica la compatibilidad.', this)">Copiar</button>
+                </div>
+            </div>
+
+            <div class="prompt-card">
+                <div class="prompt-card-header">
+                    <span class="prompt-title">📊 2. Procesamiento de Señales ObsPy / MiniSEED</span>
+                    <span class="badge badge-blue">Señales</span>
+                </div>
+                <div class="prompt-desc">Para implementar o ajustar filtros espectrales, detección STA/LTA o recortes.</div>
+                <div class="prompt-code">
+                    <span>Consulta src/subprogramas/procesamiento_integrado_contx.md y asísteme en añadir un filtro Butterworth pasa-banda con control de excepciones para trazas con gaps.</span>
+                    <button class="copy-btn" onclick="copyText('Consulta src/subprogramas/procesamiento_integrado_contx.md y asísteme en añadir un filtro Butterworth pasa-banda con control de excepciones para trazas con gaps.', this)">Copiar</button>
+                </div>
+            </div>
+
+            <div class="prompt-card">
+                <div class="prompt-card-header">
+                    <span class="prompt-title">📑 3. Actualización de Contexto Técnico</span>
+                    <span class="badge badge-purple">Metodologías</span>
+                </div>
+                <div class="prompt-desc">Para actualizar la memoria técnica tras realizar cambios funcionales en un módulo.</div>
+                <div class="prompt-code">
+                    <span>pídele a Metodologías que audite y actualice el archivo de contexto de [ruta_del_script.py] reflejando las últimas modificaciones.</span>
+                    <button class="copy-btn" onclick="copyText('pídele a Metodologías que audite y actualice el archivo de contexto de [ruta_del_script.py] reflejando las últimas modificaciones.', this)">Copiar</button>
+                </div>
+            </div>
+
+            <div class="prompt-card">
+                <div class="prompt-card-header">
+                    <span class="prompt-title">✍️ 4. Solicitar Redacción de Mensaje de Commit</span>
+                    <span class="badge badge-green">Propuesta de Commit</span>
+                </div>
+                <div class="prompt-desc">Al terminar los cambios de la sesión para que el agente redacte el texto que usarás en tu commit.</div>
+                <div class="prompt-code">
+                    <span>Revisa todos los cambios realizados en esta sesión y REDACTA COMMIT con un resumen detallado y estructurado.</span>
+                    <button class="copy-btn" onclick="copyText('Revisa todos los cambios realizados en esta sesión y REDACTA COMMIT con un resumen detallado y estructurado.', this)">Copiar</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 8. Buenas Prácticas Técnicas -->
+        <section id="buenas-practicas">
+            <h3><span class="section-icon">🛠️</span> 8. Buenas Prácticas Técnicas en Windows / Spyder</h3>
+            <p>Guía de desarrollo para asegurar compatibilidad continua en el entorno de la Red Sísmica:</p>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>🗂️ Rutas Multiplataforma</h4>
+                        <span class="badge badge-green">Pathlib / OS</span>
+                    </div>
+                    <p>Usar siempre <code>os.path.join</code> o <code>pathlib.Path</code> para evitar problemas con diagonales invertidas (<code>\</code>) en Windows.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h4>⚡ Lanzadores .BAT</h4>
+                        <span class="badge badge-blue">Ejecución</span>
+                    </div>
+                    <p>El repositorio cuenta con lanzadores automáticos (<code>Programa principal.bat</code>, <code>Procesamiento.bat</code>, etc.). Los scripts deben poder ejecutarse tanto desde el `.bat` como en Spyder.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h4>🔍 Manejo de Excepciones</h4>
+                        <span class="badge badge-amber">Robustez</span>
+                    </div>
+                    <p>Validar existencia de directorios (<code>os.makedirs(..., exist_ok=True)</code>) y atrapar errores de lectura en archivos corruptos de MiniSEED sin cerrar la UI.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h4>📝 Preservación de Comentarios</h4>
+                        <span class="badge badge-purple">Documentación</span>
+                    </div>
+                    <p>Nunca eliminar comentarios explicativos existentes ni docstrings históricos en los módulos de análisis.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <p><strong>Red Sísmica de Alerta (RSA)</strong> — Guía Técnica para el Uso de Agentes de Inteligencia Artificial (Antigravity & Codex)</p>
+            <p style="margin-top:4px;">Archivo generado en <code>ayuda/guia_uso_agente.html</code> • Repositorio <code>rsa_sismologia</code></p>
+        </footer>
+    </main>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // Theme Toggle Functionality
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            
+            const themeIcon = document.getElementById('themeIcon');
+            const themeLabel = document.getElementById('themeLabel');
+            
+            if (newTheme === 'dark') {
+                themeIcon.textContent = '☀️';
+                themeLabel.textContent = 'Modo Claro';
+                localStorage.setItem('rsa_theme', 'dark');
+            } else {
+                themeIcon.textContent = '🌙';
+                themeLabel.textContent = 'Modo Oscuro';
+                localStorage.setItem('rsa_theme', 'light');
+            }
+        }
+
+        // Initialize Theme from localStorage or preference
+        (function initTheme() {
+            const savedTheme = localStorage.getItem('rsa_theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.getElementById('themeIcon').textContent = '☀️';
+                document.getElementById('themeLabel').textContent = 'Modo Claro';
+            }
+        })();
+
+        // Copy Text Functionality
+        function copyText(text, btnElement) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = btnElement.textContent;
+                btnElement.textContent = '¡Copiado!';
+                btnElement.classList.add('copied');
+                setTimeout(() => {
+                    btnElement.textContent = originalText;
+                    btnElement.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Error al copiar: ', err);
+            });
+        }
+
+        // Filter Table Functionality
+        function filterContextTable() {
+            const input = document.getElementById('contextSearch');
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById('contextTable');
+            const tr = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < tr.length; i++) {
+                const rowText = tr[i].textContent.toLowerCase();
+                if (rowText.indexOf(filter) > -1) {
+                    tr[i].style.display = '';
+                } else {
+                    tr[i].style.display = 'none';
+                }
+            }
+        }
+
+        // Active Navigation Highlight on Scroll
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('section, div[id="inicio"]');
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 120;
+                if (pageYOffset >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                const link = item.querySelector('a');
+                if (link && link.getAttribute('href') === `#${current}`) {
+                    item.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
