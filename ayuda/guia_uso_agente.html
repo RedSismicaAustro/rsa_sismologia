@@ -723,11 +723,12 @@
             <li class="nav-item"><a href="#inicio">📌 1. Inicio y Contexto</a></li>
             <li class="nav-item"><a href="#regla-oro">🌟 2. Regla de Oro (_contx)</a></li>
             <li class="nav-item"><a href="#protocolo-sesion">🔄 3. Protocolo de Sesión y Skills</a></li>
-            <li class="nav-item"><a href="#restricciones">⛔ 4. Restricciones Críticas</a></li>
-            <li class="nav-item"><a href="#commits">✍️ 5. Redacción de Commits</a></li>
-            <li class="nav-item"><a href="#slash-commands">⚡ 6. Slash Commands</a></li>
-            <li class="nav-item"><a href="#prompts-utiles">💡 7. Prompts Recomendados</a></li>
-            <li class="nav-item"><a href="#buenas-practicas">🛠️ 8. Buenas Prácticas</a></li>
+            <li class="nav-item"><a href="#interfaz-ui">🎨 4. Directiva UI / Qt Creator & UX</a></li>
+            <li class="nav-item"><a href="#restricciones">⛔ 5. Restricciones Críticas</a></li>
+            <li class="nav-item"><a href="#commits">✍️ 6. Redacción de Commits</a></li>
+            <li class="nav-item"><a href="#slash-commands">⚡ 7. Slash Commands</a></li>
+            <li class="nav-item"><a href="#prompts-utiles">💡 8. Prompts Recomendados</a></li>
+            <li class="nav-item"><a href="#buenas-practicas">🛠️ 9. Buenas Prácticas</a></li>
         </ul>
 
         <div class="sidebar-footer">
@@ -1097,9 +1098,41 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
             </div>
         </section>
 
-        <!-- 4. Restricciones Críticas -->
+        <!-- 4. Directiva de Interfaces Gráficas (.ui / Qt Creator & UX/UI) -->
+        <section id="interfaz-ui">
+            <h3><span class="section-icon">🎨</span> 4. Directiva de Interfaces Gráficas (.ui / Qt Creator & UX/UI)</h3>
+            <p>Estrategia oficial para el diseño, modificación y mejora de interfaces gráficas en PyQt5, combinando la precisión del agente con la inspección visual en Qt Creator:</p>
+
+            <div class="grid-2">
+                <div class="card" style="border-left: 4px solid var(--accent-primary);">
+                    <div class="card-header">
+                        <h4>🔄 Flujo Híbrido .ui / Qt Creator</h4>
+                        <span class="badge badge-green">Colaboración</span>
+                    </div>
+                    <ul style="padding-left: 18px; margin-top: 8px; font-size: 13.5px; color: var(--text-secondary);">
+                        <li style="margin-bottom: 6px;"><strong>Scripts Existentes</strong>: El agente modifica el XML del <code>.ui</code> respetando la distribución y nombres de widgets ya establecidos.</li>
+                        <li style="margin-bottom: 6px;"><strong>Nuevos Módulos</strong>: El agente genera una base <code>.ui</code> limpia con layouts estructurados y <code>objectName</code> descriptivos en español.</li>
+                        <li><strong>Ajuste Visual del Usuario</strong>: El usuario abre el <code>.ui</code> en <strong>Qt Creator / Qt Designer</strong>, acomoda los widgets a su gusto y guarda. Luego el agente conecta la lógica en Python (señales, slots, ObsPy y <code>QThread</code>).</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="border-left: 4px solid var(--accent-secondary);">
+                    <div class="card-header">
+                        <h4>📐 Estándares UX/UI Científicos</h4>
+                        <span class="badge badge-blue">Buenas Prácticas</span>
+                    </div>
+                    <ul style="padding-left: 18px; margin-top: 8px; font-size: 13.5px; color: var(--text-secondary);">
+                        <li style="margin-bottom: 6px;"><strong>Jerarquía & Alineación</strong>: Agrupación en <code>QGroupBox</code> y formularios ordenados con <code>QFormLayout</code> o <code>QGridLayout</code>.</li>
+                        <li style="margin-bottom: 6px;"><strong>Diseño Adaptativo</strong>: Gráficos de trazas y tablas expansivos (<code>Expanding</code>) con <code>QSplitter</code>; paneles de parámetros compactos (<code>Preferred</code>/<code>Fixed</code>).</li>
+                        <li><strong>Feedback & Ergonomía</strong>: <em>Tooltips</em> con unidades sismológicas (Hz, s, dB) y bloqueo visual temporal de botones durante procesamientos pesados.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Restricciones Críticas -->
         <section id="restricciones">
-            <h3><span class="section-icon">⛔</span> 4. Restricciones Críticas (Prohibiciones sin Autorización)</h3>
+            <h3><span class="section-icon">⛔</span> 5. Restricciones Críticas (Prohibiciones sin Autorización)</h3>
             <p>Para proteger la estabilidad del software en operación diaria, el agente tiene prohibido ejecutar las siguientes acciones de forma autónoma:</p>
 
             <div class="grid-2">
@@ -1137,9 +1170,9 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
             </div>
         </section>
 
-        <!-- 5. Control y Redacción de Commits -->
+        <!-- 6. Control y Redacción de Commits -->
         <section id="commits">
-            <h3><span class="section-icon">✍️</span> 5. Control y Redacción de Commits (Solo Redacción, Prohibido Ejecutar)</h3>
+            <h3><span class="section-icon">✍️</span> 6. Control y Redacción de Commits (Solo Redacción, Prohibido Ejecutar)</h3>
             <p>De acuerdo a las <strong>Reglas Madres Insalvables</strong>, el agente tiene prohibido ejecutar <code>git commit</code> o <code>git push</code>. Su tarea consiste exclusivamente en auditar los cambios y redactar la propuesta estructurada para el usuario:</p>
 
             <div class="alert-box alert-danger">
@@ -1193,9 +1226,9 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
             </div>
         </section>
 
-        <!-- 6. Slash Commands -->
+        <!-- 7. Slash Commands -->
         <section id="slash-commands">
-            <h3><span class="section-icon">⚡</span> 6. Slash Commands en Antigravity</h3>
+            <h3><span class="section-icon">⚡</span> 7. Slash Commands en Antigravity</h3>
             <p>Atajos especiales disponibles en la interfaz del chat para activar flujos de trabajo avanzados:</p>
 
             <div class="grid-3">
@@ -1244,14 +1277,26 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
             </div>
         </section>
 
-        <!-- 7. Prompts Recomendados (Cheat Sheet) -->
+        <!-- 8. Prompts Recomendados (Cheat Sheet) -->
         <section id="prompts-utiles">
-            <h3><span class="section-icon">💡</span> 7. Plantillas de Prompts Recomendados</h3>
+            <h3><span class="section-icon">💡</span> 8. Plantillas de Prompts Recomendados</h3>
             <p>Copia y pega estas instrucciones preconfiguradas para obtener respuestas óptimas del agente:</p>
 
             <div class="prompt-card">
                 <div class="prompt-card-header">
-                    <span class="prompt-title">🐛 1. Depuración de Error en Interfaz PyQt5</span>
+                    <span class="prompt-title">🎨 1. Creación de Interfaz Base .ui para Nuevo Módulo</span>
+                    <span class="badge badge-green">UI/UX</span>
+                </div>
+                <div class="prompt-desc">Para generar un archivo .ui base con buenas prácticas que puedas abrir y ajustar en Qt Creator.</div>
+                <div class="prompt-code">
+                    <span>Genera la interfaz base .ui para un nuevo módulo de [descripción del módulo], con contenedor para gráficos, panel de parámetros y nombres descriptivos en español para que yo la ajuste en Qt Creator.</span>
+                    <button class="copy-btn" onclick="copyText('Genera la interfaz base .ui para un nuevo módulo de [descripción del módulo], con contenedor para gráficos, panel de parámetros y nombres descriptivos en español para que yo la ajuste en Qt Creator.', this)">Copiar</button>
+                </div>
+            </div>
+
+            <div class="prompt-card">
+                <div class="prompt-card-header">
+                    <span class="prompt-title">🐛 2. Depuración de Error en Interfaz PyQt5</span>
                     <span class="badge badge-amber">Debug</span>
                 </div>
                 <div class="prompt-desc">Úsalo cuando una ventana de PyQt5 falle al pulsar un botón o cargar datos.</div>
@@ -1263,7 +1308,7 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
 
             <div class="prompt-card">
                 <div class="prompt-card-header">
-                    <span class="prompt-title">📊 2. Procesamiento de Señales ObsPy / MiniSEED</span>
+                    <span class="prompt-title">📊 3. Procesamiento de Señales ObsPy / MiniSEED</span>
                     <span class="badge badge-blue">Señales</span>
                 </div>
                 <div class="prompt-desc">Para implementar o ajustar filtros espectrales, detección STA/LTA o recortes.</div>
@@ -1275,7 +1320,7 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
 
             <div class="prompt-card">
                 <div class="prompt-card-header">
-                    <span class="prompt-title">📑 3. Actualización de Contexto Técnico</span>
+                    <span class="prompt-title">📑 4. Actualización de Contexto Técnico</span>
                     <span class="badge badge-purple">Metodologías</span>
                 </div>
                 <div class="prompt-desc">Para actualizar la memoria técnica tras realizar cambios funcionales en un módulo.</div>
@@ -1287,7 +1332,7 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
 
             <div class="prompt-card">
                 <div class="prompt-card-header">
-                    <span class="prompt-title">✍️ 4. Solicitar Redacción de Mensaje de Commit</span>
+                    <span class="prompt-title">✍️ 5. Solicitar Redacción de Mensaje de Commit</span>
                     <span class="badge badge-green">Propuesta de Commit</span>
                 </div>
                 <div class="prompt-desc">Al terminar los cambios de la sesión para que el agente redacte el texto que usarás en tu commit.</div>
@@ -1298,9 +1343,9 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
             </div>
         </section>
 
-        <!-- 8. Buenas Prácticas Técnicas -->
+        <!-- 9. Buenas Prácticas Técnicas -->
         <section id="buenas-practicas">
-            <h3><span class="section-icon">🛠️</span> 8. Buenas Prácticas Técnicas en Windows / Spyder</h3>
+            <h3><span class="section-icon">🛠️</span> 9. Buenas Prácticas Técnicas en Windows / Spyder</h3>
             <p>Guía de desarrollo para asegurar compatibilidad continua en el entorno de la Red Sísmica:</p>
 
             <div class="grid-2">

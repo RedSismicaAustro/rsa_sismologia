@@ -81,6 +81,9 @@ Antes de modificar o depurar cualquier script Python, el agente **DEBE** buscar 
 * **Control de Rutas**: Utilizar siempre `os.path.join` o `pathlib.Path` para manejar rutas, garantizando la compatibilidad con entornos Windows.
 * **Preservación de Comentarios**: Mantener todos los docstrings y comentarios existentes que no estén relacionados con las modificaciones sugeridas.
 * **Depuración**: Asegurar que las validaciones previas de existencia de archivos, directorios e integridad de los datos ocurran al inicio de los flujos críticos.
+* **Directiva de Interfaces Gráficas (.ui / Qt Creator & UX/UI)**:
+  * **Flujo Híbrido .ui / Qt Creator**: Para módulos existentes, modificar el `.ui` según sea necesario. Para módulos nuevos, generar un `.ui` base con layouts limpios y `objectName` descriptivos en español para que el usuario pueda abrirlo, inspeccionarlo y ajustarlo visualmente en Qt Creator/Designer antes de la conexión en Python.
+  * **Estándares UX/UI Científicos**: Aplicar alineación rigurosa (`QFormLayout`, `QGridLayout`), ergonomía visual, redimensionamiento adaptativo (`Expanding` en gráficos/tablas con `QSplitter`, `Preferred`/`Fixed` en paneles de control), *tooltips* con unidades sismológicas y estados visuales claros (deshabilitación durante procesamiento en `QThread`, barras de progreso).
 
 ---
 

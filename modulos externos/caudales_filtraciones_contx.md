@@ -2,17 +2,17 @@
 proyecto: rsa_sismologia
 tipo: contexto_tecnico
 archivo: modulos externos/caudales_filtraciones.py
-temas: [caudales, filtraciones, presas, obspy, pyqt5, matplotlib_interactivo, cha2]
-generado: 2026-08-21
+temas: [caudales, filtraciones, presas, obspy, pyqt5, matplotlib_interactivo, cha2, reactive_ui, zoom_preservation]
+generado: 2026-08-22
 ---
 
 # `caudales_filtraciones.py` — Contexto Técnico para Agentes IA
 
-> Aplicación en PyQt5 y Matplotlib para la detección, marcado interactivo y cálculo de caudales de filtración en presas a partir de señales sísmicas instrumentadas (estación `CHA2`), administrando el archivo maestro `caudales.csv`.
+> Aplicación en PyQt5 y Matplotlib integrada para la detección, marcado interactivo, inspección sincrónica multicanal y cálculo de caudales de filtración en presas a partir de señales sísmicas instrumentadas (estación `CHA2`), administrando el archivo maestro `caudales.csv` y 3 lienzos gráficos sincronizados en tiempo real.
 
 **Ruta**: `c:/proyectos/rsa_sismologia/modulos externos/caudales_filtraciones.py`  
-**LOC**: 431 líneas | **Lenguaje**: Python 3 (PyQt5, ObsPy, Matplotlib, NumPy)  
-**Interfaz UI**: `src/ui/caudales.ui`  
+**LOC**: ~815 líneas | **Lenguaje**: Python 3 (PyQt5, ObsPy, Matplotlib, NumPy)  
+**Interfaz UI**: `src/ui/caudales.ui` (Panel lateral compacto + QSplitter vertical con 3 FigureCanvas)  
 **Estación Clave**: `CHA2` (Canales verticales `Z` / `ENV`)  
 
 ---
@@ -24,10 +24,19 @@ generado: 2026-08-21
 ### Objetivos Clave:
 1. **Fórmula de Caudal**: Calcula el caudal volumétrico ($Q$) en función del intervalo de tiempo ($\Delta t$ en segundos) entre eventos consecutivos de descarga:
    $$\text{Caudal} = \text{int}\left(1.214 \times \frac{3\,500\,000}{\Delta t}\right)$$
-   *(donde $1.214$ es el factor de ajuste empírico calibrado para compensar errores geométricos del aforador).*
-2. **Marcado Interactivo en Gráfico**: Permite al analista hacer clic derecho sobre el sismograma diario para colocar 2 marcas temporales, definir ventanas y extraer el evento sísmico de control (`.sis`).
-3. **Gestión de `caudales.csv`**: Almacena el histórico consolidado con triplete `[nombre_evento, caudal, bandera]` (donde `bandera == '1'` representa eventos validados y `'0'` eventos no confirmados).
-4. **Visualización Histórica de Caudales**: Grafica la curva temporal de evolución de caudales entre `selector_fecha_inicio` y `selector_fecha_fin`.
+   *(donde $1.214$ es el factor de calibración empírico para compensar geometrías del aforador).*
+2. **Arquitectura Reactiva de 3 Lienzos Verticales**:
+   - **Lienzo 1 (Superior)**: Serie temporal de caudales confirmados (`bandera == '1'`) en el periodo histórico seleccionado.
+   - **Lienzo 2 (Medio)**: Sismograma diario de 24 horas (`CHA2_AAAAMMDD_000000.mseed`) con líneas de eventos (verde=confirmado, rojo=ignorado/pendiente).
+   - **Lienzo 3 (Inferior)**: Ventana de zoom de alta resolución ($\pm 10$ min) para colocación precisa de 2 marcas de tiempo con clic derecho.
+3. **Navegación Sincrónica Top-Down**:
+   - Clic izquierdo en Lienzo 1 $\to$ actualiza automáticamente la fecha, carga el sismograma 24h y enfoca el zoom en el evento clickeado.
+   - Clic derecho en Lienzo 1 $\to$ resalta en rojo un punto de caudal incoherente para su exclusión (`bandera = '0'`) mediante el botón `🚫 Ignorar Punto Seleccionado`.
+   - Clic izquierdo en Lienzo 2 $\to$ re-centra la ventana de zoom inferior en cualquier instante del día.
+4. **Preservación Estricta de Encuadre (`mantener_vista=True`)**:
+   - Al guardar marcas o ignorar puntos, el sismograma central y el zoom conservan exactamente sus límites temporales (`xlim`) y de amplitud (`ylim`), evitando reseteos visuales molestos.
+5. **Contención No Invasiva de Errores MSEED**:
+   - Si no existe el MiniSEED para la fecha consultada, se despliega un mensaje sutil en gris en el centro del lienzo sin arrojar popups modales bloqueantes.
 
 ---
 
@@ -35,16 +44,22 @@ generado: 2026-08-21
 
 ```mermaid
 flowchart TD
-    A[Inicio: Caudales] --> B[Cargar UI caudales.ui]
-    B --> C[Inicializar fechas y leer caudales.csv]
-    C --> D[cargar_componentes_fecha: Cargar CHA2_AAAAMMDD_000000.mseed]
-    D --> E[recalcular_caudales: Actualizar Q = 1.214*3500000 / dt]
-    E --> F{Acción del Usuario}
-    F -- Click boton_graficar --> G[desplegar_grafico: Plot traza con diezmado + marcas CONTROL]
-    G --> H[Click derecho en gráfico: Alternar marcas temporales rojas]
-    H --> I[Click boton_guardar_marcas: Extraer .sis y actualizar catalogo]
-    F -- Click boton_graficar_caudales --> J[graficar_caudales: Curva temporal entre fecha inicio y fin]
-    F -- Click boton_cargar_eventos_control --> K[cargar_eventos_control: Sincronizar con eventos del día]
+    A[Inicio: Caudales] --> B[Cargar UI caudales.ui maximizada]
+    B --> C[Inicializar 3 FigureCanvas en layout vertical]
+    C --> D[Cargar caudales.csv y sincronizar eventos CONTROL]
+    D --> E[Graficar Serie de Caudales en Lienzo 1]
+    D --> F[Cargar CHA2 diario y graficar Sismograma 24h en Lienzo 2]
+    F --> G[Enfocar Zoom en Lienzo 3]
+
+    %% Interacciones
+    E -- Clic Izquierdo --> H[Sincronizar fecha, 24h y centrar Zoom]
+    E -- Clic Derecho --> I[Resaltar punto en rojo]
+    I -- Boton Ignorar Punto --> J[Poner bandera=0 en caudales.csv y ocultar de Lienzo 1]
+    
+    F -- Clic Izquierdo --> G
+    
+    G -- Clic Derecho x2 --> K[Colocar 2 marcas rojas]
+    K -- Boton Guardar Marcas --> L[Extraer .sis, registrar en catalogo, bandera=1 y actualizar vistas con mantener_vista]
 ```
 
 ---
@@ -58,12 +73,12 @@ Ubicado en `directorio_trabajo/caudales.csv` (por defecto `G:/Mi unidad/DIA/caud
 |---|---|---|---|
 | `0` | String | Nombre del archivo de evento `.sis` | `20260821_143000.sis` |
 | `1` | String / Entero | Caudal calculado (L/s) | `450` |
-| `2` | String (`'0'` o `'1'`) | Bandera de validación (1=Confirmado, 0=Ruido) | `1` |
+| `2` | String (`'0'` o `'1'`) | Bandera de validación (1=Confirmado/Visible, 0=Ignorado/Oculto) | `1` |
 
 ### 3.2. Archivo de Registro Sísmico Diario
 * Nomenclatura fija: `CHA2_AAAAMMDD_000000.mseed`
 * Ubicación: `.../AAAAMMDD/mseed/`
-* Componentes priorizadas: Canales con terminación `'Z'` o `'ENV'`.
+* Canales priorizados: Terminados en `'Z'` o `'ENV'`.
 
 ---
 
@@ -71,29 +86,35 @@ Ubicado en `directorio_trabajo/caudales.csv` (por defecto `G:/Mi unidad/DIA/caud
 
 | Componente / Método | Tipo | Descripción |
 |---|---|---|
-| `Caudales.__init__()` | Constructor | Configura rangos de fechas (última semana por defecto), combos de diezmado (`1`, `2`, `5`, `8`, `10`) y conexiones de botones. |
-| `seleccionar_directorio_trabajo()` | Slot UI | Selector de carpeta base de trabajo (`DIA`). |
-| `cargar_componentes_fecha()` | Lógica | Carga el archivo `CHA2` del día, detecta componentes y dispara `recalcular_caudales()`. |
-| `recalcular_caudales()` | Cálculo Matemático | Ordena eventos cronológicamente, calcula $\Delta t$ entre eventos sucesivos y aplica la fórmula de calibración $1.214 \times 3500000 / \Delta t$. |
-| `desplegar_grafico()` | Matplotlib UI | Genera la ventana interactiva con la traza diezamada, líneas verdes punteadas de eventos CONTROL y escucha eventos de clic derecho (`button_press_event`). |
-| `guardar_marcas()` | Extracción Sísmica | Valida exactamente 2 marcas de tiempo, recorta la ventana en formato `.sis` y actualiza la matriz de eventos. |
-| `graficar_caudales()` | Visualización | Filtra eventos con bandera `'1'` en el rango temporal seleccionado y plotea la serie histórica de caudal. |
-| `cargar_eventos_control()` | Sincronización | Lee el archivo CSV de eventos del día (`directorios['archivo_csv']`), identifica eventos clasificados como `CONTROL` y los incorpora a `self.caudales`. |
+| `Caudales.__init__()` | Constructor | Configura selectores de fechas, combos, inicializa variables internas y maximiza la ventana. |
+| `inicializar_lienzos_graficos()` | UI / Matplotlib | Incrusta las 3 instancias de `FigureCanvasQTAgg` y `NavigationToolbar2QT` (altura 24px) suprimiendo ejes Y y títulos redundantes. |
+| `cargar_guia_operacion()` | UI / HTML | Inyecta la guía interactiva formateada con código de colores en `cuadro_guia`. |
+| `al_hacer_clic_caudales()` | Slot Ratón | Maneja clic izquierdo (navegación y sincronización) y clic derecho (selección y resaltado en rojo para exclusión). |
+| `ignorar_punto_caudal_seleccionado()` | Lógica | Establece `bandera = '0'` para el evento seleccionado en `caudales.csv` sin recalcular valores y actualiza gráficos. |
+| `desplegar_grafico(silencioso, mantener_vista)` | Slot / Plot | Grafica la traza de 24h con diezmado y marcas de eventos. Si `mantener_vista=True`, restaura `xlim` y `ylim`. |
+| `actualizar_grafico_zoom(centro_tiempo)` | Slot / Plot | Extrae y grafica un corte en alta resolución ($\pm 10$ min) del canal seleccionado alrededor de `centro_tiempo`. |
+| `gestionar_marca_tiempo(tiempo_click)` | Lógica | Inserta o elimina hasta 2 marcas temporales rojas sincronizándolas entre el sismograma 24h y el zoom. |
+| `guardar_marcas()` | Extracción Sísmica | Valida 2 marcas, extrae el `.sis`, actualiza catálogos diarios, fija `bandera='1'` en `caudales.csv` y refresca gráficos. |
+| `graficar_caudales(silencioso)` | Visualización | Grafica los caudales confirmados (`bandera='1'`) en el periodo histórico y resalta en rojo la selección activa. |
+| `limpiar_graficos_sismograma(mensaje)` | Contención | Dibuja un mensaje limpio en los lienzos cuando un archivo MiniSEED no existe o falla su lectura. |
 
 ---
 
 ## 5. Deuda Técnica y Riesgos Críticos
 
-1. **Dependencia de Nombre de Estación Cableado (`CHA2`)**: `cargar_componentes_fecha()` asume explícitamente el prefijo `CHA2_`. Si la estación de monitoreo de filtraciones cambia de código en el futuro, debe parametrizarse.
-2. **Interactividad Matplotlib / Qt**: El callback `on_right_click` depende del backend interactivo de Matplotlib (`plt.show()`). En sesiones remotas o sin GUI activa, debe evitarse invocar `desplegar_grafico()`.
-3. **Formatos de Nombres de Evento**: Acepta cadenas con o sin extensión `.sis` y con prefijo de siglo (`20YYMMDD_...` vs `YYMMDD_...`), requiriendo el saneamiento aplicado en `recalcular_caudales()`.
+1. **Dependencia de Estación Fija (`CHA2`)**: `cargar_componentes_fecha()` busca archivos que inicien con `CHA2_`. Si se añade otra estación de filtración, debe agregarse un selector de estación.
+2. **Conversión de Zonas Horarias en Matplotlib**: Se utiliza `tzinfo=None` al convertir `mdates.num2date` para evitar inconsistencias de tiempo ingenuo (*naive*) vs consciente (*aware*) al interactuar con ObsPy `UTCDateTime`.
+3. **Escritura Concurrente de CSV**: Las actualizaciones de `caudales.csv` se realizan con reescritura completa del archivo mediante `escritura_archivo()`.
 
 ---
 
 ## 6. Checklist de Regresión
 
 Antes de validar cualquier modificación en `caudales_filtraciones.py`, verificar:
-- [ ] La interfaz `src/ui/caudales.ui` carga todos sus selectores (`selector_fecha_inicio`, `selector_fecha_fin`, `combo_diezmado`, `combo_traza`).
-- [ ] La fórmula de caudal preserva la bandera (`'1'` o `'0'`) de cada fila existente en `caudales.csv`.
-- [ ] El guardado de marcas extrae correctamente la ventana de tiempo sin arrojar excepciones de límites fuera de traza.
-- [ ] Los eventos marcados como `CONTROL` en el catálogo diario se sincronizan sin duplicar registros.
+- [ ] La ventana inicia maximizada con el panel de control compacto a la izquierda y 3 lienzos apilados a la derecha.
+- [ ] Cambiar las fechas de periodo actualiza automáticamente la serie superior de caudales.
+- [ ] Cambiar la fecha del sismograma o diezmado actualiza inmediatamente la traza 24h y el zoom.
+- [ ] Clic izquierdo en la serie superior sincroniza fecha, traza 24h y centra el zoom.
+- [ ] Clic derecho en la serie superior resalta el punto en rojo y el botón `🚫 Ignorar Punto Seleccionado` lo pasa a bandera 0.
+- [ ] Colocar 2 marcas con clic derecho en el zoom y pulsar `💾 Guardar marcas (.SIS)` extrae el evento, pone bandera 1 y mantiene intactos `xlim` y `ylim`.
+- [ ] Fechas sin MiniSEED no lanzan excepciones y muestran el aviso gris de ausencia de datos.
