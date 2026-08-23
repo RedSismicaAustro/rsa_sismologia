@@ -91,6 +91,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # === Formulario de configuración y eventos ===
         self.boton_directorio.clicked.connect(self.seleccionar_directorio_trabajo)
+        self.boton_siguiente_ciclo.clicked.connect(self.ir_a_siguiente_ciclo_esperado)
         self.boton_guardar_marcas.clicked.connect(self.guardar_marcas)
         self.boton_ignorar_caudal.clicked.connect(self.ignorar_punto_caudal_seleccionado)
         self.boton_salir.clicked.connect(self.close)
@@ -151,24 +152,213 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.canvas_sismograma.mpl_connect('button_press_event', self.al_hacer_clic_sismograma)
         self.canvas_zoom.mpl_connect('button_press_event', self.al_hacer_clic_zoom)
 
-        # Cargar cuadro de guía de operación en HTML
+        # Cargar cuadro de guía y diagnóstico
+        self.cargar_guia_operacion()
+
+    def verificar_senal_en_intervalo(self, dt_min, dt_max):
+        """Comprueba si existen datos sísmicos registrados para CHA2 en el intervalo [dt_min, dt_max]."""
+        try:
+            fecha_str = dt_min.strftime("%Y%m%d")
+            archivo_dia = os.path.join(self.directorio_trabajo, fecha_str + "000000")
+            dirs = obtener_directorios(archivo_dia)
+            ruta_mseed = os.path.join(dirs.get('Directorio_registros', ''), f"CHA2_{fecha_str}_000000.mseed")
+
+            if not os.path.isfile(ruta_mseed):
+                ruta_mseed = os.path.join(self.directorio_trabajo, "Datos Estaciones", "CHA2", f"CHA2_{fecha_str}_000000.mseed")
+                if not os.path.isfile(ruta_mseed):
+                    return False
+
+            st = read(ruta_mseed, headonly=True)
+            if not st:
+                return False
+
+            utc_min = UTCDateTime(dt_min)
+            utc_max = UTCDateTime(dt_max)
+
+            for tr in st:
+                if tr.stats.starttime <= utc_max and tr.stats.endtime >= utc_min:
+                    return True
+
+            return False
+        except Exception:
+            return False
+
+    def obtener_estado_bombeo_y_prediccion(self):
+        """
+        Calcula el estado de vigilancia del bombeo proyectando la próxima descarga
+        a partir de la MODA de las últimas 10 mediciones confirmadas válidas (caudal > 0).
+        """
+        if not self.caudales:
+            return None
+
+        eventos_confirmados = []
+        for fila in self.caudales:
+            if len(fila) < 3 or str(fila[2]).strip() != "1":
+                continue
+            nom = str(fila[0]).strip()
+            if len(nom) == 17:
+                nom = '20' + nom
+            try:
+                dt = datetime.strptime(nom.replace(".sis", ""), "%Y%m%d_%H%M%S")
+                caudal = int(fila[1]) if len(fila) > 1 and str(fila[1]).isdigit() else 0
+                eventos_confirmados.append((dt, nom, caudal))
+            except Exception:
+                pass
+
+        if not eventos_confirmados:
+            return None
+
+        eventos_confirmados.sort(key=lambda x: x[0])
+        ultimo_dt, ultimo_nom, ultimo_caudal_fila = eventos_confirmados[-1]
+
+        # Extraer los últimos hasta 10 caudales válidos confirmados (Caudal > 0)
+        caudales_validos = [ev[2] for ev in eventos_confirmados if ev[2] > 0]
+        ultimos_10 = caudales_validos[-10:] if caudales_validos else []
+
+        if ultimos_10:
+            from collections import Counter
+            conteo = Counter(ultimos_10)
+            max_frec = max(conteo.values())
+            modas = [val for val, frec in conteo.items() if frec == max_frec]
+            if len(modas) == 1:
+                caudal_referencia = modas[0]
+            else:
+                caudal_referencia = int(np.median(ultimos_10))
+        elif ultimo_caudal_fila > 0:
+            caudal_referencia = ultimo_caudal_fila
+        else:
+            caudal_referencia = 450  # Valor nominal de referencia
+
+        # Intervalo proyectado a partir de la moda de los últimos 10 registros
+        delta_t_seg = int(1.214 * 3500000 / caudal_referencia)
+        dt_esperado = ultimo_dt + timedelta(seconds=delta_t_seg)
+        margen_seg = max(600, int(delta_t_seg * 0.10))  # Margen de tolerancia ±10% (mínimo 10 min)
+        dt_min_esp = dt_esperado - timedelta(seconds=margen_seg)
+        dt_max_esp = dt_esperado + timedelta(seconds=margen_seg)
+
+        ahora = datetime.now()
+        segundos_transcurridos = (ahora - ultimo_dt).total_seconds()
+        horas_transcurridas = round(segundos_transcurridos / 3600.0, 1)
+        ratio = segundos_transcurridos / delta_t_seg if delta_t_seg > 0 else 0
+
+        # Paso 1: Evaluar si hay señal sísmica en el tiempo esperado
+        hay_senal_en_esperado = self.verificar_senal_en_intervalo(dt_min_esp, dt_max_esp)
+
+        if not hay_senal_en_esperado and dt_esperado < ahora:
+            estado = "REINICIO_MEDICION"
+        elif ratio > 1.5:
+            estado = "ALERTA_CRITICA"
+        elif ratio > 1.0:
+            estado = "PENDIENTE"
+        else:
+            estado = "NORMAL"
+
+        return {
+            'ultimo_nombre': ultimo_nom,
+            'ultimo_dt': ultimo_dt,
+            'ultimo_caudal': caudal_referencia,
+            'caudal_fila': ultimo_caudal_fila,
+            'delta_t_seg': delta_t_seg,
+            'delta_t_horas': round(delta_t_seg / 3600.0, 1),
+            'dt_esperado': dt_esperado,
+            'dt_min_esp': dt_min_esp,
+            'dt_max_esp': dt_max_esp,
+            'hay_senal_en_esperado': hay_senal_en_esperado,
+            'horas_transcurridas': horas_transcurridas,
+            'ratio': ratio,
+            'estado': estado,
+            'ciclos_pendientes': max(0, int(ratio))
+        }
+
+    def ir_a_siguiente_ciclo_esperado(self):
+        """Salto guiado: calcula y enfoca automáticamente la fecha y hora estimada del próximo ciclo de bombeo."""
+        pred = self.obtener_estado_bombeo_y_prediccion()
+        if not pred:
+            QMessageBox.warning(
+                self,
+                "Sin Registros Previos",
+                "No hay suficientes eventos confirmados en caudales.csv para estimar el próximo ciclo."
+            )
+            return
+
+        dt_esp = pred['dt_esperado']
+        qdate = QDate(dt_esp.year, dt_esp.month, dt_esp.day)
+
+        if self.selector_fecha_grafico.date() != qdate:
+            self.selector_fecha_grafico.blockSignals(True)
+            self.selector_fecha_grafico.setDate(qdate)
+            self.selector_fecha_grafico.blockSignals(False)
+            self.cargar_componentes_fecha()
+
+        self.desplegar_grafico(silencioso=True)
+        self.actualizar_grafico_zoom(centro_tiempo=mdates.date2num(dt_esp))
         self.cargar_guia_operacion()
 
     def cargar_guia_operacion(self):
-        """Carga la guía interactiva en formato HTML dentro del panel izquierdo."""
-        html = """
-        <div style="font-family:'Segoe UI', Tahoma, sans-serif; font-size:11px; line-height:1.4; color:#1e293b;">
-            <p style="margin:0 0 5px 0; font-weight:bold; color:#0f766e; font-size:11.5px;">📋 Flujo de Operación:</p>
-            <ol style="margin:0; padding-left:16px;">
-                <li style="margin-bottom:4px;"><strong>Navegar Caudales</strong>: <u>Clic izquierdo</u> en la serie superior para cargar su fecha, 24h y zoom.</li>
-                <li style="margin-bottom:4px;"><strong>Descartar Incoherentes</strong>: <u>Clic derecho</u> en un punto superior para resaltarlo en rojo y pulsar <em>"🚫 Ignorar Punto"</em> (bandera=0).</li>
-                <li style="margin-bottom:4px;"><strong>Sismograma 24h</strong>: <u>Clic izquierdo</u> para centrar el zoom inferior en cualquier instante.</li>
-                <li style="margin-bottom:4px;"><strong>Marcar Evento</strong>: En el zoom, <u>clic derecho</u> para colocar/quitar 2 marcas rojas.</li>
-                <li style="margin-bottom:4px;"><strong>Extraer</strong>: Pulsar <em>"Guardar marcas (.SIS)"</em> para recortar y recalcular caudales.</li>
+        """Carga el panel integrado de diagnóstico de bombeo, alarma de inundación y guía de uso en HTML."""
+        pred = self.obtener_estado_bombeo_y_prediccion()
+
+        if pred:
+            if pred['estado'] == "REINICIO_MEDICION":
+                badge_bg = "#eff6ff"
+                badge_color = "#1e40af"
+                badge_border = "#93c5fd"
+                titulo_estado = "🔄 REINICIO DE MEDICIÓN (Sin señal en ciclo esperado)"
+                detalle_estado = f"No hubo señal a la hora prevista (~{pred['dt_esperado'].strftime('%H:%M')}). Coloca la <strong>Marca Base (Caudal=0)</strong> en la señal actual para reiniciar la serie."
+            elif pred['estado'] == "ALERTA_CRITICA":
+                badge_bg = "#fee2e2"
+                badge_color = "#991b1b"
+                badge_border = "#f87171"
+                titulo_estado = "🚨 ALERTA CRÍTICA: RIESGO DE INUNDACIÓN"
+                detalle_estado = f"Motor inactivo por <strong>{pred['horas_transcurridas']}h</strong> (~{pred['ciclos_pendientes']} ciclos sin bombeo)."
+            elif pred['estado'] == "PENDIENTE":
+                badge_bg = "#fef3c7"
+                badge_color = "#92400e"
+                badge_border = "#fcd34d"
+                titulo_estado = "⚠️ AUDITORÍA PENDIENTE"
+                detalle_estado = f"Próximo ciclo debió ocurrir hace {pred['horas_transcurridas']}h. Pulsa <em>'🎯 Ir a Siguiente Ciclo'</em>."
+            else:
+                badge_bg = "#dcfce7"
+                badge_color = "#166534"
+                badge_border = "#86efac"
+                titulo_estado = "🟢 MONITOREO AL DÍA"
+                detalle_estado = "Sistema de bombeo dentro del ciclo regular de operación."
+
+            bloque_diagnostico = f"""
+            <div style="background:{badge_bg}; border:1px solid {badge_border}; color:{badge_color}; padding:6px 8px; border-radius:5px; margin-bottom:8px; font-size:10.5px;">
+                <p style="margin:0 0 3px 0; font-weight:bold; font-size:11px;">{titulo_estado}</p>
+                <p style="margin:0 0 3px 0;">{detalle_estado}</p>
+                <hr style="border:0; border-top:1px dashed {badge_border}; margin:4px 0;">
+                <span style="font-size:10px;">
+                    <strong>Último:</strong> {pred['ultimo_dt'].strftime('%Y-%m-%d %H:%M')} | <strong>Ref (Moda 10):</strong> {pred['ultimo_caudal']} L/s<br>
+                    <strong>Intervalo:</strong> ~{pred['delta_t_horas']}h | <strong>Esperado:</strong> {pred['dt_esperado'].strftime('%Y-%m-%d %H:%M')}
+                </span>
+            </div>
+            """
+        else:
+            bloque_diagnostico = """
+            <div style="background:#f1f5f9; border:1px solid #cbd5e1; color:#475569; padding:5px 7px; border-radius:4px; margin-bottom:8px; font-size:10px;">
+                ℹ️ Sin eventos confirmados para calcular predicción de ciclo.
+            </div>
+            """
+
+        html = f"""
+        <div style="font-family:'Segoe UI', Tahoma, sans-serif; font-size:11px; line-height:1.35; color:#1e293b;">
+            {bloque_diagnostico}
+            <p style="margin:0 0 4px 0; font-weight:bold; color:#0f766e; font-size:11px;">📋 Flujo de Operación Rápida:</p>
+            <ol style="margin:0; padding-left:15px; font-size:10.5px;">
+                <li style="margin-bottom:3px;"><strong>🎯 Salto Guiado</strong>: Pulsa <em>"Ir a Siguiente Ciclo"</em> para situar el zoom en el pulso previsto.</li>
+                <li style="margin-bottom:3px;"><strong>Marcar Evento</strong>: En el zoom (franja sombreada), <u>clic derecho</u> para fijar 2 marcas rojas.</li>
+                <li style="margin-bottom:3px;"><strong>Extraer</strong>: Pulsa <em>"Guardar marcas (.SIS)"</em> para registrar y saltar al siguiente.</li>
+                <li style="margin-bottom:3px;"><strong>Descartar</strong>: <u>Clic derecho</u> en serie superior y pulsa <em>"🚫 Ignorar Punto"</em>.</li>
             </ol>
-            <div style="margin-top:6px; padding:4px 6px; background:#f1f5f9; border-radius:4px; font-size:10px; color:#475569;">
-                🟢 <strong>Verde</strong>: Confirmado (1)<br>
-                🔴 <strong>Rojo</strong>: No confirmado (0) / Seleccionado
+            <div style="margin-top:5px; padding:3px 5px; background:#f8fafc; border-radius:4px; font-size:9.5px; color:#64748b;">
+                🟢 Confirmado (1) | 🔴 No confirmado (0) | 🟨 Zona Esperada
+            </div>
+            <div style="margin-top:6px; padding:5px 6px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:4px; font-size:9.8px; color:#1e40af; line-height:1.3;">
+                <p style="margin:0 0 2px 0; font-weight:bold; color:#1e3a8a;">🛡️ Vigilante Residente (Segundo Plano):</p>
+                • Ejecuta <strong>Vigilante_Caudales.bat</strong> para monitoreo continuo en bandeja.<br>
+                • <em>Autoarranque Windows</em>: Presiona <strong>Win+R</strong>, escribe <strong>shell:startup</strong> y pega un acceso directo al .bat.
             </div>
         </div>
         """
@@ -330,58 +520,16 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             self.combo_traza.blockSignals(True)
             self.combo_traza.clear()
             self.combo_traza.blockSignals(False)
-            self.limpiar_graficos_sismograma(f"No existe {self.archivo_mseed}")
+            self.limpiar_graficos_sismograma("Corte de comunicación con estación CHA2")
         
         archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
         if os.path.isfile(archivo_caudales):
             try:
                 self.caudales = lectura_archivo(archivo_caudales)
-                self.recalcular_caudales()
-                escritura_archivo(archivo_caudales, self.caudales)
             except Exception as e:
-                print(f"[ERROR] Error al procesar caudales.csv: {e}")
+                print(f"[ERROR] Error al leer caudales.csv: {e}")
         else:
             self.caudales = []
-
-    def recalcular_caudales(self):
-        """
-        Recalcula los valores de caudal para todos los eventos en self.caudales.
-        Fórmula: Caudal = int(1.214 * 3500000 / dt_segundos).
-        """
-        try:
-            if not self.caudales:
-                return
-
-            eventos_con_fecha = []
-            for fila in self.caudales:
-                if not fila or len(fila) < 2:
-                    continue
-                nombre_evento = str(fila[0]).strip()
-                if len(nombre_evento) == 17:
-                    nombre_evento = '20' + nombre_evento
-                bandera = str(fila[2]).strip() if len(fila) > 2 else "0"
-
-                try:
-                    dt = datetime.strptime(nombre_evento.replace(".sis", ""), "%Y%m%d_%H%M%S")
-                    eventos_con_fecha.append((dt, nombre_evento, bandera))
-                except Exception as e:
-                    print(f"[ADVERTENCIA] Formato de fecha inválido en evento '{nombre_evento}': {e}")
-
-            eventos_con_fecha.sort(key=lambda x: x[0])
-
-            nuevos_caudales = []
-            for i, (dt_evento, nombre_evento, bandera) in enumerate(eventos_con_fecha):
-                if i > 0:
-                    dt_anterior = eventos_con_fecha[i - 1][0]
-                    segundos = int((dt_evento - dt_anterior).total_seconds())
-                    caudal = int(1.214 * 3500000 / segundos) if segundos > 0 else 0
-                else:
-                    caudal = 0
-                nuevos_caudales.append([nombre_evento, str(caudal), bandera])
-
-            self.caudales = nuevos_caudales
-        except Exception as e:
-            print(f"[ERROR] Error general al recalcular caudales: {e}")
 
     def cargar_componentes(self, stream):
         """Puebla el combo de trazas priorizando canales verticales Z o ENV."""
@@ -461,6 +609,25 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             except Exception as e:
                 print(f"Error al graficar evento CONTROL del día: {evento} → {e}")
 
+        # === Zona Predictiva de Bombeo (Ciclo Esperado) ===
+        pred = self.obtener_estado_bombeo_y_prediccion()
+        if pred:
+            dt_esp = pred['dt_esperado']
+            dt_min_esp = pred['dt_min_esp']
+            dt_max_esp = pred['dt_max_esp']
+            inicio_dia = datetime(fecha_grafico.year, fecha_grafico.month, fecha_grafico.day, 0, 0, 0)
+            fin_dia = datetime(fecha_grafico.year, fecha_grafico.month, fecha_grafico.day, 23, 59, 59)
+            if not (dt_max_esp < inicio_dia or dt_min_esp > fin_dia):
+                t_min_esp_num = mdates.date2num(dt_min_esp)
+                t_max_esp_num = mdates.date2num(dt_max_esp)
+                t_esp_num = mdates.date2num(dt_esp)
+                color_franja = '#fca5a5' if pred['estado'] == 'ALERTA_CRITICA' else '#fef08a'
+                color_borde = '#dc2626' if pred['estado'] == 'ALERTA_CRITICA' else '#d97706'
+                self.ax_sismograma.axvspan(t_min_esp_num, t_max_esp_num, color=color_franja, alpha=0.4, linestyle='--', edgecolor=color_borde)
+                self.ax_sismograma.axvline(x=t_esp_num, color=color_borde, linestyle='--', linewidth=1.2, alpha=0.85)
+                self.ax_sismograma.text(t_esp_num, max_valor * 0.75, f"⏳ Ciclo Esperado (~{pred['ultimo_caudal']} L/s)",
+                                        rotation=90, fontsize=6.8, verticalalignment='bottom', color=color_borde, fontweight='bold')
+
         self.ax_sismograma.tick_params(axis='x', labelsize=7.5, pad=1)
         self.ax_sismograma.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
         if xlim_previo is not None:
@@ -523,6 +690,22 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             self.ax_zoom.text(0.5, 0.5, "Sin datos en intervalo de zoom",
                               horizontalalignment='center', verticalalignment='center', transform=self.ax_zoom.transAxes, fontsize=8)
+
+        # === Zona Predictiva de Bombeo en el Zoom ===
+        pred = self.obtener_estado_bombeo_y_prediccion()
+        if pred:
+            t_min_esp = mdates.date2num(pred['dt_min_esp'])
+            t_max_esp = mdates.date2num(pred['dt_max_esp'])
+            t_esp = mdates.date2num(pred['dt_esperado'])
+            if max(t_min, t_min_esp) <= min(t_max, t_max_esp):
+                color_franja = '#fca5a5' if pred['estado'] == 'ALERTA_CRITICA' else '#fef08a'
+                color_borde = '#dc2626' if pred['estado'] == 'ALERTA_CRITICA' else '#d97706'
+                self.ax_zoom.axvspan(max(t_min, t_min_esp), min(t_max, t_max_esp),
+                                     color=color_franja, alpha=0.35, linestyle='--', edgecolor=color_borde)
+                if t_min <= t_esp <= t_max:
+                    self.ax_zoom.axvline(x=t_esp, color=color_borde, linestyle='--', linewidth=1.3, alpha=0.9)
+                    self.ax_zoom.text(t_esp, self.ax_zoom.get_ylim()[1] * 0.75, "⏳ Pulso Esperado",
+                                      rotation=90, fontsize=6.8, verticalalignment='bottom', color=color_borde, fontweight='bold')
 
         # Dibujar marcas de usuario activas en el zoom
         for marca in self.marcas_usuario:
@@ -592,6 +775,14 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def guardar_marcas(self):
         """Extrae la ventana seleccionada, actualiza catálogos y preserva la vista actual de trabajo."""
+        if not self.stream:
+            QMessageBox.warning(
+                self,
+                "Registro No Consolidado",
+                "No existe registro MiniSEED cargado para este día. Debe procesarse primero el día desde el módulo de consolidación."
+            )
+            return
+
         if len(self.marcas_usuario) != 2:
             QMessageBox.warning(self, "Marcas Incompletas", "Debes seleccionar exactamente 2 marcas con clic derecho en el gráfico de zoom.")
             return
@@ -636,10 +827,34 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.eventos = ordenar_y_eliminar_duplicados(self.eventos, 1, False)
         escritura_archivo(archivo_csv, self.eventos)
         
-        # Registrar y confirmar el nuevo evento en self.caudales (bandera = '1')
+        # Calcular caudal para el nuevo evento respecto al último confirmado anterior
+        dt_nuevo = datetime.strptime(nombre_sis.replace(".sis", ""), "%Y%m%d_%H%M%S")
+        eventos_confirmados_previos = []
+        for fila in self.caudales:
+            if len(fila) >= 3 and str(fila[2]).strip() == "1":
+                nom = str(fila[0]).strip()
+                if len(nom) == 17:
+                    nom = '20' + nom
+                try:
+                    dt_prev = datetime.strptime(nom.replace(".sis", ""), "%Y%m%d_%H%M%S")
+                    if dt_prev < dt_nuevo:
+                        eventos_confirmados_previos.append((dt_prev, fila))
+                except Exception:
+                    pass
+
+        caudal_nuevo = 0
+        if eventos_confirmados_previos:
+            eventos_confirmados_previos.sort(key=lambda x: x[0])
+            dt_ultimo = eventos_confirmados_previos[-1][0]
+            segundos = int((dt_nuevo - dt_ultimo).total_seconds())
+            if segundos > 0:
+                caudal_nuevo = int(1.214 * 3500000 / segundos)
+
+        # Registrar o actualizar solo el nuevo evento en self.caudales (bandera = '1')
         evento_en_caudales = False
         for fila in self.caudales:
             if len(fila) > 0 and (fila[0] == nombre_sis or fila[0] == nombre_sis.replace('.sis', '')):
+                fila[1] = str(caudal_nuevo)
                 if len(fila) > 2:
                     fila[2] = '1'
                 else:
@@ -647,9 +862,8 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                 evento_en_caudales = True
                 break
         if not evento_en_caudales:
-            self.caudales.append([nombre_sis, "0", "1"])
+            self.caudales.append([nombre_sis, str(caudal_nuevo), "1"])
 
-        self.recalcular_caudales()
         archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
         escritura_archivo(archivo_caudales, self.caudales)
         
@@ -657,6 +871,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.marcas_usuario.clear()
         self.desplegar_grafico(silencioso=True, mantener_vista=True)
         self.graficar_caudales(silencioso=True)
+        self.cargar_guia_operacion()
         QMessageBox.information(self, "Extracción Exitosa", f"Evento {nombre_sis} extraído, confirmado y graficado en la serie de caudales.")
 
     def graficar_caudales(self, silencioso=False):
@@ -683,7 +898,10 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                 if not (fecha_inicio <= fecha_evento.date() <= fecha_fin):
                     continue
 
-                valor = int(fila[1])
+                valor = int(fila[1]) if len(fila) > 1 and str(fila[1]).isdigit() else 0
+                if valor <= 0:
+                    continue  # Marca base sin cálculo de caudal; omitir de la curva
+
                 fechas.append(fecha_evento)
                 valores.append(valor)
                 nombres.append(fila[0])
@@ -751,7 +969,9 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             nombre_archivo = fecha_actual.strftime("%Y%m%d") + "000000"
             try:
                 directorios_dia = obtener_directorios(os.path.join(self.directorio_trabajo, nombre_archivo))
-                archivo_csv_eventos = os.path.join(self.directorio_trabajo, directorios_dia['archivo_csv'])
+                archivo_csv_eventos = directorios_dia.get('archivo_csv', '')
+                if not os.path.isfile(archivo_csv_eventos):
+                    archivo_csv_eventos = os.path.join(self.directorio_trabajo, directorios_dia.get('archivo_csv', ''))
                 if os.path.isfile(archivo_csv_eventos):
                     lista_eventos = lectura_archivo(archivo_csv_eventos)
                     for fila in lista_eventos:
@@ -768,14 +988,35 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             if evento in caudales_set:
                 continue
 
-            nueva_fila = [evento, "0", "1"]
+            try:
+                nom = '20' + str(evento) if len(str(evento)) == 17 else str(evento)
+                dt_ev = datetime.strptime(nom.replace(".sis", ""), "%Y%m%d_%H%M%S")
+            except Exception:
+                dt_ev = None
+
+            caudal_ev = 0
+            if dt_ev and self.caudales:
+                dt_anterior = None
+                for fila in self.caudales:
+                    if len(fila) >= 3 and str(fila[2]).strip() == "1":
+                        n = '20' + str(fila[0]) if len(str(fila[0])) == 17 else str(fila[0])
+                        try:
+                            d = datetime.strptime(n.replace(".sis", ""), "%Y%m%d_%H%M%S")
+                            if d < dt_ev and (dt_anterior is None or d > dt_anterior):
+                                dt_anterior = d
+                        except Exception:
+                            pass
+                if dt_anterior:
+                    seg = int((dt_ev - dt_anterior).total_seconds())
+                    if seg > 0:
+                        caudal_ev = int(1.214 * 3500000 / seg)
+
+            nueva_fila = [evento, str(caudal_ev), "1"]
             eventos_control_nuevos.append(nueva_fila)
+            self.caudales.append(nueva_fila)
             caudales_set.add(evento)
 
         if eventos_control_nuevos:
-            self.caudales.extend(eventos_control_nuevos)
-            self.recalcular_caudales()
-
             try:
                 escritura_archivo(archivo_csv, self.caudales)
                 if not silencioso:

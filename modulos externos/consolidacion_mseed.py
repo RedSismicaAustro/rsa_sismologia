@@ -53,27 +53,40 @@ plt.ioff()
 from PyQt5.QtWidgets import QTextEdit
 from PyQt5.QtGui import QTextCursor
 
-def mensaje_lbl(Lbl_Mensajes, mensaje, borrar=False):
+def mensaje_lbl(Lbl_Mensajes, mensaje, borrar=False, tipo='auto'):
     """
-    Agrega mensajes con timestamp en Lbl_Mensajes y consola.
-    El historial no se borra aunque se reciba borrar=True.
+    Agrega mensajes con timestamp formateados en HTML con código de colores en Lbl_Mensajes y consola.
     """
     try:
         Lbl_Mensajes.setAlignment(Qt.AlignLeft)
         Lbl_Mensajes.setLineWrapMode(QTextEdit.WidgetWidth)
 
         texto_nuevo = "" if mensaje is None else str(mensaje)
-        texto_nuevo = " | ".join(linea.strip() for linea in texto_nuevo.splitlines() if linea.strip())
+        texto_limpio = " | ".join(linea.strip() for linea in texto_nuevo.splitlines() if linea.strip())
         timestamp = datetime.now().strftime("%H:%M:%S")
-        texto_log = f"[{timestamp}] {texto_nuevo}"
+        texto_log = f"[{timestamp}] {texto_limpio}"
         print(texto_log)
 
-        cursor = Lbl_Mensajes.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        Lbl_Mensajes.setTextCursor(cursor)
-        if Lbl_Mensajes.toPlainText():
-            Lbl_Mensajes.insertPlainText("\n")
-        Lbl_Mensajes.insertPlainText(texto_log)
+        # Determinar estilo y color visual
+        texto_lower = texto_limpio.lower()
+        if tipo == 'error' or '[comunicacion]' in texto_lower or 'corte de comunicacion' in texto_lower or 'no hay mseed' in texto_lower or 'carpeta no existe' in texto_lower or 'error' in texto_lower:
+            estilo = "color:#b91c1c; font-weight:bold; background:#fef2f2; padding:1px 3px; border-left:3px solid #dc2626;"
+            prefijo = "⚠️ "
+        elif tipo == 'exito' or 'unido:' in texto_lower or 'terminado' in texto_lower or 'grabación mseed terminada' in texto_lower:
+            estilo = "color:#15803d; font-weight:bold; background:#f0fdf4; padding:1px 3px;"
+            prefijo = "🟢 "
+        elif '===' in texto_limpio:
+            estilo = "color:#1e40af; font-weight:bold; background:#eff6ff; padding:2px 4px; border-bottom:1px solid #bfdbfe;"
+            prefijo = "📌 "
+        elif 'png' in texto_lower:
+            estilo = "color:#0f766e;"
+            prefijo = "🖼️ "
+        else:
+            estilo = "color:#334155;"
+            prefijo = ""
+
+        html_msg = f"<span style='font-family:Consolas, monospace; font-size:11px; {estilo}'><span style='color:#64748b; font-weight:normal;'>[{timestamp}]</span> {prefijo}{texto_limpio}</span>"
+        Lbl_Mensajes.append(html_msg)
 
         QCoreApplication.processEvents()
     except Exception:
@@ -111,8 +124,9 @@ def eliminar_mseeds_del_dia(directorio_registros, dia_yyyymmdd, Lbl_Mensajes):
 
 def escribir_atomico_mseed(stream, destino):
     """
-    Escribe un Stream en formato MSEED de manera atómica (tmp + replace).
+    Escribe un Stream en formato MSEED de manera atómica (tmp + replace) con reintentos para Windows.
     """
+    import time
     carpeta = os.path.dirname(destino)
     base = os.path.basename(destino)
     tmp = os.path.join(carpeta, "." + base + ".tmp")
@@ -124,8 +138,23 @@ def escribir_atomico_mseed(stream, destino):
             os.fsync(_f.fileno())
     except Exception:
         pass
-    # reemplazo atómico
-    os.replace(tmp, destino)
+
+    # Reemplazo atómico con reintentos ante bloqueos de sincronización
+    for intento in range(3):
+        try:
+            os.replace(tmp, destino)
+            return
+        except (PermissionError, OSError):
+            if intento < 2:
+                time.sleep(0.12)
+            else:
+                try:
+                    if os.path.exists(destino):
+                        os.remove(destino)
+                    os.replace(tmp, destino)
+                    return
+                except Exception as e:
+                    raise e
 
 def conversion_mseed_bloque(canal, hab_canal, nombre_canal, fecha_, directorio, Lbl_Mensajes):
     """
@@ -610,6 +639,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         patron_mseed_dia = re.compile(r'^([A-Za-z0-9]{4})_(\d{8})_(\d{6}).*\.mseed$', re.IGNORECASE)
         estaciones_procesadas = 0
         png_pendientes = []
+        estado_comunicaciones = {}
 
         for numero_fila, estacion_digital, nombre_carpeta, num_estacion in self.filas_digitales_validas():
             if self.config_estaciones['HAB_CANAL'][num_estacion] != '1':
@@ -619,8 +649,32 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             codigo_estacion = self.config_estaciones['CODIGO'][num_estacion]
             ruta_carpeta = os.path.join(self.directorio_binario, nombre_carpeta)
             if not os.path.isdir(ruta_carpeta):
-                mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: carpeta no existe: {ruta_carpeta}", False)
-                continue
+                # Búsqueda resiliente de variantes (ej: LAB02 <-> LAB2, CHA02 <-> CHA2)
+                carpeta_encontrada = None
+                try:
+                    nombre_norm = nombre_carpeta.strip().upper()
+                    variantes = {nombre_carpeta.upper(), nombre_norm, codigo_estacion.upper()}
+                    match_num = re.search(r'([A-Za-z]+)(\d+)$', nombre_norm)
+                    if match_num:
+                        prefix = match_num.group(1)
+                        num_int = int(match_num.group(2))
+                        variantes.add(f"{prefix}{num_int}")
+                        variantes.add(f"{prefix}{num_int:02d}")
+                    
+                    for sub in os.listdir(self.directorio_binario):
+                        if sub.upper() in variantes:
+                            sub_path = os.path.join(self.directorio_binario, sub)
+                            if os.path.isdir(sub_path):
+                                carpeta_encontrada = sub_path
+                                break
+                except Exception:
+                    pass
+
+                if carpeta_encontrada:
+                    ruta_carpeta = carpeta_encontrada
+                else:
+                    mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: carpeta no existe: {ruta_carpeta}", False)
+                    continue
 
             archivos_mseed = []
             archivos_otro_codigo = 0
@@ -687,7 +741,32 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 continue
 
             estaciones_procesadas += 1
+            estado_comunicaciones[codigo_estacion] = 1
             QCoreApplication.processEvents()
+
+        # Registrar estado 0 para estaciones habilitadas sin datos
+        for numero_fila, estacion_digital, nombre_carpeta, num_estacion in self.filas_digitales_validas():
+            if self.config_estaciones['HAB_CANAL'][num_estacion] == '1':
+                codigo = self.config_estaciones['CODIGO'][num_estacion]
+                if codigo not in estado_comunicaciones:
+                    estado_comunicaciones[codigo] = 0
+
+        # Guardar archivo sobrio de estado de comunicaciones
+        try:
+            archivo_com = os.path.join(self.directorio_trabajo, "comunicaciones.csv")
+            lineas_com = ["ESTACION,TIPO,ESTADO,FECHA\n"]
+            for cod, est in sorted(estado_comunicaciones.items()):
+                lineas_com.append(f"{cod},digital,{est},{dia_yyyymmdd}\n")
+            with open(archivo_com, "w", encoding="utf-8") as f_com:
+                f_com.writelines(lineas_com)
+        except Exception as e:
+            mensaje_lbl(self.Lbl_Mensajes, f"[COMUNICACION] Error al guardar comunicaciones.csv: {e}", False)
+
+        cortadas = [cod for cod, est in estado_comunicaciones.items() if est == 0]
+        if cortadas:
+            mensaje_lbl(self.Lbl_Mensajes, f"[COMUNICACION] Corte de comunicacion ({len(cortadas)} estaciones): {', '.join(cortadas)}", False, tipo='error')
+        else:
+            mensaje_lbl(self.Lbl_Mensajes, "[COMUNICACION] Todas las estaciones con enlace operativo", False, tipo='exito')
 
         mensaje_lbl(self.Lbl_Mensajes, f"=== DIGITALES COMPLETADO: {estaciones_procesadas} estaciones ===", False)
         return png_pendientes
@@ -696,6 +775,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         if not png_pendientes:
             return
 
+        import matplotlib.pyplot as plt
         mensaje_lbl(self.Lbl_Mensajes, "Imprimiendo PNGs digitales:", False)
         for archivo_salida, num_estacion, codigo_estacion, archivo_evento in png_pendientes:
             try:
@@ -704,6 +784,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 if traza_png is not None:
                     png_salida = os.path.join(self.directorio, f"{codigo_estacion}_{archivo_evento}.png")
                     traza_png.plot(type='dayplot', outfile=png_salida, dpi=200, size=(2400, 1800), linewidth=0.2, show=False)
+                    plt.close('all')
                     mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] PNG: {codigo_estacion}_{archivo_evento}.png", False)
                 else:
                     mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: no existe canal valido para PNG", False)
@@ -747,11 +828,23 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                     )
                     shutil.copy(archivo_origen, archivo_destino)
 
-        except FileNotFoundError:
-            auxiliar = self.dia + '000000'
-            lista_archivos.append(auxiliar)
+        except (FileNotFoundError, OSError):
+            pass
 
-        lista_archivos.sort()
+        # Si no se encontraron archivos en R:/, buscar binarios analógicos del día existentes en directorio_trabajo
+        if not lista_archivos:
+            try:
+                for f_local in os.listdir(self.directorio_trabajo):
+                    if re.fullmatch(r'\d{14}', f_local) and f_local.startswith(self.dia):
+                        lista_archivos.append(f_local)
+            except Exception:
+                pass
+            if not lista_archivos:
+                candidato_base = self.dia + '000000'
+                if os.path.isfile(os.path.join(self.directorio_trabajo, candidato_base)):
+                    lista_archivos.append(candidato_base)
+
+        lista_archivos = sorted(list(set(lista_archivos)))
         mensaje_lbl(self.Lbl_Mensajes, str(lista_archivos), False)
 
         self.inicializar_()
@@ -854,9 +947,9 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 pass
 
         if len(mensaje) == 0:
-            mensaje = "¡No hay archivos mseed!\n\nProceder a leer el \nregistro continuo\nSe procesarán solo\nlos resgistros analógicos"
+            mensaje = "Iniciando lectura y consolidación continua del día..."
         else:
-            mensaje = "Archivos encontrados:\n\n" + mensaje
+            mensaje = "Archivos analógicos existentes:\n\n" + mensaje
         mensaje_lbl(self.Lbl_Mensajes, mensaje, True)
 
     def Btn_Mseed(self):
@@ -936,8 +1029,9 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         mensaje_lbl(self.Lbl_Mensajes, "Archivos Unidos ", False)
 
     def imprimir_png(self):
+        import matplotlib.pyplot as plt
         hora_string = self.fecha_.strftime('%Y%m%d_%H%M%S')
-        mensaje_lbl(self.Lbl_Mensajes, 'Imprimiendo PNGs: \n', True)
+        mensaje_lbl(self.Lbl_Mensajes, 'Imprimiendo PNGs analógicos: \n', True)
         for i in range(0, 16):
             if str(self.hab_canal[i]) == '1':
                 nombrepng = f"{self.nombre_canal[i]}_{hora_string}.png"
@@ -945,8 +1039,10 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 nombrepng = os.path.join(self.directorio, nombrepng)
                 try:
                     self.trCanal[i].plot(type='dayplot', outfile=nombrepng, dpi=200, size=(2400,1800), linewidth=0.2, show=False)
+                    plt.close('all')
                 except Exception as e:
                     mensaje_lbl(self.Lbl_Mensajes, f"No se pudo generar PNG {nombrepng}: {e}", False)
+            QCoreApplication.processEvents()
 
     def Salir_(self):
         self.close()

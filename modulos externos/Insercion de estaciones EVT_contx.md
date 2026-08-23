@@ -2,29 +2,34 @@
 proyecto: rsa_sismologia
 tipo: contexto_tecnico
 archivo: modulos externos/Insercion de estaciones EVT.py
-temas: [insercion_evt, normalizacion_estaciones, catalogos_sismicos, mseed, etna, obspy, pyqt5]
-generado: 2026-08-21
+temas: [insercion_evt, normalizacion_estaciones, catalogos_sismicos, mseed_steim1, etna, kw2asc_vm, sha1_deduplicacion, obspy, pyqt5]
+generado: 2026-08-23
 ---
 
 # `Insercion de estaciones EVT.py` — Contexto Técnico para Agentes IA
 
-> Aplicación en PyQt5 y ObsPy para la inserción, normalización de códigos y sincronización temporal de registros fuera de tiempo y disparos por eventos en formato binario EVT hacia los catálogos y repositorios MiniSEED de la Red Sísmica de Alerta (RSA).
+> Aplicación especializada en PyQt5 y ObsPy para la normalización, conversión e inserción atómica de registros acelerográficos binarios Kinemetrics (EVT / K2 / ETNA) hacia los catálogos diarios y repositorios MiniSEED de la Red Sísmica de Alerta (RSA), con soporte de compresión STEIM1, deduplicación criptográfica SHA-1 y fallback automático mediante máquina virtual DOS/Windows `kw2asc.exe`.
 
 **Ruta**: `c:/proyectos/rsa_sismologia/modulos externos/Insercion de estaciones EVT.py`  
-**LOC**: 977 líneas | **Lenguaje**: Python 3 (PyQt5, ObsPy, NumPy, CSV)  
-**Estructura de Directorios Fuente**: `../AAAA/ESTA/Datos evt/` (Año, Estación, Archivos EVT)  
+**LOC**: ~1,000 líneas | **Lenguaje**: Python 3 (PyQt5, ObsPy, NumPy, CSV)  
+**Estructura de Entrada**: 
+- Modo 1 (Día individual): `.../AAAAMMDD/*.evt`
+- Modo 2 (Directorio completo con SHA-1): `.../AAAA/ESTA/Datos evt/*.evt`
+- Modo 3 (Reconstrucción total con VM): `.../AAAA/ESTA/Datos evt/*.evt` utilizando entorno VirtualBox `O:\KINEMETRICS`
 
 ---
 
 ## 1. Identidad, Alcance y Propósito
 
-Las estaciones acelerográficas autónomas (como los acelerógrafos Kinemetrics ETNA) registran eventos por disparo de umbral en tarjetas de memoria locales que se descargan periódicamente de forma manual. Este script integra dichos registros diferidos en la base de datos central de eventos del proyecto.
+Las estaciones acelerográficas autónomas registran eventos por disparo de umbral en tarjetas locales que se descargan periódicamente. Este script procesa dichas descargas y las incorpora a los catálogos y trazas de la RSA.
 
 ### Objetivos Clave:
-1. **Normalización de Códigos de Estación**: Mapea nombres históricos y variantes de nombres de carpetas y cabeceras binarias a los códigos oficiales de 4 letras de la RSA mediante `DICCIONARIO_ESTACIONES_EVT` y `DICCIONARIO_ESTACIONES_DIRECTORIO`.
-2. **Corrección de Tiempos Reseteados (1980)**: Ajusta automáticamente registros con año 1980 extrayendo la fecha real desde la ruta del archivo o la fecha de modificación del archivo binario (`corregir_tiempo_reset_1980`).
-3. **Calce y Ajuste con Catálogo de Eventos**: Compara la hora de disparo del registro contra la lista de sismos conocidos (`YYYYMMDD_HHMMSS`) dentro de una ventana de tolerancia paramétrica en minutos (`ajustar_tiempos_stream_con_catalogo`).
-4. **Inyección en Catálogo e Historial**: Guarda el archivo convertido a MiniSEED (`<ESTACION>_<YYYYMMDD_HHMMSS>.mseed`) en la carpeta de eventos y marca la columna correspondiente a la estación en la matriz de eventos del día (`insertar_evento_en_catalogo`).
+1. **Normalización Canónica de Estaciones**: Mapea variantes históricas de nombres de carpetas y códigos de cabecera binaria a los 18 códigos oficiales de 4 letras de la RSA (`EEAN`, `EEAS`, `EEBA`, `CHAB`, `CHAC`, `MABA`, `MACI`, `MADE`, `DPBA`, `DPCI`, `DPME`, `AHUA`, `MIRA`, `CICA`, `UDAZ`, `UCET`, `UCAO`, `REGC`).
+2. **Escritura MiniSEED Estándar y Atómica**: Escribe archivos `.mseed` con compresión canónica **`STEIM1`** y longitud de registro **`reclen=512`**, utilizando reemplazo atómico seguro (`archivo.mseed.tmp` $\to$ `archivo.mseed`) para evitar corrupción ante interrupciones.
+3. **Manejo Seguro de Máquina Virtual Kinemetrics (`kw2asc.exe`)**: Valida la existencia de la unidad montada `O:\KINEMETRICS` antes de invocar la reconstrucción VM; si no está disponible, realiza fallback transparente mediante conversión interna en ObsPy.
+4. **Deduplicación Criptográfica (SHA-1)**: En el procesamiento de directorios completos, genera hashes SHA-1 para omitir duplicados físicos e indexa el inventario en `inventario_evt_directorio_completo.csv`.
+5. **Liberación Estricta de Memoria**: Ejecución de bloques `finally:` con `plt.close('all')`, `st.clear()`, `del st` y `gc.collect()` para procesar miles de archivos continuos sin fugas de memoria RAM.
+6. **Inserción Atómica en Catálogo `DIA`**: Actualiza las matrices `AAAAMMDD_estaciones.csv` preservando columnas, cabeceras y orden canónico de fases.
 
 ---
 
@@ -32,59 +37,50 @@ Las estaciones acelerográficas autónomas (como los acelerógrafos Kinemetrics 
 
 ```mermaid
 flowchart TD
-    A[Inicio: Inserción de Estaciones EVT] --> B[Seleccionar directorio raíz de descargas EVT]
-    B --> C[recolectar_evt: Explorar carpetas AAAA/ESTA/...]
-    C --> D[Normalizar código de estación: Directorio o Cabecera EVT]
-    D --> E[Leer registro EVT con obspy.read]
-    E --> F{¿Año del registro es 1980?}
-    F -- Sí --> G[corregir_tiempo_reset_1980: Asignar fecha de ruta o mtime]
-    F -- No --> H[Continuar con tiempo original]
-    G --> H
-    H --> I[Cargar catálogo de eventos del día]
-    I --> J[ajustar_tiempos_stream_con_catalogo con tolerancia_minutos]
-    J --> K{¿Hubo coincidencia con evento conocido?}
-    K -- Sí --> L[Ajustar starttime del Stream al evento del catálogo]
-    K -- No --> M[Conservar hora de disparo propia]
-    L --> N[insertar_evento_en_catalogo: Escribir .mseed y actualizar CSV]
-    M --> N
-    N --> O[Procesar siguiente archivo EVT]
+    A[Inicio: Inserción de Estaciones EVT] --> B[Seleccionar Modo de Operación 1, 2 o 3]
+    
+    B --> C[Modo 1: Carpeta de Día AAAAMMDD]
+    B --> D[Modo 2: Directorio Completo AAAA/ESTA]
+    B --> E[Modo 3: Reconstrucción Total VM]
+
+    C --> F[Lectura EVT con obspy.read]
+    D --> G{Calcular SHA-1 de archivo}
+    G -- Duplicado --> H[Omitir e indexar en inventario]
+    G -- Nuevo --> F
+    
+    E --> I{¿Existe unidad O: KINEMETRICS?}
+    I -- Sí --> J[Ejecutar kw2asc.exe en VM VirtualBox RSA1]
+    I -- No --> K[Fallback: Conversión directa con ObsPy]
+    J --> L[Leer canales ASCII .001, .002, .003, .SHD]
+    K --> F
+    L --> M[Ensamblar Stream triaxial]
+
+    F --> N{¿Año es 1980?}
+    N -- Sí --> O[corregir_tiempo_reset_1980: Fecha de ruta / mtime]
+    N -- No --> P[Tiempo original]
+    O --> P
+
+    P --> Q[Ajustar con catálogo diario DIA dentro de margen de minutos]
+    Q --> R[escribir_atomico_mseed: STEIM1, reclen=512]
+    R --> S[insertar_evento_en_catalogo: Actualizar CSV atómicamente]
+    S --> T[Limpieza de memoria en finally: plt.close, st.clear, gc.collect]
 ```
 
 ---
 
-## 3. Contratos de Datos y Diccionarios de Normalización
+## 3. Contratos de Datos y Normalización
 
-### 3.1. Mapeo de Cabeceras EVT (`DICCIONARIO_ESTACIONES_EVT`)
-Homologa códigos breves internos del firmware ETNA a la nomenclatura RSA:
-* `"CHB"` ➔ `"CHAB"` (Chanlud Base)
-* `"CHC"` ➔ `"CHAC"` (Chanlud Cima)
-* `"MZB"` ➔ `"MABA"` (Mazar Base)
-* `"MZC"` ➔ `"MACI"` (Mazar Cima)
-* `"MZD"` ➔ `"MADE"` (Mazar Margen Derecha)
-* `"PABA"` ➔ `"DPBA"` (Paute Base)
-* `"PACI"` ➔ `"DPCI"` (Paute Cima)
-* `"ACC1"` ➔ `"EEAS"` (Estación Acelerográfica Sur)
-* `"UDEC"`, `"UCET"` ➔ `"UCET"` (Universidad de Cuenca)
+### 3.1. Mapeo Oficial de Estaciones
+Diccionarios depurados sin duplicados en `DICCIONARIO_ESTACIONES_EVT` y `DICCIONARIO_ESTACIONES_DIRECTORIO`:
+* Chanlud: `CHAB` (Base), `CHAC` (Cima)
+* Mazar: `MABA` (Base), `MACI` (Cima), `MADE` (Margen Derecha)
+* Paute: `DPBA` (Base), `DPCI` (Cima), `DPME` (Media)
+* Red Urbana / Regional: `EEBA`, `EEAN`, `EEAS`, `AHUA`, `MIRA`, `CICA`, `UDAZ`, `UCET`, `UCAO`, `REGC`.
 
-### 3.2. Mapeo de Directorios (`DICCIONARIO_ESTACIONES_DIRECTORIO`)
-Traduce variantes de nombres de carpetas en disco a códigos canónicos:
-* `"Azogues"`, `"CICA"` ➔ `"CICA"`
-* `"ChanludBase"`, `"ChaBase"`, `"Chanlbas"` ➔ `"CHAB"`
-* `"Chanlcim"`, `"ChaCima"`, `"ChanludCima"` ➔ `"CHAC"`
-* `"EEBase"`, `"EEE-Base"` ➔ `"EEBA"`
-* `"EEAlNor"`, `"EEALNor"`, `"EEE-AltNort"` ➔ `"EEAN"`
-* `"EEAltSur"`, `"EEAlSur"`, `"EEE-AltSur"` ➔ `"EEAS"`
-* `"Huajibam"`, `"Huajibamba"`, `"HUAJIBAM"` ➔ `"AHUA"`
-* `"MazarBas"`, `"MazarBase"` ➔ `"MABA"`
-* `"MazarCim"`, `"MazarCima"` ➔ `"MACI"`
-* `"MazarDer"` ➔ `"MADE"`
-* `"Miraflo"`, `"Miraflor"`, `"Miraflores"` ➔ `"MIRA"`
-* `"PauteBas"`, `"PauteBase"` ➔ `"DPBA"`
-* `"PauMed"` ➔ `"DPME"`
-* `"PauteCim"`, `"PauteCima"` ➔ `"DPCI"`
-* `"Regcivil"` ➔ `"REGC"`
-* `"UAzuay"` ➔ `"UDAZ"`
-* `"UCoficin"` ➔ `"UCAO"`
+### 3.2. Formato de Salida MiniSEED
+* Archivo: `<ESTACION>_<AAAAMMDD_HHMMSS>.mseed`
+* Encoding: `STEIM1` (compatibilidad universal con SeisComP, SAC, ObsPy y Geopsy).
+* Reclen: `512` bytes.
 
 ---
 
@@ -92,27 +88,28 @@ Traduce variantes de nombres de carpetas en disco a códigos canónicos:
 
 | Función / Método | Tipo | Descripción |
 |---|---|---|
-| `normalizar_codigo_estacion_desde_directorio(nombre)` | Helper | Convierte nombres de carpetas de estaciones al código estándar de 4 letras. |
-| `normalizar_codigo_estacion_desde_evt(codigo)` | Helper | Traduce los identificadores grabados en la cabecera binaria del archivo EVT. |
-| `extraer_fecha_evt_desde_ruta(archivo)` | Parser | Extrae la fecha en formato `AAAAMMDD` a partir de los segmentos del directorio padre. |
-| `corregir_tiempo_reset_1980(stream, archivo)` | Algoritmo | Desplaza el `starttime` del stream cuando el año detectado es 1980 utilizando la fecha de la ruta o de modificación. |
-| `ajustar_tiempos_stream_con_catalogo(...)` | Sincronización | Empareja el stream con el evento del catálogo más cercano dentro de la tolerancia temporal y ajusta el `starttime`. |
-| `insertar_evento_en_catalogo(...)` | Base de Datos / I/O | Convierte el stream a MiniSEED, lo almacena en el directorio de eventos y actualiza la matriz CSV de presencia de estaciones. |
+| `escribir_atomico_mseed(stream, destino)` | I/O MiniSEED | Escribe de forma atómica con codificación `STEIM1` y `reclen=512`. |
+| `normalizar_codigo_estacion_desde_directorio(nombre)` | Parser | Convierte nombres de carpetas de estaciones al código canónico de 4 letras. |
+| `normalizar_codigo_estacion_desde_evt(codigo)` | Parser | Traduce códigos de cabecera binaria del ETNA. |
+| `corregir_tiempo_reset_1980(stream, archivo)` | Algoritmo | Corrige estampas desfasadas a 1980 usando la fecha del directorio o `mtime`. |
+| `ajustar_tiempos_stream_con_catalogo(...)` | Sincronización | Empareja el stream con el evento del catálogo más cercano dentro de la tolerancia. |
+| `insertar_evento_en_catalogo(...)` | Base de Datos | Inyecta el archivo MiniSEED en la carpeta de eventos y actualiza la matriz CSV del día. |
+| `procesar_evt_con_kw2asc_vm(...)` | Integración VM | Ejecuta la conversión de bajo nivel mediante `kw2asc.exe` en VirtualBox `RSA1`. |
 
 ---
 
-## 5. Deuda Técnica y Riesgos Críticos
+## 5. Deuda Técnica y Riesgos Mitigados
 
-1. **Colisiones de Seriales/Estaciones**: Si un equipo acelerográfico fue reubicado entre diferentes estaciones a lo largo del tiempo, la cabecera interna del EVT puede contener el código de la estación anterior; por ello, la resolución prioriza la carpeta padre o el serial del equipo.
-2. **Tolerancia de Calce Temporal**: Si la tolerancia de minutos se define muy amplia (ej. >15 min), existe riesgo de calzar erróneamente un disparo instrumental con un sismo no relacionado ocurrido en la misma ventana.
-3. **Persistencia en Matriz de Eventos CSV**: La escritura en el archivo CSV de eventos del día debe preservar el orden de las columnas de estaciones para no corromper la compatibilidad con `GestorFases`.
+1. **Ausencia de VM Kinemetrics**: Mitigado con detección preventiva de `O:\KINEMETRICS` y fallback a ObsPy.
+2. **Duplicación de Archivos**: Mitigado con hashing SHA-1 en Modo 2.
+3. **Consumo de Memoria**: Mitigado con liberación explícita `st.clear()`, `del st` y `gc.collect()`.
 
 ---
 
 ## 6. Checklist de Regresión
 
 Antes de validar cualquier modificación en `Insercion de estaciones EVT.py`, verificar:
-- [ ] Los diccionarios `DICCIONARIO_ESTACIONES_EVT` y `DICCIONARIO_ESTACIONES_DIRECTORIO` contienen todas las estaciones de la red sin duplicados conflictivos.
-- [ ] La corrección de año 1980 asigna correctamente horas, minutos y microsegundos conservando la cadencia de muestreo original.
-- [ ] Los archivos MiniSEED generados contienen las componentes triaxiales completas y son legibles mediante `obspy.read()`.
-- [ ] La matriz de eventos del catálogo conserva el número de columnas y cabeceras originales tras la inserción de nuevas estaciones.
+- [ ] La compilación con `python -m py_compile` retorna código 0.
+- [ ] La escritura de archivos `.mseed` genera formato `STEIM1` con bloques de `512` bytes.
+- [ ] En ausencia de la unidad `O:`, el script no colapsa y continúa mediante ObsPy.
+- [ ] La matriz `AAAAMMDD_estaciones.csv` se actualiza de forma atómica sin corromper cabeceras.

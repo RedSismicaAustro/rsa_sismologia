@@ -66,6 +66,7 @@ flowchart TD
 * Canales analógicos: `<NOMBRE_CANAL>_20YYMMDD_000000.mseed`
 * Estaciones digitales: `<CODIGO_ESTACION>_YYYYMMDD_000000.mseed`
 * Gráficos en `Directorio_base` (`.../AAAAMMDD/`): Archivos `.png` de 24 horas a 200 DPI.
+* Archivo de enlace en `directorio_trabajo/comunicaciones.csv`: Registro sobrio del estado de cada estación (`1` = OK, `0` = Corte de comunicación).
 
 ---
 
@@ -73,14 +74,14 @@ flowchart TD
 
 | Método / Función | Responsabilidad |
 |---|---|
-| `MyApp.procesar_digitales()` | Procesa todas las estaciones digitales habilitadas en `digitales.csv`, une sus trazas y retorna la lista de PNGs pendientes. |
-| `MyApp.imprimir_png_digitales(...)` | Genera los dayplots PNG para cada archivo digital consolidado según el canal/componente configurado. |
-| `MyApp.Abrir_archivo()` | Gestiona el ciclo completo de descarga y decodificación de la telemetría continua desde la unidad `R:`. |
+| `MyApp.procesar_digitales()` | Procesa todas las estaciones digitales habilitadas en `digitales.csv` con búsqueda resiliente de carpetas (`LAB02` <-> `LAB2`), une sus trazas y retorna la lista de PNGs pendientes. |
+| `MyApp.imprimir_png_digitales(...)` | Genera los dayplots PNG para cada archivo digital consolidado según el canal/componente configurado, cerrando figuras con `plt.close('all')` para evitar fugas de memoria. |
+| `MyApp.Abrir_archivo()` | Gestiona el ciclo completo de descarga y decodificación de la telemetría continua desde `R:` o fallback automático en `directorio_trabajo`. |
 | `MyApp.unir_mseed(arch1, arch2)` | Une pares de archivos MiniSEED analógicos por canal conservando discontinuidades reales con `split()`. |
 | `MyApp.validar_fila_digital(fila, idx)` | Valida límites y tipos de datos en filas de `digitales.csv`. |
 | `MyApp.seleccionar_traza_png_digital(...)` | Prioriza la traza vertical (`Z`) según la cadena de orientación o componente configurada. |
-| `Leer_binario_comun(...)` | Decodifica la trama binaria multiplexada de 16 canales y 2077 bytes por segundo. |
-| `escribir_atomico_mseed(stream, dest)` | Escritura de seguridad mediante archivo temporal `.tmp`, `fsync` y reemplazo atómico `os.replace`. |
+| `Leer_binario_comun(...)` | Decodifica la trama binaria multiplexada por hardware de 16 canales y 2077 bytes por segundo. |
+| `escribir_atomico_mseed(stream, dest)` | Escritura de seguridad mediante archivo temporal `.tmp`, `fsync` y reemplazo atómico `os.replace` con hasta 3 reintentos ante bloqueos en Windows/Google Drive. |
 
 ---
 

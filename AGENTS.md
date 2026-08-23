@@ -99,7 +99,7 @@ Antes de modificar o depurar cualquier script Python, el agente **DEBE** buscar 
 
 ## 6. Subagentes y Protocolo de Ciclo de Vida de Sesión (.agents/skills)
 
-El repositorio cuenta con una suite de **4 habilidades especializadas (Skills)** para garantizar la consistencia, trazabilidad y memoria técnica en cada sesión de trabajo con el agente:
+El repositorio cuenta con una suite de **5 habilidades especializadas (Skills)** para garantizar la consistencia, trazabilidad, estabilidad de librerías y memoria técnica en cada sesión de trabajo con el agente:
 
 ### 🛠️ Suite de Skills Oficiales:
 
@@ -109,6 +109,7 @@ El repositorio cuenta con una suite de **4 habilidades especializadas (Skills)**
 | **2. Extraer ADR** | [`.agents/skills/extraer_adr.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/extraer_adr.md) | Registra Architectural Decision Records en `docs/adr/` preservando el porqué de cambios estructurales. | *"Extrae o actualiza el ADR de las decisiones tomadas"* |
 | **3. Transición Técnica** | [`.agents/skills/crear_transicion_tecnica.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/crear_transicion_tecnica.md) | Genera el traspaso técnico (*handover*) en `docs/transiciones/` para reanudar el trabajo en sesiones futuras. | *"Genera la transición técnica de esta sesión"* |
 | **4. Volcado de Bitácora** | [`.agents/skills/volcado_bitacora.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/volcado_bitacora.md) | Actualiza el histórico cronológico de trabajo en `docs/bitacora/bitacora_trabajo.md`. | *"Ejecuta el volcado de bitácora de esta sesión"* |
+| **5. Auditoría e Integración** | [`.agents/skills/auditoria_librerias_e_integracion.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/auditoria_librerias_e_integracion.md) | Audita llamadores de librerías compartidas y guía la integración progresiva de módulos satélite hacia `src/programa_integrado.py`. | *"Audita las llamadas a librerías e integra [modulo.py] en programa_integrado"* |
 
 ---
 

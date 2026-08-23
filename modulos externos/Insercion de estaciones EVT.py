@@ -3,48 +3,36 @@ import os
 import hashlib
 import csv
 from pathlib import Path
-def extraer_hasta_directorio(ruta_completa, nombre_directorio):
-    partes = Path(ruta_completa).parts
-    if nombre_directorio in partes:
-        indice = partes.index(nombre_directorio)
-        ruta_recortada = Path(*partes[:indice + 1])
-        return str(ruta_recortada) + '/'
-    else:
-        return ''
-ruta_librerias=os.path.dirname(__file__)
-ruta_proyecto=extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
+from collections import deque
+from datetime import datetime, timedelta
+
+ruta_librerias = os.path.dirname(__file__)
+from rsa_io import lectura_archivo, escritura_archivo, extraer_hasta_directorio
+
+ruta_proyecto = extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
 if not ruta_proyecto:
     raise RuntimeError('No se encontro la raiz del proyecto rsa_sismologia')
-ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
+ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src', 'librerias'))
 ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
-# Insertar la ruta al inicio del sys.path
+
+# Insertar rutas al inicio de sys.path
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
+# Programa para insertar registros fuera de tiempo (disparos EVT de Kinemetrics ETNA u otros digitalizadores)
+# Estructura de informacion: ..\AAAA\ESTA\Datos evt
+# AAAA: anio, ESTA: estacion, Datos EVT: archivos .evt
 
-
-#Programa para insertar los registro fuera de tiemp, incluye los disparos por eventos de los ETNA u cualquier otros tipo de digitalizador
-#Estructura de la informacions  ..\AAAA\ESTA\Datos evt
-# AAAA año
-# ESTA estación
-# Datos EVT daton con la información del registro en el nombre o en los metadatos del registro
-
-from rsa_io import lectura_archivo,escritura_archivo,extraer_hasta_directorio
-
-
-
-from metodos_rsa import parametros_estaciones,obtener_directorios,recolectar_evt,clasificar_evento_sismico,ejecutar_en_vm
-from PyQt5 import uic, QtWidgets#Importamos módulo uic y Qtwidgets
-from PyQt5.QtWidgets import (QApplication,QMainWindow, QMessageBox)
-from obspy import read, UTCDateTime
-from obspy import Stream
-from datetime import datetime
-from datetime import timedelta
+from metodos_rsa import parametros_estaciones, obtener_directorios, recolectar_evt, clasificar_evento_sismico, ejecutar_en_vm
+from PyQt5 import uic, QtWidgets
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QMessageBox)
+from obspy import read, UTCDateTime, Stream
 from PyQt5.QtCore import QUrl
 
 DICCIONARIO_ESTACIONES_EVT = {
+    "ACC1": "EEAS",
     "CHB": "CHAB",
     "CHC": "CHAC",
     "MZB": "MABA",
@@ -52,38 +40,35 @@ DICCIONARIO_ESTACIONES_EVT = {
     "MZD": "MADE",
     "PABA": "DPBA",
     "PACI": "DPCI",
-    "ACC1": "EEAS",#Esta denominación está en varios lugares, EEAlSur,EEALNor,Miraflo
-    "": "",
-    "": "",
-    "UCET": "UCET",#Esta está marcada como unversidad de Cuenca
-    "UDEC": "UCET"#Falta esta estación en la lista de estaciones, es la Universidad de Cuenca
-
+    "UCET": "UCET",
+    "UDEC": "UCET",
 }
-
 
 DICCIONARIO_ESTACIONES_DIRECTORIO = {
     "Azogues": "CICA",
     "CICA": "CICA",
-    "ChanludBase":"CHAB",
     "ChaBase": "CHAB",
-    "Chanlbas": "CHAB",
+    "ChaCima": "CHAC",
     "Chanlbas": "CHAB",
     "Chanlcim": "CHAC",
-    "ChaCima": "CHAC",
+    "ChanludBase": "CHAB",
     "ChanludCima": "CHAC",
-    "EEEBASE": "EEAS",
-    "EEBase": "EEBA",
-    "EEE-Base": "EEBA",
     "EEAlNor": "EEAN",
     "EEALNor": "EEAN",
-    "EEE-AltNort": "EEAN",
-    "EEAltSur": "EEAS",
     "EEAlSur": "EEAS",
+    "EEAltSur": "EEAS",
+    "EEBase": "EEBA",
+    "EEE-AltNort": "EEAN",
     "EEE-AltSur": "EEAS",
+    "EEE-Base": "EEBA",
+    "EEEBASE": "EEAS",
+    "HUAJIBAM": "AHUA",
     "Huajibam": "AHUA",
     "Huajibamba": "AHUA",
-    "HUAJIBAM": "AHUA",
     "Huajibamba-SSA": "AHUA",
+    "MABA": "MABA",
+    "MACI": "MACI",
+    "MADE": "MADE",
     "MazarBas": "MABA",
     "MazarBase": "MABA",
     "MazarCim": "MACI",
@@ -92,20 +77,18 @@ DICCIONARIO_ESTACIONES_DIRECTORIO = {
     "Miraflo": "MIRA",
     "Miraflor": "MIRA",
     "Miraflores": "MIRA",
-    "PauteBas": "DPBA", #Paute base
-    "Pautebas": "DPBA", #Paute base
-    "PauteBase": "DPBA", #Paute base
-    "PauMed": "DPME", #Paute medio
-    "PauteCim": "DPCI", #Paute Cima
-    "PauteCim": "DPCI", #Paute Cima
-    "PauteCima": "DPCI", #Paute Cima
-    "Regcivil": "REGC",#
-    "UAzuay": "UDAZ",#
-    "UCCamp": "UCET",#
-    "UCcamp": "UCET",#
-    "UCoficin": "UCAO",#
-    "UDEC": "UCET"#Falta esta estación en la lista de estaciones, es la Universidad de Cuenca
-
+    "PauMed": "DPME",
+    "PauteBas": "DPBA",
+    "PauteBase": "DPBA",
+    "PauteCim": "DPCI",
+    "PauteCima": "DPCI",
+    "Regcivil": "REGC",
+    "UAzuay": "UDAZ",
+    "UCCamp": "UCET",
+    "UCcamp": "UCET",
+    "UCET": "UCET",
+    "UCoficin": "UCAO",
+    "UDEC": "UCET",
 }
 
 
@@ -118,6 +101,7 @@ def normalizar_codigo_estacion_desde_directorio(entrada):
         if str(clave).lower() == entrada_lower:
             return valor
     return entrada
+
 
 def normalizar_codigo_estacion_desde_evt(entrada):
     return DICCIONARIO_ESTACIONES_EVT.get(entrada, entrada)
@@ -161,16 +145,11 @@ def corregir_tiempo_reset_1980(stream, archivo_evt):
     return True, f"Tiempo EVT 1980 corregido con {origen_fecha}: {inicio_corregido:%Y-%m-%d %H:%M:%S}"
 
 
-def ajustar_tiempos_stream_con_catalogo(eventos, stream, tolerancia_minutos):
+def ajustar_tiempos_stream_con_catalogo(eventos, stream, tolerancia_minutos=5):
     """
     Ajusta el starttime de cada traza del Stream para calzar con el evento más cercano
     dentro de una tolerancia dada. Devuelve el stream ajustado, una bandera de si hubo
     calce, el tipo de evento ('FF', 'FC', 'SISMO') y el nombre sugerido del .mseed.
-
-    Notas:
-    - Se espera que eventos sea una lista de filas donde evento[1] contiene
-      'YYYYMMDD_HHMMSS.sis' o al menos 'YYYYMMDD_HHMMSS'.
-    - Se robusteció el parseo para aceptar tanto 15 caracteres como con extensión.
     """
     tr = stream[0]
     estacion = normalizar_codigo_estacion_desde_evt(str(tr.stats.station).strip().upper())
@@ -185,7 +164,6 @@ def ajustar_tiempos_stream_con_catalogo(eventos, stream, tolerancia_minutos):
     mejor_tipo = None
 
     for evento in eventos:
-        # Validación mínima de longitud de fila
         if not evento or len(evento) < 3:
             continue
 
@@ -193,17 +171,14 @@ def ajustar_tiempos_stream_con_catalogo(eventos, stream, tolerancia_minutos):
         if tipo not in ("FF", "FC", "SISMO"):
             continue
 
-        # Aceptar varias formas en evento[1]: con o sin extensión
         crudo = str(evento[1]).strip()
         if "_" not in crudo:
             continue
 
-        # Extrae exactamente 'YYYYMMDD_HHMMSS' (15 chars) desde el inicio
         ts_txt = crudo[:15]
         try:
             tiempo_evento = datetime.strptime(ts_txt, "%Y%m%d_%H%M%S")
         except Exception:
-            # Intento alterno: dividir por '_' por si hay ruido
             try:
                 fecha, hora = ts_txt.split("_")
                 if len(fecha) == 8 and len(hora) == 6:
@@ -226,27 +201,52 @@ def ajustar_tiempos_stream_con_catalogo(eventos, stream, tolerancia_minutos):
         diferencia_tiempo = timedelta(seconds=0)
         bandera = False
 
-    # Ajusta todo el stream con el mismo delta
     for traza in stream:
         traza.stats.starttime += diferencia_tiempo
 
     return stream, bandera, mejor_tipo, archivo_mseed
 
 
+def escribir_atomico_mseed(stream, destino):
+    """
+    Escribe un Stream en formato MSEED de manera atómica con compresión STEIM1 y reclen=512.
+    """
+    import time
+    carpeta = os.path.dirname(destino)
+    base = os.path.basename(destino)
+    tmp = os.path.join(carpeta, "." + base + ".tmp")
+    stream.write(tmp, format='MSEED', encoding='STEIM1', reclen=512)
+    try:
+        with open(tmp, 'rb') as _f:
+            os.fsync(_f.fileno())
+    except Exception:
+        pass
+    for intento in range(3):
+        try:
+            os.replace(tmp, destino)
+            return
+        except (PermissionError, OSError):
+            if intento < 2:
+                time.sleep(0.1)
+            else:
+                try:
+                    if os.path.exists(destino):
+                        os.remove(destino)
+                    os.replace(tmp, destino)
+                    return
+                except Exception as e:
+                    raise e
+
 
 def insertar_evento_en_catalogo(directorio_grabar: str, eventos: list, st: Stream, serial_equipo: str = None) -> list:
     """
-    Inserta un evento en la lista de eventos, guardando el archivo MiniSEED
+    Inserta un evento en la lista de eventos, guardando el archivo MiniSEED (STEIM1)
     y marcando en 'eventos' la columna correspondiente a la estación.
-    Supone que 'eventos' tiene un encabezado en la fila 0 y que la segunda
-    columna (índice 1) es el nombre base de evento 'YYYYMMDD_HHMMSS.sis'.
     """
-    # Extrae desde el stream
     tr = st[0]
     estacion = normalizar_codigo_estacion_desde_evt(str(tr.stats.station).strip().upper())
     inicio = tr.stats.starttime
 
-    # Nombre de salida .mseed; si hay serial, anteponerlo y crear subcarpeta
     prefijo = str(serial_equipo) if serial_equipo else estacion
     nombre_archivo = f"{prefijo}_{inicio.strftime('%Y%m%d_%H%M%S')}.mseed"
 
@@ -257,7 +257,6 @@ def insertar_evento_en_catalogo(directorio_grabar: str, eventos: list, st: Strea
 
     ruta_completa = os.path.join(destino, nombre_archivo)
 
-    # Carga parámetros de estación
     parametros = parametros_estaciones()
     estaciones = [str(x).strip().upper() for x in parametros['CODIGO']]
     componentes = parametros['COMPONENTE']
@@ -267,36 +266,27 @@ def insertar_evento_en_catalogo(directorio_grabar: str, eventos: list, st: Strea
         print(f"[ADVERTENCIA] Estación '{estacion}' no está en la configuración.")
         return eventos
 
-    # Homologar: el CSV guarda 'YYYYMMDD_HHMMSS.sis'
     archivo_evento = f"{inicio.strftime('%Y%m%d_%H%M%S')}.sis"
-    segundos_elementos = [str(f[1]).strip() for f in eventos]  # asumiendo fila 0 = encabezado
-    # Busca desde fila 1 si la fila 0 es encabezado
+    segundos_elementos = [str(f[1]).strip() for f in eventos]
     try:
         n_evento = segundos_elementos.index(archivo_evento)
     except ValueError:
-        # Si la fila 0 es encabezado, intenta desde 1
         try:
             n_evento = segundos_elementos[1:].index(archivo_evento) + 1
         except ValueError:
-            # No encontrado: salir limpio
             return eventos
 
-    # Asegurar calib presente
     for tr in st:
         if not hasattr(tr.stats, "calib"):
             tr.stats.calib = 1.0
 
-    # Escribir MSEED (parámetros por defecto)
-    st.write(ruta_completa, format='MSEED')
-    print("\nInsertando evento  ",ruta_completa)
-    # Actualizar eventos de forma segura:
-    # Si tu estructura es [ID, FECHA, ..., columnas por estación], mantener 'indice + 3'
-    # pero validando rangos.
+    escribir_atomico_mseed(st, ruta_completa)
+    print(f"\n[MSEED] Insertando evento consolidado: {ruta_completa}")
+
     col_destino = idx_est + 3
     if col_destino < len(eventos[n_evento]):
         eventos[n_evento][col_destino] = estacion + componentes[idx_est] + '1000000'
     else:
-        # Expandir fila si hiciera falta
         faltan = col_destino - len(eventos[n_evento]) + 1
         eventos[n_evento].extend([''] * faltan)
         eventos[n_evento][col_destino] = estacion + componentes[idx_est] + '1000000'
@@ -304,36 +294,18 @@ def insertar_evento_en_catalogo(directorio_grabar: str, eventos: list, st: Strea
     return eventos
 
 
-
-def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, bandera_insertar, directorio_destino=None, ventana_parent=None):
+def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, bandera_insertar, directorio_destino=None, ventana_parent=None, tolerancia_minutos=5):
     """
     Lee un archivo EVT (Kinemetrics), trata de calzarlo en el catálogo del día para ajustar tiempos,
     clasifica el evento y, si corresponde, inserta el .mseed y actualiza el CSV.
-
-    Parámetros:
-        archivo_evt (str): Ruta del archivo .EVT a procesar.
-        directorio_trabajo (str): Carpeta base C:/DIA/ (o similar) donde se arma 'archivo' AAAAMMDDhhmmss.
-        bandera_verificar (bool): Si True, genera gráfico; se guarda PNG y se abre en visor del sistema.
-        bandera_insertar (bool): Si True y el evento calza, inserta el .mseed y actualiza el CSV del día.
-        directorio_destino (str|None): Si se quiere forzar un destino por serial (crea subcarpetas por serial).
-        ventana_parent (QMainWindow|None): Si se pasa, se mantiene la ventana Matplotlib no modal viva
-                                           guardando la referencia en ventana_parent._figs_abiertas.
-
-    Retorna:
-        list[list]: Una lista con una sola fila de resumen del procesamiento del EVT.
     """
-    import os, re, gc
+    import re, gc
     import matplotlib.pyplot as plt
-
-    # Imports locales para abrir PNG sin bloquear la app
     from PyQt5.QtWidgets import QMessageBox
 
     datos_completos = []
 
-    # Reconstrucción descriptiva de la ruta por si no cae en diccionario
-    # (no cambiamos tu lógica, solo la hacemos más clara/robusta)
-    directorios_almacenamiento = re.split(r"[\\/]", archivo_evt)
-    from collections import deque
+    directorios_almacenamiento = re.split(r"[\\/]", str(archivo_evt))
     partes_ruta_mapeadas = deque()
     for d in directorios_almacenamiento:
         if not d:
@@ -341,7 +313,6 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
         partes_ruta_mapeadas.append(DICCIONARIO_ESTACIONES_DIRECTORIO.get(d, d))
     directorio_estacion_almacenado = " / ".join(partes_ruta_mapeadas) if partes_ruta_mapeadas else "Sin ruta"
 
-    # Variables de salida
     mensaje = ''
     mensaje_1 = ''
     resultado_str = ''
@@ -351,28 +322,32 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
     equipo_modelo, equipo_version, equipo_serial = 'Desconocido', 'Desconocida', 'Desconocido'
     aviso_tiempo = ''
 
-    # Intento de lectura EVT
     st = None
     try:
         st = read(archivo_evt, format='KINEMETRICS_EVT')
-        evt_info = st[0].stats.kinemetrics_evt
+        evt_info = getattr(st[0].stats, 'kinemetrics_evt', {})
     except Exception:
-        archivo_mseed = "No es compatible al formato"
-        # Usar ruta cruda en Windows para evitar escapes inválidos
-        try:
-            ejecutar_en_vm(archivo_evt, r'O:\KINEMETRICS')
-        except Exception as e:
-            print(f"[AVISO] ejecutar_en_vm falló: {e}")
-        mensaje = "Error: archivo no legible como EVT"
-        mensaje_1 = "No insertado"
-        datos_grabar = [archivo_evt, archivo_mseed, mensaje, "", mensaje_1,
-                        "", directorio_estacion_almacenado, "Desconocido",
-                        "Desconocido", "Desconocida", "Desconocido"]
-        datos_completos.append(datos_grabar)
-        return datos_completos
+        if os.path.exists(r'O:\KINEMETRICS'):
+            try:
+                st = ejecutar_en_vm(Path(archivo_evt), Path(r'O:\KINEMETRICS'))
+                evt_info = getattr(st[0].stats, 'kinemetrics_evt', {}) if st else {}
+            except Exception as e:
+                print(f"[AVISO] Fallback ejecutar_en_vm falló para {archivo_evt}: {e}")
+                st = None
+        else:
+            st = None
+
+        if not st:
+            archivo_mseed = "No es compatible al formato"
+            mensaje = "Error: archivo no legible como EVT (ObsPy/VM no disponible)"
+            mensaje_1 = "No insertado"
+            datos_grabar = [archivo_evt, archivo_mseed, mensaje, "", mensaje_1,
+                            "", directorio_estacion_almacenado, "Desconocido",
+                            "Desconocido", "Desconocida", "Desconocido"]
+            datos_completos.append(datos_grabar)
+            return datos_completos
 
     try:
-        # === Construcción de 'archivo' AAAAMMDDhhmmss con el directorio de trabajo ===
         tiempo_corregido, aviso_tiempo = corregir_tiempo_reset_1980(st, archivo_evt)
         if tiempo_corregido:
             print(f"[TIEMPO] {aviso_tiempo} | {archivo_evt}")
@@ -384,38 +359,30 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
         )
         directorios = obtener_directorios(archivo)
 
-        # === Extraer info del equipo de forma robusta ===
         try:
-            equipo_modelo  = str(evt_info.get('comment', 'Desconocido'))
+            equipo_modelo = str(evt_info.get('comment', 'Desconocido'))
             equipo_version = str(evt_info.get('instrument', 'Desconocida'))
-            equipo_serial  = str(evt_info.get('serialnumber', 'Desconocido'))
+            equipo_serial = str(evt_info.get('serialnumber', 'Desconocido'))
         except Exception:
             pass
 
-        # Normaliza código de estación
         estacion = normalizar_codigo_estacion_desde_evt(str(st[0].stats.station).strip().upper())
-
-        # Si se pide destino por serial, renombra y dirige a esa carpeta
         serial_para_nombre = str(equipo_serial) if directorio_destino else None
         directorio_final = directorio_destino if directorio_destino else directorios.get('Directorio_eventos', directorios.get('directorio_eventos', directorio_trabajo))
 
-        # Localiza CSV del día con tolerancia de may/min
         ruta_csv = directorios.get('Archivo_csv') or directorios.get('archivo_csv')
         if ruta_csv and os.path.exists(ruta_csv):
             eventos = lectura_archivo(ruta_csv)
 
-            # === Ajuste de tiempos contra el catálogo (tolerancia 5 min) ===
             st, bandera_localizacion, tipo, archivo_mseed_nominal = ajustar_tiempos_stream_con_catalogo(
-                eventos, st, tolerancia_minutos=5
+                eventos, st, tolerancia_minutos=tolerancia_minutos
             )
 
-            # Arma ruta prevista del .mseed
             if serial_para_nombre:
                 archivo_mseed = os.path.join(directorio_final, serial_para_nombre, serial_para_nombre + archivo_mseed_nominal[4:])
             else:
                 archivo_mseed = os.path.join(directorio_final, archivo_mseed_nominal)
 
-            # === Clasificación (sobre copia para no tocar st principal) ===
             st_copia = st.copy()
             resultado = clasificar_evento_sismico(st_copia)
             resultado_str = ' / '.join([f"{k}: {v}" for k, v in resultado.items()])
@@ -424,7 +391,6 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
             if aviso_tiempo:
                 mensaje += f" | {aviso_tiempo}"
 
-            # === Verificación: guardar PNG y abrir visor del sistema (no bloquea) ===
             if bandera_verificar:
                 try:
                     plt.close('all')
@@ -443,28 +409,23 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
                     )
                     plt.suptitle(titulo_grafico)
 
-                    # Mostrar la ventana Matplotlib en modo no modal y mantener referencia viva
                     try:
                         fig.show()
-                        plt.pause(0.001)  # cede control al loop de eventos
+                        plt.pause(0.001)
 
                         if ventana_parent is not None:
                             if not hasattr(ventana_parent, "_figs_abiertas"):
                                 ventana_parent._figs_abiertas = []
                             ventana_parent._figs_abiertas.append(fig)
-                            # Limita cuántas figuras mantener (opcional)
                             if len(ventana_parent._figs_abiertas) > 5:
                                 fig_vieja = ventana_parent._figs_abiertas.pop(0)
                                 try:
                                     plt.close(fig_vieja)
                                 except Exception:
                                     pass
-                        # Si no quieres mantener la ventana Matplotlib, descomenta:
-                        # plt.close(fig)
                     except Exception as e:
                         print(f"[AVISO] Mostrar figura no modal falló: {e}")
 
-                    # Pregunta por inserción si hay localización
                     if bandera_localizacion:
                         respuesta = QMessageBox.question(
                             None, "Insertar evento",
@@ -479,7 +440,6 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
                 except Exception as e:
                     print(f"[AVISO] Verificación falló: {e}")
 
-            # === Inserción en catálogo / escritura CSV ===
             if bandera_insertar and bandera_localizacion:
                 try:
                     eventos = insertar_evento_en_catalogo(directorio_final, eventos, st, serial_para_nombre)
@@ -491,7 +451,6 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
             archivo_mseed = f"No encontrado csv del dia: {ruta_csv}"
             mensaje = "Sin CSV, no se puede localizar/insertar"
     finally:
-        # Limpieza de memoria del Stream
         try:
             if st is not None:
                 st.clear()
@@ -500,7 +459,6 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
             pass
         gc.collect()
 
-    # Fila de salida
     datos_grabar = [archivo_evt, archivo_mseed, mensaje, archivo, mensaje_1,
                     resultado_str, directorio_estacion_almacenado, estacion,
                     equipo_modelo, equipo_version, equipo_serial]
@@ -777,13 +735,12 @@ def procesar_lista_archivos_evt(ventana, lista_rutas_evt):
     ventana.progressBar.setValue(total_archivos)
     return resumen_procesamiento
 
+
 class VentanaInsercionEVT(QMainWindow):
     def __init__(self, parent=None):
         super(VentanaInsercionEVT, self).__init__(parent)
 
-
-        # Cargar la interfaz desde el archivo .ui directamente en esta instancia
-        ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", "Insertar_evt.ui")
+        ruta_ui = os.path.join(ruta_proyecto, "src", "ui", "Insertar_evt.ui")
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui, self)
         self.cargar_ayuda_desde_archivo()
@@ -807,14 +764,7 @@ class VentanaInsercionEVT(QMainWindow):
             if hasattr(self, control):
                 getattr(self, control).setEnabled(False)
 
-
-
     def cargar_ayuda_desde_archivo(self):
-        """
-        Carga en el QTextBrowser 'txt_ayuda' el archivo HTML de ayuda.
-        Primero busca una copia versionable en rsa_sismologia/ayuda/ y,
-        por compatibilidad, luego revisa rsa_sismologia/datos/.
-        """
         try:
             rutas_ayuda = [
                 os.path.abspath(os.path.join(ruta_proyecto, "ayuda", "ayuda_insercion_evt.html")),
@@ -855,12 +805,6 @@ class VentanaInsercionEVT(QMainWindow):
             """
             self.txt_ayuda.setHtml(mensaje_error)
 
-
-
-
-
-
-
     def cargar_directorio_origen(self, event):
         if self.radioDirectorio1.isChecked():
             self.directorio_estacion = QtWidgets.QFileDialog.getExistingDirectory(None, 'Seleccione Directorio EVT')
@@ -898,7 +842,6 @@ class VentanaInsercionEVT(QMainWindow):
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"No se pudo generar inventario EVT:\n{e}")
 
-
     def actualizar_subdirectorios_por_anio(self, directorio_anio):
         self.cmbx_subdirectorios.clear()
         self.cmbx_subdirectorios.addItem("Todos")
@@ -925,7 +868,8 @@ class VentanaInsercionEVT(QMainWindow):
                 QMessageBox.warning(self, "Advertencia", "No se seleccionó un directorio de destino para el serial. Se cancelará el proceso.")
                 return
         else:
-            self.directorio_destino = None  # Por si se usa en el procesamiento, pero no se necesita
+            self.directorio_destino = None
+
         if self.radioDirectorio1.isChecked():
             directorio_anio = self.cmbx_eventos.currentText()
             subdirectorio_filtro = self.cmbx_subdirectorios.currentText()
@@ -938,23 +882,27 @@ class VentanaInsercionEVT(QMainWindow):
             self.progressBar.setMaximum(total_archivos)
             self.progressBar.setValue(0)
             datos = procesar_lista_archivos_evt(self, lista_evt)
-        if self.radioLista.isChecked():
+        elif self.radioLista.isChecked():
+            if not hasattr(self, "ruta_csv") or not self.ruta_csv or not os.path.isfile(self.ruta_csv):
+                QMessageBox.warning(self, "Error", "Debes seleccionar un archivo CSV válido.")
+                return
             rutas_evt = extraer_rutas_evt_desde_lista(lectura_archivo(self.ruta_csv))
             datos = procesar_lista_archivos_evt(self, rutas_evt)
-        if self.radioDirectorio2.isChecked():
+        elif self.radioDirectorio2.isChecked():
             if hasattr(self, "lista_evt_directorio_completo"):
                 lista_evt = self.lista_evt_directorio_completo
                 datos = procesar_lista_archivos_evt(self, lista_evt)
             else:
-                QMessageBox.warning(self, "Error", "No se ha seleccionado ningún directorio.")
+                QMessageBox.warning(self, "Error", "No se ha seleccionado ningún directorio completo.")
                 return
+
         if datos is None:
             QMessageBox.warning(self, "Error", "No hay datos para procesar.")
             return
-        salida=os.path.join(self.directorio_trabajo, 'procesados_desde_csv.csv')
+
+        salida = os.path.join(self.directorio_trabajo, 'procesados_desde_csv.csv')
         escritura_archivo(salida, datos)
         QMessageBox.information(self, "Proceso finalizado", f"Archivo generado:\n{salida}")
-
 
     def seleccionar_directorio_trabajo(self):
         folderpath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Seleccionar carpeta de trabajo')
@@ -963,11 +911,11 @@ class VentanaInsercionEVT(QMainWindow):
         if not folderpath.endswith('/'):
             folderpath += '/'
         self.directorio_trabajo = folderpath
-        self.lbl_directorio_trabajo.setText("Directorio de trabajo:   "+self.directorio_trabajo)
-
+        self.lbl_directorio_trabajo.setText("Directorio de trabajo:   " + self.directorio_trabajo)
 
     def cerrar_ventana(self):
         self.close()
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
