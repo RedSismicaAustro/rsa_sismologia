@@ -1,129 +1,82 @@
-
-import matplotlib
-matplotlib.use('Qt5Agg')  # Seguridad en entornos PyQt5
-import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter
-from datetime import datetime
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog, QLabel
-
-
-
-
-
 import sys
 import os
 from pathlib import Path
+from datetime import datetime
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+from matplotlib.dates import DateFormatter
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog, QLabel
+
 def extraer_hasta_directorio(ruta_completa, nombre_directorio):
     partes = Path(ruta_completa).parts
     if nombre_directorio in partes:
         indice = partes.index(nombre_directorio)
         ruta_recortada = Path(*partes[:indice + 1])
         return str(ruta_recortada) + '/'
-    else:
-        return ''
-ruta_librerias=os.path.dirname(__file__)
-ruta_proyecto=extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
-ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
+    return ''
+
+ruta_librerias = os.path.dirname(__file__)
+ruta_proyecto = extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
+if not ruta_proyecto:
+    raise RuntimeError('No se encontro la raiz del proyecto rsa_sismologia')
+ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src', 'librerias'))
 ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
-# Insertar la ruta al inicio del sys.path
+
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
 if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
-
 from rsa_io import lectura_archivo, escritura_archivo
 
-# ========================
-# Utilitario de proyecto
-# ========================
-def extraer_hasta_directorio(ruta_completa, nombre_directorio):
-    """
-    Extrae el path hasta el directorio dado (incluyéndolo).
-    Si no existe en la ruta, devuelve ''.
-    """
-    partes = Path(ruta_completa).parts
-    if nombre_directorio in partes:
-        indice = partes.index(nombre_directorio)
-        ruta_recortada = Path(*partes[:indice + 1])
-        return str(ruta_recortada) + '/'
-    else:
-        return ''
 
-
-
-# Resolver rutas de librerías/datos (opcional; si no las usas, no pasa nada)
-ruta_librerias = os.path.dirname(__file__)
-ruta_proyecto = extraer_hasta_directorio(ruta_librerias, 'rsa_sismologia')
-ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src', 'librerias'))
-ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
-
-if ruta_librerias and ruta_librerias not in sys.path:
-    sys.path.insert(0, ruta_librerias)
-# Nota: no es habitual meter "datos" en sys.path; lo omito para no ensuciar imports.
-
-
-# ============================
-# Clase principal de la GUI
-# ============================
 class ProcesadorNiveles(QWidget):
     """
-    Procesa archivos .csv de niveles:
-    - Detecta formato de fecha por archivo.
-    - Normaliza y consolida en niveles.csv
-    - Mantiene archivo de historial archivos.csv
-    - Resuelve duplicados por timestamp y filtra atípicos locales.
-    - Grafica la serie resultante.
+    Procesador y consolidador de registros de nivel de embalses (Chanlud, Labrado):
+    - Detecta el formato de fecha de forma independiente por cada archivo CSV.
+    - Normaliza fechas al estándar canónico (dd/mm/AAAA HH:MM:SS) y valores numéricos.
+    - Resuelve duplicados temporales por coherencia con vecinos.
+    - Filtra valores atípicos (outliers) por cota física de variación e interpolación lineal.
+    - Mantiene el inventario de archivos procesados y genera la gráfica temporal.
     """
 
     def __init__(self):
         super().__init__()
-        self.initUI()
+        self.inicializar_interfaz()
 
-    # -----------------------
-    # Interfaz básica
-    # -----------------------
-    def initUI(self):
+    def inicializar_interfaz(self):
         layout = QVBoxLayout()
-        self.label = QLabel("Selecciona el directorio con los archivos CSV")
-        layout.addWidget(self.label)
+        self.label_estado = QLabel("Selecciona el directorio con los archivos CSV de niveles de embalse")
+        layout.addWidget(self.label_estado)
 
-        self.button = QPushButton("Seleccionar Directorio")
-        self.button.clicked.connect(self.seleccionar_directorio)
-        layout.addWidget(self.button)
+        self.boton_seleccionar = QPushButton("Seleccionar Directorio")
+        self.boton_seleccionar.clicked.connect(self.seleccionar_directorio)
+        layout.addWidget(self.boton_seleccionar)
 
         self.setLayout(layout)
-        self.setWindowTitle("Procesador de Niveles de Presa")
-        self.setGeometry(300, 300, 520, 200)
+        self.setWindowTitle("Procesador de Niveles de Embalse - RSA")
+        self.setGeometry(300, 300, 520, 180)
 
     def seleccionar_directorio(self):
-        directory = QFileDialog.getExistingDirectory(self, "Seleccionar Directorio")
-        if directory:
-            self.label.setText(f"Directorio seleccionado: {directory}")
-            self.procesar_archivos(directory)
+        directorio = QFileDialog.getExistingDirectory(self, "Seleccionar Directorio con Archivos CSV")
+        if directorio:
+            self.label_estado.setText(f"Directorio seleccionado:\n{directorio}")
+            self.procesar_archivos(directorio)
 
-    # ----------------------------------------------
-    # Detección de formato de fecha (por archivo)
-    # ----------------------------------------------
     def determinar_formato_fecha(self, fechas):
         """
-        Determina el formato de fecha a partir de una muestra pequeña del archivo.
-        Devuelve el primer formato que parsea TODA la muestra.
-        Esta función se llama por CADA ARCHIVO a procesar.
+        Determina el formato de fecha evaluando una muestra de registros del archivo.
+        Devuelve el primer formato que parsea exitosamente la muestra.
         """
-        # Muestra acotada para rendimiento y robustez
-        muestra = [f for f in fechas if f]  # descarta None/'' en la muestra
-        muestra = muestra[:50] if len(muestra) > 50 else muestra
-
+        muestra = [f for f in fechas if f][:50]
         formatos = [
-            # dd/mm/AAAA y mm/dd/AAAA con o sin segundos
             '%d/%m/%Y %H:%M:%S', '%m/%d/%Y %H:%M:%S',
             '%d/%m/%Y %H:%M',    '%m/%d/%Y %H:%M',
-            # separador con guiones
             '%d-%m-%Y %H:%M:%S', '%m-%d-%Y %H:%M:%S',
             '%d-%m-%Y %H:%M',    '%m-%d-%Y %H:%M',
-            # ISO-like
-            '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'
+            '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
+            '%d/%m/%y %H:%M:%S', '%d/%m/%y %H:%M'
         ]
 
         for formato in formatos:
@@ -136,34 +89,23 @@ class ProcesadorNiveles(QWidget):
 
         raise ValueError("Formato de fecha no reconocido en la muestra de datos del archivo.")
 
-    # ------------------------------------------------------
-    # Normalización por archivo (usa formato detectado)
-    # ------------------------------------------------------
     def leer_csv_con_formato_por_archivo(self, ruta_csv):
         """
-        Lee un csv con cabecera en 3 primeras filas, detecta FORMATO DE FECHA PARA ESE ARCHIVO,
-        y retorna filas normalizadas con:
-          - fecha (columna 1) como datetime
-          - valor (columna 2) como float (soporta coma decimal)
-        Devuelve lista vacía si no se puede parsear.
+        Lee un archivo CSV individual, determina su formato de fecha propio y
+        retorna las filas normalizadas con fecha (datetime) y valor (float).
         """
         datos_crudos = lectura_archivo(ruta_csv)
         if not datos_crudos or len(datos_crudos) < 4:
             return []
 
-        # Quitamos 3 filas de cabecera del archivo fuente
         filas_datos = datos_crudos[3:]
-
-        # Extraemos pequeña muestra de fechas de la columna 1
         fechas_muestra = []
         for fila in filas_datos[:80]:
             if len(fila) > 1 and fila[1]:
                 fechas_muestra.append(str(fila[1]).strip())
 
-        # Detectar formato **para este archivo**
         formato = self.determinar_formato_fecha(fechas_muestra)
 
-        # Parsear filas
         normalizadas = []
         for fila in filas_datos:
             if len(fila) < 3:
@@ -180,45 +122,34 @@ class ProcesadorNiveles(QWidget):
                 fila_out[2] = valor_num
                 normalizadas.append(fila_out)
             except Exception as ex:
-                print("Error parseando fila:", fila, "->", ex)
+                print(f"Advertencia: No se pudo parsear fila en {os.path.basename(ruta_csv)}: {fila} -> {ex}")
                 continue
 
         return normalizadas
 
-    # --------------------------------------------------------------------
-    # Depuración por vecindad: duplicados y atípicos locales
-    # --------------------------------------------------------------------
-    def depurar_por_vecindad(self, filas, max_delta_por_hora=None,
+    def depurar_por_vecindad(self, filas, max_delta_por_hora=0.30,
                              umbral_abs_interpolacion=0.25,
                              factor_relativo_vecinos=3.0):
         """
         1) Resuelve duplicados por timestamp eligiendo el candidato más coherente con vecinos.
         2) Elimina valores atípicos locales (outliers) basados en:
-           - Desviación respecto a interpolación lineal entre vecinos (si existen ambos).
-           - Desviación relativa respecto a un único vecino (si falta uno).
-           - (Opcional) Cota física de variación por hora (max_delta_por_hora).
-
-        Entradas:
-            filas: lista de filas con fecha(datetime) en [1], valor(float) en [2].
-        Retorna:
-            lista depurada, ordenada, sin duplicados ni outliers.
+           - Cota física de variación por hora (max_delta_por_hora en m/h).
+           - Desviación respecto a interpolación lineal entre vecinos contiguos.
+           - Desviación relativa respecto a un único vecino disponible.
         """
         from statistics import median
 
         if not filas:
             return []
 
-        # Orden temporal y agrupación por timestamp
         filas_ordenadas = sorted(filas, key=lambda x: x[1])
         grupos = {}
         for fila in filas_ordenadas:
             grupos.setdefault(fila[1], []).append(fila)
         tiempos = sorted(grupos.keys())
 
-        # Mediana preliminar por timestamp (referencia robusta)
         prelim = {t: median(float(f[2]) for f in grupos[t]) for t in tiempos}
 
-        # 1) Resolver duplicados por coherencia con vecinos
         elegidos = {}
         ultimo_valor_elegido = None
         for i, t in enumerate(tiempos):
@@ -238,7 +169,7 @@ class ProcesadorNiveles(QWidget):
                     if v_sig is not None:
                         costo += abs(v - v_sig)
                     if v_prev is None and v_sig is None:
-                        costo += abs(v - prelim[t])  # sin vecinos: caemos a mediana local
+                        costo += abs(v - prelim[t])
                     if costo < mejor_costo:
                         mejor_costo, mejor = costo, fila
                 fila_ok = mejor
@@ -248,7 +179,6 @@ class ProcesadorNiveles(QWidget):
 
         base = [elegidos[t] for t in tiempos]
 
-        # 2) Filtrado de outliers locales
         def horas_entre(t1, t2):
             return abs((t2 - t1).total_seconds()) / 3600.0
 
@@ -258,7 +188,6 @@ class ProcesadorNiveles(QWidget):
             t = fila[1]
             v = float(fila[2])
 
-            # Buscar vecinos válidos
             j_prev = i - 1
             while j_prev >= 0 and base[j_prev] is None:
                 j_prev -= 1
@@ -271,7 +200,6 @@ class ProcesadorNiveles(QWidget):
 
             descartar = False
 
-            # c) Cota física de variación por hora (si aplica)
             if max_delta_por_hora is not None:
                 if tiene_prev:
                     dt_h = horas_entre(base[j_prev][1], t)
@@ -284,7 +212,6 @@ class ProcesadorNiveles(QWidget):
                         if abs((float(base[j_sig][2]) - v) / dt_h) > max_delta_por_hora:
                             descartar = True
 
-            # a) Interpolación lineal si hay ambos vecinos
             if not descartar and tiene_prev and tiene_sig:
                 t_prev, v_prev = base[j_prev][1], float(base[j_prev][2])
                 t_sig, v_sig = base[j_sig][1], float(base[j_sig][2])
@@ -295,7 +222,6 @@ class ProcesadorNiveles(QWidget):
                     if abs(v - v_interp) > umbral_abs_interpolacion:
                         descartar = True
 
-            # b) Solo un vecino: test relativo
             if not descartar and (tiene_prev ^ tiene_sig):
                 v_vecino = float(base[j_prev][2]) if tiene_prev else float(base[j_sig][2])
                 diff_tipica = abs(v_vecino - prelim[t]) if t in prelim else abs(v - v_vecino)
@@ -309,31 +235,14 @@ class ProcesadorNiveles(QWidget):
 
         return depurada
 
-    # ----------------------------------------------
-    # Procesamiento principal de archivos
-    # ----------------------------------------------
-    def procesar_archivos(self, directory):
-        """
-        Flujo completo:
-        - Lee niveles.csv y archivos.csv (si existen) y quita cabeceras si corresponde.
-        - Recorre los .csv del directorio, detecta formato POR ARCHIVO y normaliza.
-        - Mergea con lo existente.
-        - Resuelve duplicados y filtra atípicos locales.
-        - Escribe niveles.csv y archivos.csv con cabeceras coherentes.
-        - Grafica la serie final.
-        """
-        archivo_niveles = os.path.join(directory, 'niveles.csv')
-        archivo_archivos = os.path.join(directory, 'archivos.csv')
+    def procesar_archivos(self, directorio):
+        archivo_niveles = os.path.join(directorio, 'niveles.csv')
+        archivo_archivos = os.path.join(directorio, 'archivos.csv')
 
-        # Lectura de existentes
         niveles_existentes = lectura_archivo(archivo_niveles) or []
         archivos_existentes = lectura_archivo(archivo_archivos) or []
 
         def quitar_cabecera_si_corresponde(filas):
-            """
-            Si la primera fila parece cabecera (tiene letras), quitamos 3 filas.
-            Si el archivo ya no tiene cabeceras, no quitamos nada.
-            """
             if len(filas) >= 3:
                 hay_texto = any(any(c.isalpha() for c in str(celda)) for celda in filas[0])
                 return filas[3:] if hay_texto else filas
@@ -342,7 +251,6 @@ class ProcesadorNiveles(QWidget):
         niveles_existentes = quitar_cabecera_si_corresponde(niveles_existentes)
         archivos_existentes = quitar_cabecera_si_corresponde(archivos_existentes)
 
-        # Convertir niveles existentes a datetime/float, aceptando formatos mixtos
         formatos_posibles = [
             '%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M',
             '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
@@ -379,15 +287,13 @@ class ProcesadorNiveles(QWidget):
             fila_norm[2] = v
             niveles_normalizados.append(fila_norm)
 
-        # Historial de archivos ya procesados
         ya_procesados = set()
         for fila in archivos_existentes:
             if fila and len(fila) >= 1:
                 ya_procesados.add(str(fila[0]).strip())
 
-        # Procesar nuevos .csv del directorio (formato por archivo)
         nuevos_archivos = []
-        for nombre in sorted(os.listdir(directory)):
+        for nombre in sorted(os.listdir(directorio)):
             if not nombre.lower().endswith('.csv'):
                 continue
             if nombre in ('niveles.csv', 'archivos.csv'):
@@ -395,39 +301,34 @@ class ProcesadorNiveles(QWidget):
             if nombre in ya_procesados:
                 continue
 
-            ruta_csv = os.path.join(directory, nombre)
-            print("Procesando:", ruta_csv)
+            ruta_csv = os.path.join(directorio, nombre)
+            print(f"Procesando: {ruta_csv}")
             filas_norm = self.leer_csv_con_formato_por_archivo(ruta_csv)
             if not filas_norm:
-                print("Saltando (vacío o ilegible):", nombre)
+                print(f"Saltando (vacio o ilegible): {nombre}")
                 continue
 
             niveles_normalizados.extend(filas_norm)
             nuevos_archivos.append([nombre])
 
-        # Resolver duplicados y filtrar outliers locales (ajusta parámetros a tu realidad)
         niveles_depurados = self.depurar_por_vecindad(
             niveles_normalizados,
-            max_delta_por_hora=0.30,        # 30 cm/h; pon None si no quieres este control
-            umbral_abs_interpolacion=0.25,  # tolerancia vs interpolación
-            factor_relativo_vecinos=3.0     # severidad con un solo vecino
+            max_delta_por_hora=0.30,
+            umbral_abs_interpolacion=0.25,
+            factor_relativo_vecinos=3.0
         )
 
-        # Orden ya viene temporal por la depuración; convertimos fecha a string estable (AAAA de 4 dígitos)
         for fila in niveles_depurados:
             fila[1] = fila[1].strftime("%d/%m/%Y %H:%M:%S")
-            # valor en formato compacto
             fila[2] = f"{float(fila[2]):.6f}".rstrip('0').rstrip('.')
 
-        # Escribir niveles.csv con CABECERA
         cabecera_niveles = [
-            ["# Archivo consolidado de niveles"],
-            ["# Formato: identificador, fecha(dd/mm/AAAA HH:MM:SS), valor, ..."],
-            ["# Generado por ProcesadorNiveles"]
+            ["# Archivo consolidado de niveles de embalse"],
+            ["# Formato: identificador, fecha(dd/mm/AAAA HH:MM:SS), valor_nivel(m), ..."],
+            ["# Generado por ProcesadorNiveles - RSA"]
         ]
         escritura_archivo(archivo_niveles, cabecera_niveles + niveles_depurados)
 
-        # Actualizar archivos.csv (historial + nuevos, sin duplicados) con cabecera
         todos_archivos = []
         ya = set()
         for fila in archivos_existentes:
@@ -444,52 +345,41 @@ class ProcesadorNiveles(QWidget):
                 todos_archivos.append([n])
 
         cabecera_archivos = [
-            ["# Archivos procesados"],
-            ["# Una fila por archivo"],
-            ["# nombre"]
+            ["# Archivos de nivel procesados"],
+            ["# Una fila por archivo CSV incorporado"],
+            ["# nombre_archivo"]
         ]
         escritura_archivo(archivo_archivos, cabecera_archivos + todos_archivos)
 
-        self.label.setText("Procesamiento completado.")
-        print("Filas consolidadas:", len(niveles_depurados))
+        self.label_estado.setText(f"Procesamiento completado con éxito.\nTotal registros consolidados: {len(niveles_depurados)}")
+        print(f"Filas consolidadas en niveles.csv: {len(niveles_depurados)}")
 
-        # Graficar usando el mismo formato que guardamos
         self.graficar_niveles(niveles_depurados, "%d/%m/%Y %H:%M:%S")
 
-    # -----------------------
-    # Gráfica simple
-    # -----------------------
     def graficar_niveles(self, niveles, formato_fecha):
-        """
-        Recibe niveles con fecha en [1] (string con formato_fecha) y valor en [2].
-        Dibuja la serie en Matplotlib.
-        """
         try:
             fechas = [datetime.strptime(fila[1], formato_fecha) for fila in niveles]
             valores = [float(fila[2]) for fila in niveles]
         except Exception as ex:
-            print("Error preparando datos para gráfico:", ex)
+            print(f"Error preparando datos para grafico: {ex}")
             return
 
         plt.figure(figsize=(10, 6))
-        plt.plot(fechas, valores, marker='o', linestyle='-')
-        plt.xlabel('Fecha')
-        plt.ylabel('Nivel de la Presa')
-        plt.title('Niveles de la Presa a lo Largo del Tiempo')
+        plt.plot(fechas, valores, marker='o', markersize=3, linestyle='-', color='#1f77b4', lw=1.2)
+        plt.xlabel('Fecha y Hora')
+        plt.ylabel('Nivel de la Presa (m s.n.m.)')
+        plt.title('Niveles del Embalse a lo Largo del Tiempo')
         plt.xticks(rotation=45)
-        plt.grid(True)
+        plt.grid(True, linestyle='--', alpha=0.6)
 
-        date_format = DateFormatter("%d-%m-%Y %H:%M")
+        date_format = DateFormatter("%d/%m/%Y %H:%M")
         plt.gca().xaxis.set_major_formatter(date_format)
         plt.tight_layout()
         plt.show()
 
 
-# ========================
-# Ejecución del programa
-# ========================
 if __name__ == '__main__':
-    app = QApplication([])
-    ex = ProcesadorNiveles()
-    ex.show()
-    app.exec_()
+    app = QApplication(sys.argv)
+    ventana = ProcesadorNiveles()
+    ventana.show()
+    sys.exit(app.exec_())
