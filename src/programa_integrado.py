@@ -87,9 +87,8 @@ class VentanaPrincipal(QMainWindow):
         # Construir menús y barra de herramientas
         self.construccion_menu()
 
-        # Rutas del proyecto y variables protegidas
+        # Rutas del proyecto
         self.RAIZ_PROYECTO = os.path.abspath(ruta_proyecto)
-        self.variables_permitidas = self.__dict__.keys()
 
         # Configuración inicial limpia (Nivel 1, Estado A)
         self.configurar_estado_inicial()
@@ -241,25 +240,25 @@ class VentanaPrincipal(QMainWindow):
         # 5. Mostrar widget maximizado impregnado en la ventana
         widget.showMaximized()
 
-        # 5. Interceptar cierre del widget de forma universal (sin modificar el archivo del subprograma)
+        # 6. Interceptar cierre de forma asíncrona segura (QTimer) para evitar reentrancia
         metodo_close_original = widget.closeEvent
         def closeEvent_interceptado(event):
             try:
                 metodo_close_original(event)
             except Exception:
                 pass
-            self.volver_estado_trabajo()
+            QTimer.singleShot(0, self.volver_estado_trabajo)
         widget.closeEvent = closeEvent_interceptado
 
-        # 6. Conectar señales y botones de salida del .ui
+        # 7. Conectar señales y botones de salida del .ui mediante QTimer
         try:
-            widget.destroyed.connect(self.volver_estado_trabajo)
+            widget.destroyed.connect(lambda: QTimer.singleShot(0, self.volver_estado_trabajo))
         except Exception:
             pass
 
         if hasattr(widget, 'cerrado'):
             try:
-                widget.cerrado.connect(self.volver_estado_trabajo)
+                widget.cerrado.connect(lambda: QTimer.singleShot(0, self.volver_estado_trabajo))
             except Exception:
                 pass
 
@@ -268,12 +267,12 @@ class VentanaPrincipal(QMainWindow):
                 btn = getattr(widget, nombre_btn)
                 if hasattr(btn, 'clicked'):
                     try:
-                        btn.clicked.connect(self.volver_estado_trabajo)
+                        btn.clicked.connect(lambda: QTimer.singleShot(0, self.volver_estado_trabajo))
                     except Exception:
                         pass
                 elif hasattr(btn, 'triggered'):
                     try:
-                        btn.triggered.connect(self.volver_estado_trabajo)
+                        btn.triggered.connect(lambda: QTimer.singleShot(0, self.volver_estado_trabajo))
                     except Exception:
                         pass
 
@@ -281,7 +280,7 @@ class VentanaPrincipal(QMainWindow):
         return True
 
     def limpiar_widget_actual(self):
-        """Limpia de forma segura el widget activo en el centro"""
+        """Limpia de forma segura el widget activo en el centro sin corromper punteros C++"""
         if self.widget_activo:
             if hasattr(self.widget_activo, 'limpiar_estado'):
                 try:
@@ -289,49 +288,50 @@ class VentanaPrincipal(QMainWindow):
                 except Exception as e:
                     print(f"Aviso al limpiar widget activo: {e}")
 
-            if hasattr(self.widget_activo, 'disconnect_all_signals'):
-                try:
-                    self.widget_activo.disconnect_all_signals()
-                except Exception:
-                    pass
-
-            for attr_name in list(self.widget_activo.__dict__.keys()):
-                attr = getattr(self.widget_activo, attr_name)
-                if hasattr(attr, 'disconnect'):
-                    try:
-                        attr.disconnect()
-                    except Exception:
-                        pass
-
-            self.widget_activo.deleteLater()
             self.widget_activo = None
+
+        import gc
+        gc.collect()
+
+        # Limpiar variables no permitidas acumuladas en la ventana principal
+        self.limpiar_variables_temporales()
 
     def notificar_cierre_subprograma(self):
         """Notificación de cierre desde subprogramas"""
         QTimer.singleShot(0, self.volver_estado_trabajo)
 
     def volver_estado_trabajo(self):
-        """Regresa al estado de trabajo previo tras cerrar un subprograma restaurando la pila LIFO"""
-        print("=== RETOMANDO CONTROL EN VENTANA PRINCIPAL (LIFO) ===")
-        self.limpiar_widget_actual()
-        self.setCentralWidget(QWidget(self))
-        self.desapilar_y_restaurar_estado()
-        self.repaint()
-        QApplication.processEvents()
+        """Regresa al estado de trabajo previo tras cerrar un subprograma restaurando la pila LIFO (Ejecución Única)"""
+        if getattr(self, '_retomando_control', False):
+            return
+        if self.widget_activo is None:
+            return
+        self._retomando_control = True
+
+        try:
+            print("=== RETOMANDO CONTROL EN VENTANA PRINCIPAL (LIFO) ===")
+            subprograma = self.widget_activo
+            self.widget_activo = None
+
+            if hasattr(subprograma, 'limpiar_estado'):
+                try:
+                    subprograma.limpiar_estado()
+                except Exception as e:
+                    print(f"Aviso al limpiar widget activo: {e}")
+
+            self.setCentralWidget(QWidget(self))
+            self.desapilar_y_restaurar_estado()
+            
+            import gc
+            gc.collect()
+        finally:
+            self._retomando_control = False
 
     def limpiar_estado_completo(self):
         """Limpia completamente el estado de la aplicación"""
         self.limpiar_widget_actual()
         self.limpiar_widget_inicializacion()
-        self.limpiar_variables_temporales()
         self.pila_estados.clear()
-
-    def limpiar_variables_temporales(self):
-        """Elimina variables que no estaban en el estado original"""
-        variables_actuales = list(self.__dict__.keys())
-        for var in variables_actuales:
-            if var not in self.variables_permitidas:
-                delattr(self, var)
 
     def construccion_menu(self):
         # Crear barra de menú

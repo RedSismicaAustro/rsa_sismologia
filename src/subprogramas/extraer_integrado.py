@@ -256,6 +256,8 @@ class Extraer_evento(QMainWindow):
         except Exception as e:
             print("Otro error:", e)
         self.visor_limpiar_completo()
+        if hasattr(self, 'canvas') and self.canvas:
+            self.canvas.draw()
         bandera_ajuste=0
         if self.chkBx_ajuste.checkState()==2:
             bandera_ajuste=1
@@ -304,10 +306,7 @@ class Extraer_evento(QMainWindow):
         hora_sismo=lectura_eventos(self.archivo)[1]
         a= self.cmbx_eventos.currentIndex()
         
-        self.trCanal = [
-                        stream.copy() if isinstance(stream, Stream) else []
-                        for stream in self.lectura_mseed_dia
-                        ]
+        self.copiar_stream_dia()
         self.tiempo = obtencion_hora(self.archivo)
         hora=self.tiempo.hour
         minuto=self.tiempo.minute
@@ -499,6 +498,13 @@ class Extraer_evento(QMainWindow):
             self.visor_limpiar_completo()
             filtro_evento(self.visor,self.trCanal,self.sp_Box_finf.value(),self.sp_Box_fsup.value(),self.sp_Box_orden.value(),self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina,self.filtros_estaciones,self.estaciones_eventos_total,self.Btn_estaciones.isEnabled())
 
+    def copiar_stream_dia(self):
+        """Copia streams del día de forma segura y limpia"""
+        self.trCanal = [
+            stream.copy() if (isinstance(stream, Stream) and len(stream) > 0) else []
+            for stream in self.lectura_mseed_dia
+        ]
+
     def recargar_evento(self):
         self.copiar_stream_dia()
         self.visor_limpiar_completo()
@@ -507,196 +513,27 @@ class Extraer_evento(QMainWindow):
     def verificar_estaciones(self):
         estaciones_(self.hab_grafico,self.estaciones_eventos,self.filtros_estaciones,self).exec_()
         
-    def limpiar_estado_completo(self):
-        """
-        Limpia completamente todos los recursos antes de cerrar la ventana.
-        Libera memoria de streams, canvas, figuras y widgets.
-        """
-        print("🧹 Iniciando limpieza completa de recursos...")
-        
-        try:
-            # 1. DETENER Y LIMPIAR TIMERS
-            if hasattr(self, 'timer') and self.timer:
-                self.timer.stop()
-                self.timer.deleteLater()
-                self.timer = None
-            
-            # 2. LIMPIAR STREAMS DE OBSPY (Los más pesados)
-            self._limpiar_streams()
-            
-            # 3. LIMPIAR CANVAS Y FIGURAS DE MATPLOTLIB
-            self._limpiar_matplotlib()
-            
-            # 4. LIMPIAR LISTAS Y DATOS
-            self._limpiar_datos()
-            
-            # 5. DESCONECTAR SIGNALS
-            self._desconectar_signals()
-            
-            # 6. LIMPIAR WIDGETS DINÁMICOS
-            self._limpiar_widgets_dinamicos()
-            
-            # 7. FORZAR RECOLECCIÓN DE BASURA
-            gc.collect()
-            
-            print("✅ Limpieza completa finalizada")
-            
-        except Exception as e:
-            print(f"❌ Error durante la limpieza: {e}")
-
-    def _limpiar_streams(self):
-        """Limpia todos los streams de ObsPy"""
-        print("🔄 Liberando streams de ObsPy...")
-        
-        # Limpiar streams individuales del día
-        if hasattr(self, 'lectura_mseed_dia') and self.lectura_mseed_dia:
-            for i, stream in enumerate(self.lectura_mseed_dia):
-                if isinstance(stream, Stream) and len(stream) > 0:
-                    try:
-                        stream.clear()
-                        del stream
-                    except Exception as e:
-                        print(f"⚠️ Error limpiando stream día {i}: {e}")
-            self.lectura_mseed_dia.clear()
-            del self.lectura_mseed_dia
-        
-        # Limpiar streams de canales
-        if hasattr(self, 'trCanal') and self.trCanal:
-            for i, stream in enumerate(self.trCanal):
-                if isinstance(stream, Stream) and len(stream) > 0:
-                    try:
-                        stream.clear()
-                        del stream
-                    except Exception as e:
-                        print(f"⚠️ Error limpiando stream canal {i}: {e}")
-            self.trCanal.clear()
-            del self.trCanal
-        
-        # Limpiar otros streams si existen
-        attrs_streams = ['stLeido', 'stream_filtrado', 'streams_eventos']
-        for attr in attrs_streams:
-            if hasattr(self, attr):
-                stream_obj = getattr(self, attr)
-                if isinstance(stream_obj, (list, Stream)):
-                    try:
-                        if isinstance(stream_obj, list):
-                            for s in stream_obj:
-                                if isinstance(s, Stream):
-                                    s.clear()
-                            stream_obj.clear()
-                        else:
-                            stream_obj.clear()
-                        delattr(self, attr)
-                    except Exception as e:
-                        print(f"⚠️ Error limpiando {attr}: {e}")
-
-    def _limpiar_matplotlib(self):
-        """Limpia completamente matplotlib y canvas"""
-        print("📊 Liberando recursos de matplotlib...")
-        
-        try:
-            # Limpiar canvas
-            if hasattr(self, 'canvas') and self.canvas:
-                self.canvas.figure.clear()
-                self.canvas.close()
-                self.canvas.deleteLater()
-                self.canvas = None
-            
-            # Limpiar figura principal
-            if hasattr(self, 'visor') and self.visor:
+    def visor_limpiar_completo(self):
+        """Limpieza segura de la figura antes de cada gráfico nuevo y refresco de lienzo"""
+        if hasattr(self, 'visor') and self.visor:
+            try:
+                for ax in self.visor.get_axes():
+                    ax.clear()
+            except Exception:
+                pass
+            try:
                 self.visor.clear()
-                self.visor.clf()
-                plt.close(self.visor)
-                del self.visor
-                self.visor = None
-            
-            # Cerrar todas las figuras restantes de matplotlib
-            plt.close('all')
-            
-        except Exception as e:
-            print(f"⚠️ Error limpiando matplotlib: {e}")
-
-    def _limpiar_datos(self):
-        """Limpia listas, diccionarios y datos en memoria"""
-        print("💾 Liberando datos en memoria...")
-        
-        # Listas y diccionarios a limpiar
-        attrs_listas = [
-            'hora_sismos', 'hora_sismos_extraidos', 'eventos_auxiliar',
-            'estaciones_eventos', 'estaciones_eventos_total', 'filtros_estaciones',
-            'parametros', 'directorios'
-        ]
-        
-        for attr in attrs_listas:
-            if hasattr(self, attr):
+            except Exception:
+                pass
+            if hasattr(self, 'canvas') and self.canvas:
                 try:
-                    obj = getattr(self, attr)
-                    if isinstance(obj, (list, dict)):
-                        if hasattr(obj, 'clear'):
-                            obj.clear()
-                    delattr(self, attr)
-                except Exception as e:
-                    print(f"⚠️ Error limpiando {attr}: {e}")
-        
-        # Variables globales si existen
-        global datos_sismo
-        if 'datos_sismo' in globals():
-            datos_sismo.clear()
+                    self.canvas.draw()
+                except Exception:
+                    pass
 
-    def _desconectar_signals(self):
-        """Desconecta todas las señales de PyQt5"""
-        print("🔌 Desconectando señales...")
-        
-        try:
-            # Lista de botones que pueden tener señales conectadas
-            botones = [
-                'Btn_eventos', 'Btn_filtrar', 'Btn_guardar', 'Btn_recargar',
-                'Btn_extraer_fijo', 'Btn_Salir', 'Btn_pagina', 'Btn_estaciones',
-                'btn_cortar', 'btn_m_6', 'btn_p_6', 'btn_p__', 'btn_p__1',
-                'btn_p__2', 'btn_m__', 'btn_m__1', 'btn_m__2', 'btn_m_3',
-                'btn_m_1', 'btn_m_0_5', 'btn_m_0_2', 'btn_p_3_0', 'btn_p_1_0',
-                'btn_p_0_5', 'btn_p_0_2'
-            ]
-            
-            for btn_name in botones:
-                if hasattr(self, btn_name):
-                    btn = getattr(self, btn_name)
-                    if btn and hasattr(btn, 'disconnect'):
-                        btn.disconnect()
-            
-            # ComboBoxes y SpinBoxes
-            controles = ['cmbx_eventos', 'sp_Box_finf', 'sp_Box_fsup', 'sp_Box_orden']
-            for ctrl_name in controles:
-                if hasattr(self, ctrl_name):
-                    ctrl = getattr(self, ctrl_name)
-                    if ctrl and hasattr(ctrl, 'disconnect'):
-                        ctrl.disconnect()
-                        
-        except Exception as e:
-            print(f"⚠️ Error desconectando señales: {e}")
-
-    def _limpiar_widgets_dinamicos(self):
-        """Limpia widgets creados dinámicamente"""
-        print("🎛️ Liberando widgets dinámicos...")
-        
-        try:
-            # Limpiar grupos de widgets si existen
-            grupos = ['grupo_carga', 'grupo_evento', 'grupo_guardar', 
-                     'grupo_cortar', 'grupo_desplazar', 'grupo_hora_especifica']
-            
-            for grupo in grupos:
-                if hasattr(self, grupo):
-                    widget = getattr(self, grupo)
-                    if widget:
-                        widget.deleteLater()
-            
-        except Exception as e:
-            print(f"⚠️ Error limpiando widgets: {e}")
-
-    def Salir_mejorado(self):
-        """Método de salida mejorado con limpieza completa"""
-        print("🚪 Iniciando proceso de salida...")
-        
+    def Salir_(self):
+        """Método de salida interactivo con confirmación de guardado de informe"""
+        print("🚪 Iniciando proceso de salida de extracción...")
         message_box = QMessageBox(
             QMessageBox.Question,
             "¡Importante!",
@@ -714,132 +551,16 @@ class Extraer_evento(QMainWindow):
                 print(f"❌ Error guardando informe: {e}")
                 QMessageBox.warning(self, "Error", f"No se pudo guardar el informe: {e}")
         
-        # Realizar limpieza completa ANTES de cerrar
-        self.limpiar_estado_completo()
-        
-        # Cerrar la ventana
         self.close()
 
-    def closeEvent_mejorado(self, event):
-        """
-        Método closeEvent mejorado que garantiza limpieza completa
-        """
-        print("🏁 Ejecutando closeEvent...")
-        
-        try:
-            # Realizar limpieza completa
-            self.limpiar_estado_completo()
-            
-            # Emitir señal de cerrado
-            if hasattr(self, 'cerrado'):
-                self.cerrado.emit()
-            
-            # Aceptar el evento de cierre
-            event.accept()
-            
-            print("✅ Ventana cerrada correctamente")
-            
-        except Exception as e:
-            print(f"❌ Error durante el cierre: {e}")
-            # Aún así aceptar el cierre para evitar ventana colgada
-            event.accept()
-
-    def visor_limpiar_completo(self):
-        """Limpieza completa antes de cada gráfico nuevo"""
-        if hasattr(self, 'visor') and self.visor:
-            # Limpiar todos los axes
-            try:
-                for ax in self.visor.get_axes():
-                    ax.clear()
-            except:
-                pass
-            
-            # Limpiar la figura completa
-            self.visor.clear()
-            self.visor.clf()
-            
-            # Liberar de matplotlib completamente
-            import matplotlib.pyplot as plt
-            plt.close(self.visor)
-            
-            # Forzar actualización del canvas
-            if hasattr(self, 'canvas') and self.canvas:
-                self.canvas.draw_idle()
-
-    def copiar_stream_dia(self):
-        """Copia streams del día con limpieza previa mejorada"""
-        print("🔄 Copiando streams del día...")
-        
-        # PASO 1: Limpieza profunda de streams anteriores
-        if hasattr(self, 'trCanal') and self.trCanal:
-            for i, stream in enumerate(self.trCanal):
-                if isinstance(stream, Stream) and len(stream) > 0:
-                    try:
-                        stream.clear()
-                        del stream
-                    except Exception as e:
-                        print(f"⚠️ Error limpiando stream {i}: {e}")
-            
-            self.trCanal.clear()
-            del self.trCanal
-        
-        # PASO 2: Forzar recolección inmediata
-        gc.collect()
-        
-        # PASO 3: Crear nueva copia con manejo de errores
-        self.trCanal = []
-        
-        for idx, stream in enumerate(self.lectura_mseed_dia):
-            if isinstance(stream, Stream) and len(stream) > 0:
-                try:
-                    # Verificar que el stream tenga datos válidos
-                    if len(stream[0].data) > 0:
-                        copia = stream.copy()
-                        self.trCanal.append(copia)
-                    else:
-                        print(f"⚠️ Stream {idx} sin datos")
-                        self.trCanal.append([])
-                except Exception as e:
-                    print(f"❌ Error copiando stream {idx}: {e}")
-                    self.trCanal.append([])
-            else:
-                self.trCanal.append([])
-        
-        print(f"✅ {len([s for s in self.trCanal if isinstance(s, Stream)])} streams copiados")
-
-    def verificar_memoria(self):
-        """Método de diagnóstico para verificar el estado de memoria"""
-        try:
-            import psutil
-            import os
-            
-            process = psutil.Process(os.getpid())
-            memoria_mb = process.memory_info().rss / 1024 / 1024
-            print(f"📊 Uso de memoria actual: {memoria_mb:.2f} MB")
-            
-            # Contar objetos matplotlib activos
-            import matplotlib.pyplot as plt
-            figuras_activas = len(plt.get_fignums())
-            print(f"📈 Figuras matplotlib activas: {figuras_activas}")
-            
-            return memoria_mb, figuras_activas
-        except ImportError:
-            print("📊 psutil no disponible para diagnóstico de memoria")
-            return None, None
-
-    # REEMPLAZAR LOS MÉTODOS EXISTENTES CON ESTOS:
-    
-    def limpiar_estado(self):
-        """Método que reemplaza al original - llama a la limpieza completa"""
-        return self.limpiar_estado_completo()
-
-    def Salir_(self):
-        """Método que reemplaza al original - llama a la salida mejorada"""
-        return self.Salir_mejorado()
-
     def closeEvent(self, event):
-        """Método que reemplaza al original - llama al closeEvent mejorado"""
-        return self.closeEvent_mejorado(event)
+        """Notificar cierre a la ventana principal de forma estándar y segura"""
+        if hasattr(self, 'cerrado'):
+            try:
+                self.cerrado.emit()
+            except Exception:
+                pass
+        event.accept()
 
 class estaciones_(QDialog):
 
