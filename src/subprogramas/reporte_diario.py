@@ -441,11 +441,11 @@ class estaciones_(QDialog):
         self.tr_Canal=evaluacion[1]
         self.hab_canal=self.parametros['HAB_CANAL']
         self.setFixedSize(410, 420)
-        QDialog.__init__(self)
-        # Cargar la interfaz desde el archivo .ui directamente en esta instancia
         ruta_ui =  os.path.join(ruta_proyecto,"src", "ui", "estaciones.ui")
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui, self)
+
+
         self.ck_box_disp_canal={}
         self.ck_box_hab_canal={}
         self.ck_box_comentario={}
@@ -508,6 +508,10 @@ class estaciones_(QDialog):
         self.btn_Calcular=QPushButton("Calcular",self)
         self.btn_Calcular.setGeometry(310, 450, 80, 24)  #setGeometry(x, y, width, height)
         self.btn_Calcular.clicked.connect(self.calcular)
+        self.btn_Salir=QPushButton("Salir",self)
+        self.btn_Salir.setGeometry(410, 450, 80, 24)  #setGeometry(x, y, width, height)
+        self.btn_Salir.clicked.connect(self.close)
+
     
     def graficar(self):
         nombre_canal_total_=self.parametros['NOMBRE']

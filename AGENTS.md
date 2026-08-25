@@ -57,6 +57,12 @@ Antes de modificar o depurar cualquier script Python, el agente **DEBE** buscar 
 | [`src/librerias/analizar metodos_rsa.py`](file:///c:/proyectos/rsa_sismologia/src/librerias/analizar%20metodos_rsa.py) | [`analizar_metodos_rsa_contx.md`](file:///c:/proyectos/rsa_sismologia/src/librerias/analizar_metodos_rsa_contx.md) |
 | [`src/librerias/estaciones.py`](file:///c:/proyectos/rsa_sismologia/src/librerias/estaciones.py) | [`estaciones_contx.md`](file:///c:/proyectos/rsa_sismologia/src/librerias/estaciones_contx.md) |
 | [`src/librerias/gestor_fases.py`](file:///c:/proyectos/rsa_sismologia/src/librerias/gestor_fases.py) | [`gestor_fases_contx.md`](file:///c:/proyectos/rsa_sismologia/src/librerias/gestor_fases_contx.md) |
+| [`src/librerias/metodos_gestion.py`](file:///c:/proyectos/rsa_sismologia/src/librerias/metodos_gestion.py) | [`metodos_gestion_contx.md`](file:///c:/proyectos/rsa_sismologia/src/librerias/metodos_gestion_contx.md) |
+| [`src/librerias/metodos_rsa.py`](file:///c:/proyectos/rsa_sismologia/src/librerias/metodos_rsa.py) | [`metodos_rsa_contx.md`](file:///c:/proyectos/rsa_sismologia/src/librerias/metodos_rsa_contx.md) |
+| [`src/librerias/panel_estado.py`](file:///c:/proyectos/rsa_sismologia/src/librerias/panel_estado.py) | [`panel_estado_contx.md`](file:///c:/proyectos/rsa_sismologia/src/librerias/panel_estado_contx.md) |
+| [`src/librerias/rsa_procesamiento.py`](file:///c:/proyectos/rsa_sismologia/src/librerias/rsa_procesamiento.py) | [`rsa_procesamiento_contx.md`](file:///c:/proyectos/rsa_sismologia/src/librerias/rsa_procesamiento_contx.md) |
+| [`src/librerias/rsa_utilidades.py`](file:///c:/proyectos/rsa_sismologia/src/librerias/rsa_utilidades.py) | [`rsa_utilidades_contx.md`](file:///c:/proyectos/rsa_sismologia/src/librerias/rsa_utilidades_contx.md) |
+| [`src/librerias/ventana_estaciones.py`](file:///c:/proyectos/rsa_sismologia/src/librerias/ventana_estaciones.py) | [`ventana_estaciones_contx.md`](file:///c:/proyectos/rsa_sismologia/src/librerias/ventana_estaciones_contx.md) |
 | [`src/subprogramas/extraer_integrado.py`](file:///c:/proyectos/rsa_sismologia/src/subprogramas/extraer_integrado.py) | [`extraer_integrado_contx.md`](file:///c:/proyectos/rsa_sismologia/src/subprogramas/extraer_integrado_contx.md) |
 | [`src/subprogramas/fases.py`](file:///c:/proyectos/rsa_sismologia/src/subprogramas/fases.py) | [`fases_contx.md`](file:///c:/proyectos/rsa_sismologia/src/subprogramas/fases_contx.md) |
 | [`src/subprogramas/inicio.py`](file:///c:/proyectos/rsa_sismologia/src/subprogramas/inicio.py) | [`inicio_contx.md`](file:///c:/proyectos/rsa_sismologia/src/subprogramas/inicio_contx.md) |
@@ -90,19 +96,22 @@ Antes de modificar o depurar cualquier script Python, el agente **DEBE** buscar 
 
 ---
 
-## 5. Control y Redacción de Commits (Regla `GENERA COMMIT` / `REDACTA COMMIT`)
+## 5. Control y Redacción de Commits (Regla `GENERA COMMIT` / `REDACTA COMMIT` — GitHub Desktop)
 
 * **Prohibido Ejecutar Commits**: El agente **NUNCA** ejecuta `git commit` ni `git push`.
+* **Entorno de Control de Versiones**: El usuario utiliza **GitHub Desktop** para gestionar los commits. Por lo tanto, las propuestas deben presentarse formateadas directamente para los campos de GitHub Desktop (**Título/Summary** y **Descripción extendida**).
 * **Procedimiento al Recibir la Instrucción del Usuario**:
-  1. Revisar los cambios pendientes (`git status` o análisis de archivos modificados).
-  2. Redactar un mensaje de commit descriptivo, claro e integral que agrupe y ponga en contexto todas las modificaciones realizadas durante la sesión.
-  3. Presentar la propuesta del mensaje al usuario en un bloque de código listo para que el usuario realice el commit manualmente si lo considera adecuado.
+  1. Revisar exhaustivamente los cambios realizados (`git status` o inspección de archivos modificados/creados).
+  2. Redactar una propuesta integral, precisa y estructurada:
+     * **Título / Summary**: Título conciso, representativo y con prefijo convencional (`refactor:`, `docs:`, `feat:`, `fix:`) de máximo 72 caracteres.
+     * **Descripción / Description**: Detalle completo en viñetas claras y concretas que explique qué se hizo, por qué y qué archivos/módulos fueron afectados, sin omitir detalles relevantes.
+  3. Presentar la propuesta en bloques de texto listos para copiar y pegar en GitHub Desktop.
 
 ---
 
 ## 6. Subagentes y Protocolo de Ciclo de Vida de Sesión (.agents/skills)
 
-El repositorio cuenta con una suite de **5 habilidades especializadas (Skills)** para garantizar la consistencia, trazabilidad, estabilidad de librerías y memoria técnica en cada sesión de trabajo con el agente:
+El repositorio cuenta con una suite de **4 habilidades especializadas (Skills)** para garantizar la consistencia, trazabilidad, estabilidad de librerías y memoria técnica en cada sesión de trabajo con el agente:
 
 ### 🛠️ Suite de Skills Oficiales:
 
@@ -111,8 +120,7 @@ El repositorio cuenta con una suite de **5 habilidades especializadas (Skills)**
 | **1. Generar Contexto** | [`.agents/skills/generar_contexto.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/generar_contexto.md) | Crea o actualiza archivos `_contx.md` con 6 secciones (flujo Mermaid, contratos, métodos, riesgos y checklist). | *"genera/actualiza el contexto de [script.py]"* |
 | **2. Extraer ADR** | [`.agents/skills/extraer_adr.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/extraer_adr.md) | Registra Architectural Decision Records en `docs/adr/` preservando el porqué de cambios estructurales. | *"Extrae o actualiza el ADR de las decisiones tomadas"* |
 | **3. Transición Técnica** | [`.agents/skills/crear_transicion_tecnica.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/crear_transicion_tecnica.md) | Genera el traspaso técnico (*handover*) en `docs/transiciones/` para reanudar el trabajo en sesiones futuras. | *"Genera la transición técnica de esta sesión"* |
-| **4. Volcado de Bitácora** | [`.agents/skills/volcado_bitacora.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/volcado_bitacora.md) | Actualiza el histórico cronológico de trabajo en `docs/bitacora/bitacora_trabajo.md`. | *"Ejecuta el volcado de bitácora de esta sesión"* |
-| **5. Auditoría e Integración** | [`.agents/skills/auditoria_librerias_e_integracion.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/auditoria_librerias_e_integracion.md) | Audita llamadores de librerías compartidas y guía la integración progresiva de módulos satélite hacia `src/programa_integrado.py`. | *"Audita las llamadas a librerías e integra [modulo.py] en programa_integrado"* |
+| **4. Auditoría e Integración** | [`.agents/skills/auditoria_librerias_e_integracion.md`](file:///c:/proyectos/rsa_sismologia/.agents/skills/auditoria_librerias_e_integracion.md) | Audita llamadores de librerías compartidas y guía la integración progresiva de módulos satélite hacia `src/programa_integrado.py`. | *"Audita las llamadas a librerías e integra [modulo.py] en programa_integrado"* |
 
 ---
 
@@ -129,7 +137,6 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
 1. `Genera o actualiza el contexto tecnico de los archivos que fueron modificados durante la sesión, según la skill generar_contexto.md.`
 2. `Extrae o actualiza el ADR de las decisiones tomadas durante la sesión, según la skill extraer_adr.md.`
 3. `Genera la transición técnica de esta sesión según la skill crear_transicion_tecnica.md.`
-4. `Ejecuta el volcado de bitácora de esta sesión según la skill volcado_bitacora.md.`
-5. `Genera el texto de los commits para los repositorio modificados en las ultimas 4 intrucciones (modificacioens de la documentacion)` *(Respetando la Regla Madre: solo proponer y redactar en código, nunca ejecutar)*.
+4. `Genera el texto de los commits para los repositorios modificados en las ultimas 3 instrucciones (modificaciones de la documentacion)` *(Respetando la Regla Madre: redactar propuesta integral optimizada para GitHub Desktop con Título + Descripción detallada, nunca ejecutar)*.
 
 

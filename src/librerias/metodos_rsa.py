@@ -239,24 +239,26 @@ def filtro_evento(visor,stLeido,freqmin_,freqmax_,grado_,t_inicio,t_final,estaci
     #estaciones_eventos_total  Todas las estaciones que tienen registros mseed del evento
     #bandera_todos    Bandera para filtrar todos los canales con los parametros generales o con los filtros estacion por estación.
 
-    num_canal=len(estaciones_eventos)
+    num_canal = len(estaciones_eventos)
     for i in range(0, num_canal):
-        indice=estaciones_eventos_total.index(estaciones_eventos[i])
-        canal_= int(estaciones_eventos[i])
-        if bandera_todos:
-            grado_=int(filtros_estaciones[indice][0:2])
-            freqmin_=int(filtros_estaciones[indice][2:4])
-            freqmax_=int(filtros_estaciones[indice][4:6])
-        if grado_!=0:
+        indice = estaciones_eventos_total.index(estaciones_eventos[i])
+        canal_ = int(estaciones_eventos[i])
+        grado_i = grado_
+        freqmin_i = freqmin_
+        freqmax_i = freqmax_
+        if bandera_todos and filtros_estaciones and indice < len(filtros_estaciones):
+            f_est = filtros_estaciones[indice]
+            if f_est and f_est != '000000':
+                grado_i = int(f_est[0:2])
+                freqmin_i = int(f_est[2:4])
+                freqmax_i = int(f_est[4:6])
+        if grado_i != 0:
             try:
-                stLeido[canal_].filter("bandpass",freqmin=freqmin_,freqmax=freqmax_,corners=grado_)
-            except ValueError:
+                stLeido[canal_].filter("bandpass", freqmin=freqmin_i, freqmax=freqmax_i, corners=grado_i)
+            except (ValueError, Exception):
                 pass
-    aux=t_final-t_inicio
-    plt.close()
-    #stLeido[0] = obspy.signal.filter.highpass(stLeido[0].data, 1.0, corners=1, zerophase=True, df=stLeido[0].stats.sampling_rate)
-    #stLeido[0][0] = obspy.realtime.signal.offset(stLeido[0][0], offset=5.0, rtmemory_list=None)
-    grafico_evento_int(visor,stLeido,0,aux,estaciones_eventos,hab_grafico,bandera_marcas,pagina)
+    grafico_evento_int(visor, stLeido, t_inicio, t_final, estaciones_eventos, hab_grafico, bandera_marcas, pagina)
+
 
 
 def cargar_evento(parametro,eventos_reporte,catalogo,eventos,canales_eventos_dia,directorio_trabajo,directorio_reporte):

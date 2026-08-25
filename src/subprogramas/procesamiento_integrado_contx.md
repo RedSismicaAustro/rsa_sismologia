@@ -1,583 +1,124 @@
-# CONTEXTO INTEGRAL DE MANTENIMIENTO V3 (EXHAUSTIVO)
-## procesamiento_integrado.py
+---
+proyecto: rsa_sismologia
+tipo: contexto_tecnico
+archivo: src/subprogramas/procesamiento_integrado.py
+temas: [procesamiento_sismico, localizacion_hipocentral, seiscomp, reportes_pdf, gis, pyqt5, obspy]
+generado: 2026-08-24
+---
 
-> Documento maestro de mantenimiento basado en el código fuente actual y la V2 existente.
-> Su objetivo es preservar conocimiento técnico, facilitar correcciones futuras y reducir riesgos de modificación.
+# `src/subprogramas/procesamiento_integrado.py` — Contexto Técnico para Agentes IA
+
+> Núcleo operativo y analítico del procesamiento sísmico de la Red Sísmica de Alerta (RSA). Integra la revisión de eventos, picado de fases, localización hipocentral (SeisComP / ProcesoV2 / FAST), visualizador cartográfico GIS embebido y generación automatizada de catálogos y boletines PDF en 7 modalidades.
+
+**Ruta**: `src/subprogramas/procesamiento_integrado.py`  
+**LOC**: 1786 | **Lenguaje**: Python 3 (PyQt5, Matplotlib, ObsPy, NumPy, XML)  
+**Dependencias**: `PyQt5`, `obspy`, `matplotlib`, `numpy`, `librerias.rsa_io`, `librerias.rsa_procesamiento`, `librerias.metodos_gis_rsa`, `librerias.metodos_rsa`, `librerias.metodos_gestion`, `librerias.metodos_reportes_individuales`, `librerias.rsa_pdf_catalogo`  
+**Proceso**: Invocado desde la ventana principal `src/programa_integrado.py` (`Procesamiento -> Procesamiento integrado`) mediante `cargar_widget_menu()`.
 
 ---
 
-# 1. Propósito del módulo
+## 1. Arquitectura de 3 Paneles y Flujo Operativo
 
-`procesamiento_integrado.py` es el núcleo operativo del flujo de procesamiento sísmico RSA.
-
-Coordina:
-
-- Carga de días de trabajo.
-- Selección de eventos.
-- Gestión de procesamiento sísmico.
-- Integración con ProcesoV2.
-- Gestión Virtual ↔ Real.
-- Monitoreo de archivos RSA.
-- Generación de reportes.
-- Gestión de estaciones.
-- Integración GIS.
-- Persistencia de resultados.
-
----
-
-# 2. Arquitectura lógica
-
-```text
-Procesar_evento
-│
-├── Gestión GUI
-├── Gestión eventos
-├── Gestión procesamiento
-├── Gestión estaciones
-├── Gestión Virtual / Real
-├── Monitor RSA
-├── GIS
-├── Reportes
-└── Persistencia
+```mermaid
+flowchart TD
+    A[Ventana Principal: programa_integrado.py] -->|Carga Procesar_evento| B[Procesar_evento __init__]
+    
+    subgraph UI_Paneles [Layout Horizontal de 3 Paneles]
+        C[Panel Izquierdo: Formulario Proceso.ui]
+        D[Panel Central: Configuración Estaciones / Filtros]
+        E[Panel Derecho: Mapa Cartográfico GIS widget_grafico_mpl]
+    end
+    
+    B --> UI_Paneles
+    
+    B --> F[Abrir_archivo: Cargar puntos.csv y Catálogo Base]
+    F --> G[cargar_tipo_evento: Clasificar eventos por tipo]
+    G --> H[preparar_evento: Seleccionar sismo a procesar]
+    
+    H --> I[procesar_: Lanzar SeisComP / ProcesoV2 / FAST]
+    I --> J[FileMonitorThread: Monitorear XML / CSV de resultados]
+    J -->|archivo_cambiado| K[Cargar fases calculadas y actualizar mapa GIS]
+    
+    H --> L[estaciones_: Configurar canales Z/N/E y filtros Butterworth]
+    L --> D
+    
+    H --> M[reportar_: Diálogo reporte_ para Modos 1 a 7]
+    M --> N[rsa_pdf_catalogo.reporte_resumen_modos: Generar PDF]
+    
+    H --> O[Salir_: Guardar resumen temporal e informe]
+    O --> P[closeEvent: Detener hilo -> limpiar_estado -> emit cerrado]
+    P --> A
 ```
 
 ---
 
-# 3. Clases principales
+## 2. Modalidades de Reporte Sísmico Institucional (Modos 1 a 7)
 
-## FileMonitorThread
+El módulo define y gestiona 7 modos de generación de catálogos y boletines PDF:
 
-Responsable de monitorear archivos RSA.
-
-### Señales
-
-```python
-archivo_cambiado(str)
-```
-
-### Métodos
-
-- run()
-- sleep_interruptible()
-
-### Responsabilidad
-
-Detectar cambios en archivos RSA sin bloquear la GUI.
+| Modo | Constante / Código | Denominación y Alcance Técnico |
+|---|---|---|
+| **M1** | `MODO_PERIODO_FRANJAS` (1) | Período por franjas horarias de turno (`00–12`, `12–18`, `18–24`) para control interno. |
+| **M2** | `MODO_DIARIO_REVISION` (2) | Reporte diario de revisión con detalle técnico completo y eventos locales/dummies. |
+| **M3** | `MODO_OFICIAL_DETALLADO` (3) | Boletín oficial detallado (solo eventos confirmados del catálogo) + página de responsables. |
+| **M4** | `MODO_OFICIAL_RESUMEN` (4) | Resumen oficial institucional (solo catálogo condensado, sin desglose de fases). |
+| **M5** | `MODO_FACULTAD_RESUMEN` (5) | Resumen ejecutivo institucional para Facultad y redes colaboradoras. |
+| **M6** | `MODO_INSTITUCIONAL_DETALLADO` (6) | Catálogo técnico detallado sin campos administrativos de operadores. |
+| **M7** | `MODO_INSTITUCIONAL_RESUMEN` (7) | Resumen institucional sintético de alta dirección. |
 
 ---
 
-## Procesar_evento
+## 3. Clases y Componentes Principales
 
-Clase principal del sistema.
-
-Responsabilidades:
-
-- administrar eventos;
-- controlar procesamiento;
-- controlar monitor;
-- gestionar estaciones;
-- actualizar GIS;
-- generar reportes.
+| Clase / Componente | Tipo / Herencia | Responsabilidad y Operaciones |
+|---|---|---|
+| `FileMonitorThread` | `QThread` | Hilo de monitoreo asíncrono que detecta modificaciones en archivos de salida de procesamiento sísmico (`.xml`, `.csv`) e informa a la GUI vía `archivo_cambiado`. |
+| `Procesar_evento` | `QWidget` | Orquestador central de procesamiento sísmico, manejo de eventos, interacción con FAST/SeisComP, mapa GIS y reportes. |
+| `Cambio_Coeficientes_Filtro` | `QWidget` | Subinterfaz para modificar interactivamente frecuencias de corte (`finf`, `fsup`) y orden de filtros Butterworth por canal. |
+| `estaciones_` | `QWidget` | Subpanel integrado en el panel central para habilitar/deshabilitar estaciones, canales (`Z`, `N`, `E`) y ganancias visuales. |
+| `reporte_` | `QDialog` | Diálogo modal interactivo para configurar y disparar la emisión de catálogos PDF en los modos 1 a 7. |
 
 ---
 
-## Cambio_Coeficientes_Filtro
+## 4. Métodos Clave de `Procesar_evento`
 
-Ventana auxiliar para edición de filtros.
-
----
-
-## estaciones_
-
-Editor de:
-
-- estaciones habilitadas;
-- filtros;
-- visualización de señales;
-- interacción GIS.
-
----
-
-## reporte_
-
-Inserción de eventos externos.
+| Método | Firma | Descripción |
+|---|---|---|
+| `Abrir_archivo()` | `()` | Carga el archivo base del día, inicializa combos de filtros, listas de eventos y parsea el catálogo existente. |
+| `preparar_evento()` | `(nombre_evento)` | Carga la traza MiniSEED del evento seleccionado, inicializa las fases sismológicas y actualiza el mapa GIS. |
+| `procesar_()` | `()` | Ejecuta el procesamiento de fases sísmicas y localización hipocentral mediante ProcesoV2 / SeisComP / FAST. |
+| `iniciar_monitor_virtual()` | `(archivos)` | Lanza el hilo `FileMonitorThread` para detectar la culminación de cálculos externos. |
+| `detener_monitor_virtual()` | `()` | Solicita interrupción segura del hilo de monitoreo y espera su finalización (`quit()`, `wait()`). |
+| `guardar_evento()` | `()` | Persiste el catálogo consolidado en `archivo_catalogo` ordenando cronológicamente y eliminando duplicados. |
+| `actualizar_mapa()` | `(procesamiento)` | Redibuja el widget cartográfico `widget_mapa` (`widget_grafico_mpl`) con las estaciones y el nuevo epicentro. |
+| `Salir_()` | `()` | Valida el guardado de reportes temporales pendientes y cierra el subprograma. |
+| `limpiar_estado()` | `()` | Detiene monitores, limpia visores Matplotlib (`clf()`, `deleteLater()`) y vacía estructuras de memoria. |
+| `closeEvent()` | `(event)` | Orquesta el desmontaje seguro, limpia el panel central y emite la señal `cerrado` hacia `VentanaPrincipal`. |
 
 ---
 
-# 4. Dependencias internas
+## 5. Contratos de Datos y Persistencia
 
-- rsa_io
-- rsa_procesamiento
-- rsa_pdf_catalogo
-- metodos_rsa
-- metodos_gestion
-- metodos_gis_rsa
-- metodos_reportes_individuales
+### 5.1. Entradas del Constructor
+* `archivo` (str): Ruta base del día (`.../YYYYMMDD000000`).
+* `directorio_trabajo` (str): Directorio raíz de datos (`G:/Mi unidad/DIA/`).
+* `responsable` (str): Operador o entidad responsable.
+* `horario` (str): Turno operativo o período de análisis.
 
----
-
-# 5. Dependencias externas
-
-- PyQt5
-- matplotlib
-- pathlib
-- xml.etree.ElementTree
-- datetime
+### 5.2. Archivos Generados y Modificados
+* `archivo_catalogo` (`*_catalogo.csv`): Matriz de eventos procesados con tiempos de origen, coordenadas hipocentrales ($Lat, Lon, Prof$), magnitudes ($Ml, Mw$) y calidad de ajuste.
+* `archivo_auxiliar` (`*_aux.csv`): Registro temporal de intentos de procesamiento y flags de revisión.
+* `archivo_reporte` (`Reporte_*.pdf`): Documentos PDF oficiales generados por ReportLab con gráficos de fases e intensidades.
 
 ---
 
-# 6. Modelo de datos principal
-
-## self.eventos
-
-Eventos del día.
-
-Contrato:
-
-```text
-[id, nombre_evento, tipo_evento, estaciones...]
-```
-
----
-
-## self.catalogo
-
-Catálogo sísmico consolidado.
-
----
-
-## self.eventos_reporte
-
-Eventos utilizados en reportes.
-
----
-
-## self.procesamiento
-
-```text
-Fila 0 → Cabecera
-Fila 1 → Inicio
-Fila N → Intentos
-```
-
----
-
-## self.trCanal
-
-Datos sísmicos cargados mediante MiniSEED.
-
----
-
-## self.responsables
-
-Responsables por franja horaria.
-
----
-
-## self.directorios
-
-Diccionario de rutas operativas.
-
----
-
-# 7. Máquina de estados
-
-```text
-Inicialización
-      ↓
-Abrir_archivo
-      ↓
-Preparar evento
-      ↓
-Procesamiento disponible
-      ↓
-Estaciones abiertas
-      ↓
-Monitoreo RSA
-      ↓
-Actualización procesamiento
-      ↓
-Cierre
-```
-
----
-
-# 8. Flujo completo de procesamiento
-
-```text
-Abrir_archivo()
-      ↓
-preparar_evento()
-      ↓
-procesar_()
-      ↓
-guardar_intento()
-      ↓
-actualizar_mapa()
-      ↓
-reportar_()
-```
-
----
-
-# 9. Flujo Virtual ↔ Real
-
-```text
-REAL
- ↓
-Copiar a Virtual
- ↓
-ProcesoV2
- ↓
-RSA actualizado
- ↓
-recalcular_procesamiento()
- ↓
-Copiar Virtual → Real
-```
-
-Regla crítica:
-
-No alterar esta secuencia.
-
----
-
-# 10. Señales Qt documentadas
-
-## FileMonitorThread
-
-```python
-archivo_cambiado(str)
-```
-
----
-
-## Procesar_evento
-
-```python
-cerrado()
-```
-
----
-
-## estaciones_
-
-```python
-senal_cerrar()
-senal_actualizar_mapa()
-senal_cambios_estaciones(list,list)
-senal_cambio_vista(str)
-```
-
----
-
-# 11. Contratos internos
-
-## filtros_estaciones
-
-Formato:
-
-```text
-OOffss
-```
-
-## estaciones_eventos
-
-Contiene índices reales de estaciones.
-
-Nunca nombres.
-
----
-
-## evento_procesar
-
-Debe contener la fila completa del evento.
-
----
-
-# 12. Invariantes
-
-Siempre deben cumplirse:
-
-```text
-evento_procesar != ''
-```
-
-```text
-estaciones_eventos ⊆ estaciones_eventos_total
-```
-
-```text
-len(filtros_estaciones)
-==
-len(estaciones_eventos_total)
-```
-
-```text
-file_monitor == None
-o
-file_monitor.isRunning()
-```
-
----
-
-# 13. Métodos críticos
-
-## activar_hilo()
-
-Activa monitoreo RSA.
-
-Impacto: Muy Alto.
-
----
-
-## recalcular_procesamiento()
-
-Actualiza intentos automáticamente.
-
-Impacto: Muy Alto.
-
----
-
-## procesar_()
-
-Método central de procesamiento.
-
-Impacto: Crítico.
-
----
-
-## guardar_evento()
-
-Persistencia principal.
-
-Impacto: Alto.
-
----
-
-## Salir_()
-
-Generación de reporte temporal.
-
-Impacto: Medio.
-
----
-
-# 14. Gestión GIS
-
-Responsable:
-
-```python
-widget_grafico_mpl
-```
-
-Métodos asociados:
-
-- actualizar_mapa()
-- _estaciones_piden_actualizar_mapa()
-
----
-
-# 15. Gestión de memoria
-
-Elementos sensibles:
-
-- visor
-- canvas
-- widget_mapa
-- trCanal
-
-Liberar siempre antes del cierre.
-
----
-
-# 16. Acoplamientos identificados
-
-## estaciones_ ↔ Procesar_evento
-
-Acoplamiento Alto.
-
-Comparte:
-
-- estaciones_eventos
-- filtros_estaciones
-- eventos
-
----
-
-## guardar_intento()
-
-Impacta:
-
-- GIS
-- reportes
-- monitoreo
-- procesamiento
-
----
-
-# 17. Riesgos de modificación
-
-## Muy Alto
-
-- procesar_()
-- recalcular_procesamiento()
-- guardar_intento()
-- archivos_fast()
-- verificar_coincidencias()
-
-## Alto
-
-- actualizar_mapa()
-- _estaciones_cerraron()
-
----
-
-# 18. Deuda técnica
-
-## DT-01
-
-Duplicidad:
-
-```text
-_estaciones_cerraron()
-_estaciones_cerraron__()
-```
-
----
-
-## DT-02
-
-Detección de bloqueo:
-
-```python
-os.rename(ruta,ruta)
-```
-
-Dependiente del sistema operativo.
-
----
-
-## DT-03
-
-GUI y lógica fuertemente acopladas.
-
----
-
-## DT-04
-
-Lógica Virtual/Real dispersa.
-
----
-
-# 19. Responsabilidades por método
-
-| Método | Responsabilidad |
-|----------|----------|
-| Abrir_archivo | Cargar día |
-| preparar_evento | Preparar evento |
-| procesar_ | Procesamiento |
-| activar_hilo | Monitoreo |
-| recalcular_procesamiento | Actualización |
-| actualizar_mapa | GIS |
-| guardar_evento | Persistencia |
-| reportar_ | Reporte |
-| insertar_ | Inserción externa |
-| Salir_ | Salida controlada |
-
----
-
-# 20. Estrategia de refactorización
-
-Fase 1
-
-- Unificar `_estaciones_cerraron`.
-
-Fase 2
-
-- Aislar Virtual/Real.
-
-Fase 3
-
-- Separar Reportes.
-
-Fase 4
-
-- Separar GUI y lógica.
-
-Fase 5
-
-- Crear pruebas automatizadas.
-
----
-
-# 21. Checklist de regresión
-
-## Procesamiento
-
-- [ ] Carga día.
-- [ ] Selección de evento.
-- [ ] Procesamiento SISMO.
-- [ ] Actualización automática.
-
-## Virtual
-
-- [ ] Copia REAL→VIRTUAL.
-- [ ] RSA detectado.
-- [ ] Copia VIRTUAL→REAL.
-
-## GIS
-
-- [ ] Actualización de mapa.
-- [ ] Cambio de vista.
-
-## Reportes
-
-- [ ] Reporte individual.
-- [ ] Reporte temporal.
-
-## Cierre
-
-- [ ] Hilo detenido.
-- [ ] Recursos liberados.
-- [ ] Señales emitidas.
-
----
-
-# 22. Reglas para futuros desarrolladores
-
-1. No alterar contratos internos.
-2. Mantener compatibilidad histórica.
-3. Mantener compatibilidad con ProcesoV2.
-4. No eliminar señales Qt existentes.
-5. Documentar nuevos modos de reporte.
-6. Mantener separación Virtual/Real.
-7. Ejecutar checklist de regresión antes de liberar cambios.
-
----
-
-# 23. Conocimiento crítico
-
-Los componentes más sensibles del sistema son:
-
-1. Virtual ↔ Real.
-2. guardar_intento().
-3. verificar_coincidencias().
-4. FileMonitorThread.
-5. actualización GIS.
-6. estaciones_.
-
-Toda modificación debe validarse mediante pruebas funcionales completas.
-
----
-
-# 24. Recomendación final
-
-Antes de incorporar nuevas funcionalidades:
-
-- estabilizar contratos;
-- reducir acoplamiento;
-- crear pruebas de regresión;
-- aislar lógica de negocio.
-
-Este documento debe evolucionar junto con el código y convertirse en la referencia oficial de mantenimiento.
+## 6. Riesgos Específicos y Checklist de Estabilidad
+
+1. **Ciclo de Vida de Hilos (`QThread`)**:
+   * `FileMonitorThread` debe ser detenido explícitamente en `detener_monitor_virtual()` antes de cerrar el widget para evitar cierres abruptos de Python por hilos huérfanos.
+2. **Punteros C++ de Subpaneles y Mapas**:
+   * `estaciones_` y `widget_mapa` residen en los paneles central y derecho. `limpiar_panel_central()` y `limpiar_estado()` deben invocarse en `closeEvent` para evitar violaciones de acceso en Qt.
+3. **Persistencia Atómica del Catálogo**:
+   * Las operaciones sobre el catálogo deben ejecutar `ordenar_y_eliminar_duplicados()` antes de invocar `escritura_archivo()` para preservar la integridad cronológica.
+4. **Navegación LIFO**:
+   * El retorno a la ventana principal se rige exclusivamente por `self.cerrado.emit()` en `closeEvent()`.

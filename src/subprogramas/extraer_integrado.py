@@ -21,8 +21,11 @@ if ruta_librerias not in sys.path:
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, 
-                             QLabel, QMessageBox, QCheckBox)
+                             QLabel, QMessageBox, QCheckBox, QPushButton)
+
+
 from PyQt5 import uic
 from metodos_rsa import (leer_mseed,grafico_evento_int,lectura_archivo,
                          filtro_evento)
@@ -54,42 +57,45 @@ import matplotlib.pyplot as plt
 
 
 
-class Extraer_evento(QMainWindow):
-    cerrado = pyqtSignal()  # señal que se emitire al cerrar
-    def __init__(self, archivo, directorio_trabajo, responsable, periodo,parent=None):
+class Extraer_evento(QWidget):
+    cerrado = pyqtSignal()  # señal que se emite al cerrar
+
+    def __getattr__(self, name):
+        """Delegación transparente de atributos y widgets hacia la interfaz cargada"""
+        if 'ui' in self.__dict__ and hasattr(self.ui, name):
+            return getattr(self.ui, name)
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
+    def __init__(self, archivo, directorio_trabajo, responsable, periodo, parent=None):
         super().__init__(parent)
-        print("Entrando a subprograma estraer eventos")
+        print("Entrando a subprograma extraer eventos")
 
         self.directorio_trabajo = directorio_trabajo
-        self.responsable=responsable
-        self.archivo=archivo
-        self.periodo=periodo
-        self.setWindowTitle('Extraer Eventos')
-        # Configurar el layout principal
-        layout_principal = QHBoxLayout()
-        # Panel izquierdo
-        panel_izquierdo = QVBoxLayout()
-        # Cargar la interfaz desde el archivo .ui directamente en esta instancia
-        
-        extrar_ui=os.path.join(ruta_ui,'Extraer.ui')
-        uic.loadUi(extrar_ui, self)
-        # Añadir la interfaz cargada al panel izquierdo
-        panel_izquierdo.addWidget(self.centralWidget())  # Ahora centralWidget es la UI cargada
-        layout_principal.addLayout(panel_izquierdo, 1)
-        # Panel derecho (gráfico)
-        panel_derecho = QVBoxLayout()
+        self.responsable = responsable
+        self.archivo = archivo
+        self.periodo = periodo
+
+        self.setWindowTitle('EXTRACCIÓN DE EVENTOS')
+
+        # Configurar layout principal horizontal
+        layout_principal = QHBoxLayout(self)
+        layout_principal.setContentsMargins(5, 5, 5, 5)
+
+        # Panel izquierdo: Cargar UI de controles
+        extrar_ui = os.path.join(ruta_ui, 'Extraer.ui')
+        self.ui = uic.loadUi(extrar_ui)
+        self.ui.setFixedWidth(284)
+        layout_principal.addWidget(self.ui)
+
+
+        # Panel derecho: Visor Matplotlib
         self.visor = Figure(figsize=(8, 4), dpi=100)
         self.canvas = FigureCanvas(self.visor)
-        panel_derecho.addWidget(self.canvas)
-        layout_principal.addLayout(panel_derecho, 4)
-        # Establecer el layout principal en el widget central
-        widget_central = QWidget()
-        widget_central.setLayout(layout_principal)
-        self.setCentralWidget(widget_central)
-        self.setWindowTitle("EXTRACCION DE EVENTOS")
+        layout_principal.addWidget(self.canvas, 4)
+
+        # Conexiones de botones y controles
         self.Btn_eventos.clicked.connect(self.cargar_eventos)
         self.Btn_filtrar.clicked.connect(self.filtrar_evento)
-        #self.Btn_guardar.clicked.connect(self.testeo_botones)
         self.Btn_guardar.clicked.connect(self.guardar_evento)
         self.Btn_recargar.clicked.connect(self.recargar_evento)
         self.Btn_extraer_fijo.clicked.connect(self.cargar_eventos_fijo)
@@ -98,6 +104,7 @@ class Extraer_evento(QMainWindow):
         self.Btn_estaciones.clicked.connect(self.verificar_estaciones)
         self.btn_cortar.clicked.connect(self.cortar_evento)
         self.btn_m_6.clicked.connect(self.mas_6_minutos)
+
         self.btn_p_6.clicked.connect(self.menos_6_minutos)
         self.btn_p__.clicked.connect(self.mas_2_segundos)
         self.btn_p__1.clicked.connect(self.mas_10_segundos)
@@ -282,8 +289,9 @@ class Extraer_evento(QMainWindow):
         self.grupo_evento.setEnabled(False)
     
     def lista_filtros(self, text):
-        text="F inf ="+str(self.sp_Box_finf.value())+"F sup ="+str(self.sp_Box_fsup.value())+" orden ="+str(self.sp_Box_orden.value())
+        text = f"f_inf={self.sp_Box_finf.value()}  f_sup={self.sp_Box_fsup.value()}  orden={self.sp_Box_orden.value()}"
         self.Lbl_Mensajes_2.setText(text)
+
 
     def cargar_eventos(self):
         self.grupo_evento.setEnabled(True)
@@ -492,11 +500,12 @@ class Extraer_evento(QMainWindow):
         grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
 
     def filtrar_evento(self):
-        b=self.sp_Box_finf.value()|self.sp_Box_fsup.value()|self.sp_Box_orden.value()
+        b = self.sp_Box_finf.value() | self.sp_Box_fsup.value() | self.sp_Box_orden.value()
         if b != 0:
-            #self.copiar_stream_dia()
+            self.copiar_stream_dia()
             self.visor_limpiar_completo()
-            filtro_evento(self.visor,self.trCanal,self.sp_Box_finf.value(),self.sp_Box_fsup.value(),self.sp_Box_orden.value(),self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina,self.filtros_estaciones,self.estaciones_eventos_total,self.Btn_estaciones.isEnabled())
+            filtro_evento(self.visor, self.trCanal, self.sp_Box_finf.value(), self.sp_Box_fsup.value(), self.sp_Box_orden.value(), self.t_inicio, self.t_final, self.estaciones_eventos, self.hab_grafico, self.bandera_marcas, self.pagina, self.filtros_estaciones, self.estaciones_eventos_total, self.Btn_estaciones.isEnabled())
+
 
     def copiar_stream_dia(self):
         """Copia streams del día de forma segura y limpia"""
@@ -511,8 +520,12 @@ class Extraer_evento(QMainWindow):
         grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)        
 
     def verificar_estaciones(self):
-        estaciones_(self.hab_grafico,self.estaciones_eventos,self.filtros_estaciones,self).exec_()
-        
+        dialogo = estaciones_(self.hab_grafico, self.estaciones_eventos, self.filtros_estaciones, self)
+        dialogo.exec_()
+        self.recargar_evento()
+
+
+
     def visor_limpiar_completo(self):
         """Limpieza segura de la figura antes de cada gráfico nuevo y refresco de lienzo"""
         if hasattr(self, 'visor') and self.visor:
@@ -531,30 +544,45 @@ class Extraer_evento(QMainWindow):
                 except Exception:
                     pass
 
+    def limpiar_estado(self):
+        """Limpia figuras y buffers sismológicos antes de cerrar."""
+        try:
+            if hasattr(self, 'visor') and self.visor is not None:
+                self.visor.clf()
+                self.visor = None
+            if hasattr(self, 'lectura_mseed_dia'):
+                self.lectura_mseed_dia = None
+            if hasattr(self, 'trCanal'):
+                self.trCanal = None
+            gc.collect()
+        except Exception as e:
+            print(f"Aviso en limpieza de Extraer_evento: {e}")
+
     def Salir_(self):
         """Método de salida interactivo con confirmación de guardado de informe"""
         print("🚪 Iniciando proceso de salida de extracción...")
-        message_box = QMessageBox(
-            QMessageBox.Question,
+        padre_dialogo = self.window() if self.window() is not None else self
+        resp = QMessageBox.question(
+            padre_dialogo,
             "¡Importante!",
             "  ¿Guardar informe?\nSolo guardar definitivo\n  de 12H, 18H o 24H",
             QMessageBox.Yes | QMessageBox.No,
-            self.window()
+            QMessageBox.No
         )
-        result = message_box.exec_()
         
-        if result == QMessageBox.Yes:
+        if resp == QMessageBox.Yes:
             try:
                 extraer_dia(self.archivo, self.responsable, False)
                 print("📋 Informe guardado correctamente")
             except Exception as e:
                 print(f"❌ Error guardando informe: {e}")
-                QMessageBox.warning(self, "Error", f"No se pudo guardar el informe: {e}")
+                QMessageBox.warning(padre_dialogo, "Error", f"No se pudo guardar el informe: {e}")
         
         self.close()
 
     def closeEvent(self, event):
         """Notificar cierre a la ventana principal de forma estándar y segura"""
+        self.limpiar_estado()
         if hasattr(self, 'cerrado'):
             try:
                 self.cerrado.emit()
@@ -564,19 +592,21 @@ class Extraer_evento(QMainWindow):
 
 class estaciones_(QDialog):
 
-    def __init__(self, hab_grafico,estaciones_eventos,filtros,parent=None):
-        super(estaciones_,self).__init__()
+    def __init__(self, hab_grafico, estaciones_eventos, filtros, parent=None):
         super().__init__(parent)
-        self.parent=parent
-        self.parametros=parametros_estaciones()#parametros son los parametros de las estaciones (nombre_canal_total_,nombre_canal,tipo_canal_,n_canales_,hab_canal)
-        self.estaciones_eventos=estaciones_eventos
-        self.filtros=filtros
-        self.numero_estaciones=len(self.estaciones_eventos)
-        self.hab_grafico=hab_grafico
-        self.setFixedSize(410, 420)
-        QDialog.__init__(self)
-        secundaria_ui=os.path.join(ruta_ui,"secundaria.ui")
-        uic.loadUi(secundaria_ui,self)
+        self.parent = parent
+        self.parametros = parametros_estaciones()
+        self.estaciones_eventos = estaciones_eventos
+        self.filtros = filtros
+        self.numero_estaciones = len(self.estaciones_eventos)
+        self.hab_grafico = hab_grafico
+        secundaria_ui = os.path.join(ruta_ui, "secundaria.ui")
+        uic.loadUi(secundaria_ui, self)
+        self.setFixedSize(600, 600)
+
+
+
+
         self.ck_box_hab_canal={}
         self.lbl_nombre={}
         self.lbl_codigo={}
@@ -654,20 +684,27 @@ class estaciones_(QDialog):
 
             if self.hab_grafico[canal_]=='1':
                 self.ck_box_hab_canal[i].setChecked(True)
-        self.lbl_todos=QLabel("PLOT TODOS",self)
-        self.lbl_todos.setGeometry(140, 435, 150, 24)  #setGeometry(x, y, width, height)
-        self.ck_box_todos=QCheckBox(self)
-        self.ck_box_todos.setGeometry(210, 437, 150, 24)  #setGeometry(x, y, width, height)
+        self.lbl_todos = QLabel("PLOT TODOS", self)
+        self.lbl_todos.setGeometry(120, 490, 80, 24)
+        self.ck_box_todos = QCheckBox(self)
+        self.ck_box_todos.setGeometry(205, 490, 30, 24)
         self.ck_box_todos.setChecked(True)
 
-        self.lbl_filtros=QLabel("FILTRO TODOS",self)
-        self.lbl_filtros.setGeometry(131, 455, 150, 24)  #setGeometry(x, y, width, height)
-        self.ck_box_filtros=QCheckBox(self)
-        self.ck_box_filtros.setGeometry(210, 457, 150, 24)  #setGeometry(x, y, width, height)
+        self.lbl_filtros = QLabel("FILTRO TODOS", self)
+        self.lbl_filtros.setGeometry(250, 490, 90, 24)
+        self.ck_box_filtros = QCheckBox(self)
+        self.ck_box_filtros.setGeometry(345, 490, 30, 24)
         self.ck_box_filtros.setChecked(False)
+
+        # Botón de Retorno / Salida
+        self.Btn_salir = QPushButton("Salir", self)
+        self.Btn_salir.setGeometry(480, 486, 80, 28)
+        self.Btn_salir.clicked.connect(self.Salir_)
 
         self.ck_box_todos.toggled.connect(self.validar)
         self.ck_box_filtros.toggled.connect(self.validar_filtros)
+
+
 
 
     def validar(self):
@@ -688,32 +725,38 @@ class estaciones_(QDialog):
                 self.ck_box_filtro[i].setChecked(False)
 
 
-    def closeEvent(self, event):
-        auxiliar=[]
+    def guardar_configuracion(self):
+        auxiliar = []
         for i in range(0, self.numero_estaciones):
-            canal_=int(self.estaciones_eventos[i])
-            estacion_i=self.estaciones_eventos[i]
-            indice=self.parent.estaciones_eventos_total.index(estacion_i)
-            if self.ck_box_hab_canal[i].checkState()==2:
+            canal_ = int(self.estaciones_eventos[i])
+            estacion_i = self.estaciones_eventos[i]
+            indice = self.parent.estaciones_eventos_total.index(estacion_i)
+            if self.ck_box_hab_canal[i].checkState() == 2:
                 auxiliar.append(canal_)
-            if self.ck_box_filtro[i].checkState()==2:
-                orden_i=self.spbox_fil_orden[i].value()
-                finf_i=self.spbox_fil_finf[i].value()
-                fsup_i=self.spbox_fil_fsup[i].value()
+            if self.ck_box_filtro[i].checkState() == 2:
+                orden_i = self.spbox_fil_orden[i].value()
+                finf_i = self.spbox_fil_finf[i].value()
+                fsup_i = self.spbox_fil_fsup[i].value()
                 string_concatenado = f"{orden_i:02}{finf_i:02}{fsup_i:02}"
-                self.parent.filtros_estaciones[indice]=string_concatenado
+                self.parent.filtros_estaciones[indice] = string_concatenado
             else:
-                self.parent.filtros_estaciones[indice]='000000'
-        self.parent.estaciones_eventos=auxiliar
-        self.parent.filtros_estaciones=self.filtros
+                self.parent.filtros_estaciones[indice] = '000000'
+        self.parent.estaciones_eventos = auxiliar
         for i in range(0, self.numero_estaciones):
-            canal_=int(self.estaciones_eventos[i])
-            self.parent.componente_canal=str(self.spbox_canal[i])
-            if self.ck_box_hab_canal[i].checkState()==2:
-                self.parent.hab_grafico[canal_]='1'
+            canal_ = int(self.estaciones_eventos[i])
+            self.parent.componente_canal = str(self.spbox_canal[i].value() if hasattr(self.spbox_canal[i], 'value') else self.spbox_canal[i])
+            if self.ck_box_hab_canal[i].checkState() == 2:
+                self.parent.hab_grafico[canal_] = '1'
             else:
-                self.parent.hab_grafico[canal_]='0'
+                self.parent.hab_grafico[canal_] = '0'
+
+    def closeEvent(self, event):
+        self.guardar_configuracion()
+        event.accept()
 
     def Salir_(self):
-        self.destroy()
+        self.guardar_configuracion()
+        self.accept()
+
+
 

@@ -29,56 +29,54 @@ class CustomScrollArea(QScrollArea):
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - event.angleDelta().y())
 
 
-class Marcar_evento(QMainWindow):
-    cerrado = pyqtSignal()  # señal que se emitire al cerrar
+import gc
+
+class Marcar_evento(QWidget):
+    cerrado = pyqtSignal()  # señal que se emite al cerrar
+
+    def __getattr__(self, name):
+        """Delegación transparente de atributos y widgets hacia la interfaz cargada"""
+        if 'ui' in self.__dict__ and hasattr(self.ui, name):
+            return getattr(self.ui, name)
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
     def __init__(self, archivo, directorio_trabajo, responsable, periodo, parent=None):
         super().__init__(parent)
-        print("ENtrando a subprograma marcar eventos")
-        self.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.setWindowFlags(Qt.Widget)    # 👈 clave: se embebe dentro del MainWindow
-        self.directorio_trabajo = directorio_trabajo
-        self.archivo=archivo
-        self.responsable=responsable
-        self.periodo=periodo
-        self.setWindowTitle("Marcado de eventos")
+        print("Entrando a subprograma marcar eventos")
 
-        #self.directorio_trabajo = "G:\\Mi unidad\\DIA"
-        
+        self.directorio_trabajo = directorio_trabajo
+        self.archivo = archivo
+        self.responsable = responsable
+        self.periodo = periodo
+        self.setWindowTitle("MARCADO DE EVENTOS")
+
         self.archivos_mseed = []
         self.mapa_estaciones = parametros_estaciones()
         self.marcas = []
-        # Configurar el layout principal
-        layout_principal = QHBoxLayout()
-        # Panel izquierdo
-        panel_izquierdo = QVBoxLayout()
 
-        # Cargar la interfaz desde el archivo .ui directamente en esta instancia
+        # Configurar layout principal horizontal
+        layout_principal = QHBoxLayout(self)
+        layout_principal.setContentsMargins(5, 5, 5, 5)
+
+        # Panel izquierdo: Cargar interfaz .ui directamente
         RAIZ_PROYECTO = os.path.dirname(os.path.abspath(__file__))
-        RAIZ_PROYECTO=os.path.join(RAIZ_PROYECTO, "..")
-        ruta_ui =  os.path.join(RAIZ_PROYECTO, "ui", 'marcar_eventos.ui')
-        ruta_ui = os.path.abspath(ruta_ui)
-        uic.loadUi(ruta_ui, self)
+        RAIZ_PROYECTO = os.path.join(RAIZ_PROYECTO, "..")
+        ruta_ui = os.path.abspath(os.path.join(RAIZ_PROYECTO, "ui", 'marcar_eventos.ui'))
+        self.ui = uic.loadUi(ruta_ui)
+        self.ui.setFixedWidth(260)
+        layout_principal.addWidget(self.ui)
 
-        # Añadir la interfaz cargada al panel izquierdo
-        panel_izquierdo.addWidget(self.centralWidget())  # Ahora centralWidget es la UI cargada
-        layout_principal.addLayout(panel_izquierdo, 1)
-        # Panel derecho (gráfico)
-        panel_derecho = QVBoxLayout()
+
+        # Panel derecho: Visor en Scroll Area
         self.figura = Figure(figsize=(72, 6), dpi=100)
         self.canvas = FigureCanvas(self.figura)
-        # Scroll Area para el Canvas
         self.scroll_area = CustomScrollArea()
         self.scroll_area.setWidget(self.canvas)
         self.scroll_area.setWidgetResizable(False)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        # Añadir el scroll area al panel derecho
-        panel_derecho.addWidget(self.scroll_area)
-        layout_principal.addLayout(panel_derecho, 4)
-        # Establecer el layout principal en el widget central
-        widget_central = QWidget()
-        widget_central.setLayout(layout_principal)
-        self.setCentralWidget(widget_central)   #Ya está llamada por el menu principal
+        layout_principal.addWidget(self.scroll_area, 4)
+
         # Conectar los botones a funciones
         self.btn_anterior.clicked.connect(lambda: self.navegar_segmento(-1))
         self.btn_siguiente.clicked.connect(lambda: self.navegar_segmento(1))
@@ -87,11 +85,12 @@ class Marcar_evento(QMainWindow):
         self.boton_salir.clicked.connect(self.salir)
         self.lista_mseed.itemClicked.connect(self.seleccionar_grafico_mseed)
         self.scroll_area.horizontalScrollBar().valueChanged.connect(self.actualizar_hora)
-        # Conectar la barra de desplazamiento al cambio de período
         self.barra_horas.valueChanged.connect(self.cambiar_periodo_por_barra)
+
         self.stream = None
         self.segmento_actual = 0
         self.amplitude_factor = 1.0
+
         # Guardar el estado de la posición actual
         self.posicion_segmento_guardada = 0
         self.posicion_scroll_guardada = 0
@@ -372,21 +371,21 @@ class Marcar_evento(QMainWindow):
         self.close()
 
     def limpiar_estado(self):
-        """Limpia figuras, visores, hilos, timers, etc., antes de cerrar."""
+        """Limpia figuras y buffers antes de cerrar."""
         try:
-            if hasattr(self, 'canvas'):
-                self.canvas.deleteLater()
-                self.canvas = None
-            if hasattr(self, 'visor'):
-                self.visor.clf()
-                self.visor = None
-            # Limpieza de listas, buffers o datos
+            if hasattr(self, 'figura') and self.figura is not None:
+                self.figura.clf()
+                self.figura = None
+            if hasattr(self, 'stream'):
+                self.stream = None
             if hasattr(self, 'stLeido'):
-                del self.stLeido
+                self.stLeido = None
             if hasattr(self, 'lista_eventos'):
                 self.lista_eventos.clear()
+            gc.collect()
         except Exception as e:
-            print(f"Error en limpieza de Extraer_evento: {e}")
+            print(f"Aviso en limpieza de Marcar_evento: {e}")
+
 
 
     def closeEvent(self, event):

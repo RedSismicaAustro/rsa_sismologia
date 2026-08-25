@@ -124,10 +124,12 @@ def extraccion(evento_auxiliar, solo_eventos, archivo, bandera_forzar):
                            starttime=t_ini, endtime=t_fin, nearest_sample=False)
             if len(stcanal) == 0:
                 continue
+            stcanal = stcanal.copy()
 
             # Corrección de polaridad si aplica
+            comp_idx = min(max(0, componente), len(stcanal) - 1)
             if parametros['POLARIDAD'][numero_estacion] == 'N':
-                stcanal[componente].data *= -1
+                stcanal[comp_idx].data = stcanal[comp_idx].data * -1
 
             # Guardar .mseed de evento
             nombre_mseed_ev = os.path.join(
@@ -137,49 +139,63 @@ def extraccion(evento_auxiliar, solo_eventos, archivo, bandera_forzar):
             stcanal.write(nombre_mseed_ev, format='MSEED', encoding='STEIM1', reclen=512)
             print('Grabando:', nombre_mseed_ev)
 
-        # Conversión a “analógicas” (V2) y remuestreo a 64 Hz
-        for estacion_analogica in estaciones_analogicas:
-            if estacion_analogica[0] == 'ESTACION':
-                continue
-
-            numero_estacion = int(estacion_analogica[0])
-            componente = int(parametros['COMPONENTE'][numero_estacion]) - 1
-
-            nombre_mseed_ev = os.path.join(
-                directorios['Directorio_eventos'],
-                parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed')
-            )
-            if not os.path.exists(nombre_mseed_ev):
-                sis_extraido = np.array([], dtype=np.int32)
-                sismo_extraido.append(sis_extraido)
-                continue
-
-            stcanal = read(nombre_mseed_ev)
-            stcanal.detrend("demean")
-            stcanal[componente].data = stcanal[componente].data.astype('int32')
-
-            sis_extraido = stcanal[componente].data
-            fs = stcanal[componente].stats.sampling_rate
-
-            if fs != 64:
-                sis_extraido = signal.resample(sis_extraido, numero_de_muestras)
-                sis_extraido = np.rint(sis_extraido).astype(np.int32)
-
-            # Forzar tamaño exacto
-            if sis_extraido.size != numero_de_muestras:
-                if sis_extraido.size > numero_de_muestras:
-                    sis_extraido = sis_extraido[:numero_de_muestras]
-                else:
-                    faltantes = numero_de_muestras - sis_extraido.size
-                    sis_extraido = np.pad(sis_extraido, (0, faltantes), mode='constant')
-
-            sismo_extraido.append(sis_extraido)
-
         # Construcción del archivo .sis (solo si es SISMO)
         if tipo_evento == "SISMO":
-            archivo_cabecera = os.path.join(directorios['Directorio_trabajo'], "cabecera_sismo")
+            # Conversión a “analógicas” (V2) y remuestreo a 64 Hz
+            for estacion_analogica in estaciones_analogicas:
+                if estacion_analogica[0] == 'ESTACION':
+                    continue
+
+                numero_estacion = int(estacion_analogica[0])
+                componente = int(parametros['COMPONENTE'][numero_estacion]) - 1
+
+                nombre_mseed_ev = os.path.join(
+                    directorios['Directorio_eventos'],
+                    parametros['CODIGO'][numero_estacion] + t_ini.strftime('_%Y%m%d_%H%M%S.mseed')
+                )
+                if not os.path.exists(nombre_mseed_ev):
+                    sis_extraido = np.array([], dtype=np.int32)
+                    sismo_extraido.append(sis_extraido)
+                    continue
+
+                try:
+                    stcanal = read(nombre_mseed_ev)
+                    stcanal = stcanal.copy()
+                    stcanal.detrend("demean")
+                    comp_idx = min(max(0, componente), len(stcanal) - 1)
+                    stcanal[comp_idx].data = stcanal[comp_idx].data.astype('int32')
+
+                    sis_extraido = stcanal[comp_idx].data
+                    fs = stcanal[comp_idx].stats.sampling_rate
+
+                    if fs != 64:
+                        sis_extraido = signal.resample(sis_extraido, numero_de_muestras)
+                        sis_extraido = np.rint(sis_extraido).astype(np.int32)
+
+                    # Forzar tamaño exacto
+                    if sis_extraido.size != numero_de_muestras:
+                        if sis_extraido.size > numero_de_muestras:
+                            sis_extraido = sis_extraido[:numero_de_muestras]
+                        else:
+                            faltantes = numero_de_muestras - sis_extraido.size
+                            sis_extraido = np.pad(sis_extraido, (0, faltantes), mode='constant')
+
+                    sismo_extraido.append(sis_extraido)
+                except Exception as e:
+                    print(f"Aviso al procesar analógica {nombre_mseed_ev}: {e}")
+                    sismo_extraido.append(np.array([], dtype=np.int32))
+
+            candidatos_cabecera = [
+                os.path.join(directorios['Directorio_trabajo'], "cabecera_sismo"),
+                os.path.join(ruta_datos, "cabecera_sismo"),
+                "C:/DIA/cabecera_sismo",
+                os.path.join(directorios.get('Directorio_base', ''), "cabecera_sismo"),
+            ]
+            archivo_cabecera = next((c for c in candidatos_cabecera if os.path.exists(c)), candidatos_cabecera[0])
+
             try:
                 with open(archivo_cabecera, 'rb') as archivo_leer:
+
                     cabecera = b''
                     contador = 0
                     # Avanza dos etiquetas 0x0008
@@ -418,8 +434,8 @@ def referencia_directorio_completa(archivo) -> str:
 
     · Si la ruta ya es exactamente …\DIA\AAAAMMDD000000     → se devuelve tal cual.
     · Si la ruta es …\DIA\AAAAMMDD000000.[ext]              → se quita la extensión.
-    · Para cualquier archivo bajo …\DIA\AAAA\AAAA_MM\AAAA_MM_DD\… →
-      se construye y devuelve …\DIA\AAAAMMDD000000.
+    · Para cualquier archivo bajo …\DIA\…                   →
+      extrae la fecha de las carpetas o del nombre y devuelve …\DIA\AAAAMMDD000000.
     """
     ruta = Path(archivo).expanduser().resolve()
     partes = ruta.parts
@@ -432,32 +448,45 @@ def referencia_directorio_completa(archivo) -> str:
     except StopIteration:
         raise ValueError("La ruta no contiene un directorio 'DIA'.")
 
+    directorio_dia = Path(*partes[:idx_dia + 1])       # …\DIA
+
     # ------------------------------------------------------------------ #
     # 2) CASO 1: la entrada YA tiene la forma …\DIA\AAAAMMDD000000 o
     #            …\DIA\AAAAMMDD000000.[ext]  → salir pronto.
     # ------------------------------------------------------------------ #
-    if len(partes) == idx_dia + 2:                      # solo un elemento tras 'DIA'
-        nombre = Path(partes[-1]).stem                  # sin extensión
+    if len(partes) == idx_dia + 2:
+        nombre = Path(partes[-1]).stem
         if nombre.isdigit() and len(nombre) == 14 and nombre.endswith("000000"):
-            return os.path.join(Path(*partes[:idx_dia + 1]), nombre)
+            return os.path.join(directorio_dia, nombre)
 
     # ------------------------------------------------------------------ #
-    # 3) CASO 2: ruta completa …\DIA\AAAA\AAAA_MM\AAAA_MM_DD\…\archivo.ext
-    #            → extraer AAAA, MM, DD de las carpetas.
+    # 3) Intentar extraer la fecha (YYYYMMDD) del nombre de archivo
     # ------------------------------------------------------------------ #
+    stem_limpio = ruta.stem.replace("_", "")
+    m = re.search(r'(20\d{6})', stem_limpio)
+    if m:
+        return os.path.join(directorio_dia, f"{m.group(1)}000000")
+
+    # ------------------------------------------------------------------ #
+    # 4) Extraer de las carpetas bajo DIA (soporta YYYY_MM_DD con o sin AAAA)
+    # ------------------------------------------------------------------ #
+    for parte in reversed(partes[idx_dia + 1:]):
+        sub = parte.split("_")
+        if len(sub) == 3 and len(sub[0]) == 4 and len(sub[1]) == 2 and len(sub[2]) == 2:
+            return os.path.join(directorio_dia, f"{sub[0]}{sub[1]}{sub[2]}000000")
+        elif len(parte) == 8 and parte.isdigit():
+            return os.path.join(directorio_dia, f"{parte}000000")
+
+    # Fallback clásico
     try:
-        anio = partes[idx_dia + 1]                     # AAAA
-        mes  = partes[idx_dia + 2].split("_")[1]       # MM
-        dia  = partes[idx_dia + 3].split("_")[2]       # DD
-    except (IndexError, ValueError):
+        anio = partes[idx_dia + 1]
+        mes  = partes[idx_dia + 2].split("_")[1]
+        dia  = partes[idx_dia + 3].split("_")[2]
+        return os.path.join(directorio_dia, f"{anio}{mes}{dia}000000")
+    except Exception:
         raise ValueError(
-            "La ruta no sigue el patrón esperado 'AAAA/AAAA_MM/AAAA_MM_DD/'."
+            f"No se pudo determinar la referencia del día para la ruta: {archivo}"
         )
-
-    referencia = f"{anio}{mes}{dia}000000"
-    directorio_dia = Path(*partes[:idx_dia + 1])       # …\DIA
-
-    return os.path.join(directorio_dia, referencia)
 
 def ubicacion(latitud,longitud):
     coordenadas=[]

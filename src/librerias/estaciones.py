@@ -16,11 +16,11 @@ ruta_librerias = os.path.abspath(os.path.join(ruta_proyecto, 'src','librerias'))
 # Insertar la ruta al inicio del sys.path
 if ruta_librerias not in sys.path:
     sys.path.insert(0, ruta_librerias)
-from PyQt5.QtWidgets import (QLabel, QCheckBox)
+from PyQt5.QtWidgets import (QLabel, QCheckBox, QDialog, QSpinBox, QPushButton)
 from PyQt5 import uic
 from metodos_gestion import parametros_estaciones
 datos_sismo={}
-from PyQt5.QtWidgets import (QDialog,QSpinBox)
+
 class estaciones_(QDialog):
     def __init__(self, hab_grafico,estaciones_eventos,filtros,parent=None):
         super(estaciones_,self).__init__()
@@ -30,13 +30,14 @@ class estaciones_(QDialog):
         self.estaciones_eventos=estaciones_eventos
         self.filtros=filtros
         self.numero_estaciones=len(self.estaciones_eventos)
-        self.hab_grafico=hab_grafico
+        self.hab_grafico=self.hab_grafico
         self.setFixedSize(410, 420)
-        QDialog.__init__(self)
 
         ruta_ui =  os.path.join(ruta_proyecto,"src",  "ui", "secundaria.ui")
         ruta_ui = os.path.abspath(ruta_ui)
         uic.loadUi(ruta_ui, self)
+
+
 
         self.ck_box_hab_canal={}
         self.lbl_nombre={}
@@ -129,8 +130,14 @@ class estaciones_(QDialog):
         self.ck_box_filtros.setGeometry(210, 457, 150, 24)  #setGeometry(x, y, width, height)
         self.ck_box_filtros.setChecked(False)
 
+        # Botón de Retorno / Salida
+        self.Btn_salir = QPushButton("Salir", self)
+        self.Btn_salir.setGeometry(410, 445, 80, 28)
+        self.Btn_salir.clicked.connect(self.Salir_)
+
         self.ck_box_todos.toggled.connect(self.validar)
         self.ck_box_filtros.toggled.connect(self.validar_filtros)
+
 
 
     def validar(self):
@@ -151,31 +158,37 @@ class estaciones_(QDialog):
                 self.ck_box_filtro[i].setChecked(False)
 
 
-    def closeEvent(self, event):
-        auxiliar=[]
+    def guardar_configuracion(self):
+        auxiliar = []
         for i in range(0, self.numero_estaciones):
-            canal_=self.estaciones_eventos[i]
-            estacion_i=self.estaciones_eventos[i]
-            indice=self.parent.estaciones_eventos_total.index(estacion_i)
-            if self.ck_box_hab_canal[i].checkState()==2:
+            canal_ = int(self.estaciones_eventos[i])
+            estacion_i = self.estaciones_eventos[i]
+            indice = self.parent.estaciones_eventos_total.index(estacion_i)
+            if self.ck_box_hab_canal[i].checkState() == 2:
                 auxiliar.append(canal_)
-            if self.ck_box_filtro[i].checkState()==2:
-                orden_i=self.spbox_fil_orden[i].value()
-                finf_i=self.spbox_fil_finf[i].value()
-                fsup_i=self.spbox_fil_fsup[i].value()
+            if self.ck_box_filtro[i].checkState() == 2:
+                orden_i = self.spbox_fil_orden[i].value()
+                finf_i = self.spbox_fil_finf[i].value()
+                fsup_i = self.spbox_fil_fsup[i].value()
                 string_concatenado = f"{orden_i:02}{finf_i:02}{fsup_i:02}"
-                self.parent.filtros_estaciones[indice]=string_concatenado
+                self.parent.filtros_estaciones[indice] = string_concatenado
             else:
-                self.parent.filtros_estaciones[indice]='000000'
-        self.parent.estaciones_eventos=auxiliar
-        self.parent.filtros_estaciones=self.filtros
+                self.parent.filtros_estaciones[indice] = '000000'
+        self.parent.estaciones_eventos = auxiliar
         for i in range(0, self.numero_estaciones):
-            canal_=self.estaciones_eventos[i]
-            self.parent.componente_canal=str(self.spbox_canal[i])
-            if self.ck_box_hab_canal[i].checkState()==2:
-                self.parent.hab_grafico[canal_]='1'
+            canal_ = int(self.estaciones_eventos[i])
+            self.parent.componente_canal = str(self.spbox_canal[i].value() if hasattr(self.spbox_canal[i], 'value') else self.spbox_canal[i])
+            if self.ck_box_hab_canal[i].checkState() == 2:
+                self.parent.hab_grafico[canal_] = '1'
             else:
-                self.parent.hab_grafico[canal_]='0'
+                self.parent.hab_grafico[canal_] = '0'
+
+    def closeEvent(self, event):
+        self.guardar_configuracion()
+        event.accept()
+
     def Salir_(self):
-        self.destroy()
+        self.guardar_configuracion()
+        self.accept()
+
 

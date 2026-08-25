@@ -15,10 +15,12 @@ ruta_datos = os.path.abspath(os.path.join(ruta_proyecto, 'datos'))
 from obspy import UTCDateTime
 import csv
 import json
+import re
 import obspy
 import subprocess
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar,QMessageBox
-from PyQt5.QtCore import Qt, QCoreApplication
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QMessageBox
+from PyQt5.QtCore import Qt, QCoreApplication, QEventLoop
+
 
 def lectura_archivo(archivo):
     """
@@ -225,20 +227,43 @@ def parametros_estaciones():
 def obtener_directorios(ruta_archivo: str) -> dict:
     """
     Construye la estructura de carpetas y nombres de archivo estándar para un
-    evento sísmico a partir de cualquier ruta que contenga:
+    evento sísmico a partir de cualquier ruta que contenga una marca de tiempo
+    o que pertenezca a un directorio de trabajo sísmico.
 
-    - Marca de tiempo de 14 dígitos (AAAAMMDDhhmmss)   → usa AAAA directamente.
-    - Marca de tiempo de 12 dígitos (AAMMDDhhmmss):
-        · Si el archivo está dentro de “.../DIA/AAMMDDhhmmss*”         → año = 20AA
-        · Si el path es “…/DIA/AAAA/.../AAMMDDhhmmss*”                 → año = AAAA
+    Soporta dinámicamente múltiples estructuras de carpetas bajo DIA:
+    - DIA/AAAA/AAAA_MM/AAAA_MM_DD
+    - DIA/AAAA_MM/AAAA_MM_DD
+    - DIA/AAAA_MM_DD
     """
     # --------------------------------------------------------------------- #
     ruta_original = Path(ruta_archivo.strip())
     nombre_base   = ruta_original.stem           # sin extensión
     marca_tiempo  = nombre_base.replace("_", "") # quita guion bajo
 
+    # Si el nombre_base contiene prefijo de estación (ej. LABR_20260824_124011), extraer dígitos
     if not (marca_tiempo.isdigit() and len(marca_tiempo) in (12, 14)):
-        raise ValueError(f"No reconozco la marca de tiempo en: {ruta_archivo}")
+        m14 = re.search(r'(20\d{12})', marca_tiempo)
+        if m14:
+            marca_tiempo = m14.group(1)
+        else:
+            m12 = re.search(r'(\d{12})', marca_tiempo)
+            if m12:
+                marca_tiempo = m12.group(1)
+            else:
+                # Buscar en las partes de la ruta carpetas con fecha
+                encontrada = False
+                for p in reversed(ruta_original.parts):
+                    p_limpio = p.replace("_", "")
+                    if len(p_limpio) == 8 and p_limpio.isdigit():
+                        marca_tiempo = p_limpio + "000000"
+                        encontrada = True
+                        break
+                    elif len(p_limpio) == 14 and p_limpio.isdigit():
+                        marca_tiempo = p_limpio
+                        encontrada = True
+                        break
+                if not encontrada:
+                    raise ValueError(f"No reconozco la marca de tiempo en: {ruta_archivo}")
 
     # ----------- hallar “DIA” y el posible directorio-año --------------- #
     partes = ruta_original.parts
@@ -281,6 +306,7 @@ def obtener_directorios(ruta_archivo: str) -> dict:
     # -------------- descomponer para directorios / sufijos --------------- #
     anio, mes, dia = anio_largo, fecha_larga[4:6], fecha_larga[6:8]
     hora, minuto, segundo = timestamp_corto[6:8], timestamp_corto[8:10], timestamp_corto[10:12]
+    nombre_dia_guiones = f"{anio}_{mes}_{dia}"
 
     # ----- ubicar carpeta “DIA” en la ruta para armar directorio_base ----- #
     directorio_trabajo = (
@@ -289,12 +315,45 @@ def obtener_directorios(ruta_archivo: str) -> dict:
         else ruta_original.parent     # fallback
     )
 
-    directorio_base = (
-        directorio_trabajo /
-        anio /
-        f"{anio}_{mes}" /
-        f"{anio}_{mes}_{dia}"
-    )
+    # 1. Verificar si la ruta original ya contiene la carpeta del día
+    directorio_base = None
+    for p in [ruta_original] + list(ruta_original.parents):
+        if p.name in (nombre_dia_guiones, fecha_larga) and p.is_dir():
+            directorio_base = p
+            break
+
+    # 2. Si no, buscar entre las estructuras existentes en disco
+    if directorio_base is None:
+        candidatos_base = [
+            directorio_trabajo / anio / f"{anio}_{mes}" / nombre_dia_guiones, # DIA/2026/2026_08/2026_08_24
+            directorio_trabajo / f"{anio}_{mes}" / nombre_dia_guiones,        # DIA/2026_08/2026_08_24
+            directorio_trabajo / nombre_dia_guiones,                          # DIA/2026_08_24
+            directorio_trabajo / anio / fecha_larga,                          # DIA/2026/20260824
+            directorio_trabajo / fecha_larga,                                 # DIA/20260824
+        ]
+        for cand in candidatos_base:
+            if cand.exists():
+                directorio_base = cand
+                break
+
+    # 3. Si ninguno existe aún (ej. se va a crear el día), inferir el layout adecuado
+    if directorio_base is None:
+        if (directorio_trabajo / anio).exists():
+            directorio_base = directorio_trabajo / anio / f"{anio}_{mes}" / nombre_dia_guiones
+        elif (directorio_trabajo / f"{anio}_{mes}").exists():
+            directorio_base = directorio_trabajo / f"{anio}_{mes}" / nombre_dia_guiones
+        else:
+            # Detectar si hay carpetas tipo YYYY_MM en el directorio de trabajo
+            tiene_meses_directos = any(
+                p.is_dir() and len(p.name.split('_')) == 2 and p.name.split('_')[0].isdigit()
+                for p in directorio_trabajo.iterdir()
+            ) if directorio_trabajo.exists() and directorio_trabajo.is_dir() else False
+
+            if tiene_meses_directos:
+                directorio_base = directorio_trabajo / f"{anio}_{mes}" / nombre_dia_guiones
+            else:
+                directorio_base = directorio_trabajo / anio / f"{anio}_{mes}" / nombre_dia_guiones
+
 
     # ---------------- subcarpetas estándar -------------------------------- #
     directorio_dia             = directorio_base / "dia"
@@ -565,7 +624,7 @@ class VentanaProgreso(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Progreso")
         self.setFixedSize(300, 100)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint)
         
         layout = QVBoxLayout(self)
         self.etiqueta = QLabel(mensaje)
@@ -576,11 +635,19 @@ class VentanaProgreso(QDialog):
         self.barra.setValue(0)
         layout.addWidget(self.barra)
 
-        self.show()  # IMPORTANTE para que se dibuje
+        self.show()
+        QCoreApplication.processEvents()
 
-    def actualizar(self, valor):
+    def actualizar(self, valor, mensaje=None):
         self.barra.setValue(valor)
-        QCoreApplication.processEvents()  # Fuerza a Qt a redibujar la barra
+        if mensaje:
+            self.etiqueta.setText(mensaje)
+        self.barra.repaint()
+        self.etiqueta.repaint()
+        QCoreApplication.processEvents()
 
     def cerrar(self):
         self.accept()
+        self.deleteLater()
+
+

@@ -240,41 +240,22 @@ class VentanaPrincipal(QMainWindow):
         # 5. Mostrar widget maximizado impregnado en la ventana
         widget.showMaximized()
 
-        # 6. Interceptar cierre de forma asíncrona segura (QTimer) para evitar reentrancia
-        metodo_close_original = widget.closeEvent
-        def closeEvent_interceptado(event):
-            try:
-                metodo_close_original(event)
-            except Exception:
-                pass
-            QTimer.singleShot(0, self.volver_estado_trabajo)
-        widget.closeEvent = closeEvent_interceptado
-
-        # 7. Conectar señales y botones de salida del .ui mediante QTimer
-        try:
-            widget.destroyed.connect(lambda: QTimer.singleShot(0, self.volver_estado_trabajo))
-        except Exception:
-            pass
-
+        # 6. Conectar retorno LIFO asegurando disparo único y seguro
         if hasattr(widget, 'cerrado'):
             try:
                 widget.cerrado.connect(lambda: QTimer.singleShot(0, self.volver_estado_trabajo))
             except Exception:
                 pass
+        else:
+            metodo_close_original = widget.closeEvent
+            def closeEvent_interceptado(event):
+                try:
+                    metodo_close_original(event)
+                except Exception:
+                    pass
+                QTimer.singleShot(0, self.volver_estado_trabajo)
+            widget.closeEvent = closeEvent_interceptado
 
-        for nombre_btn in ('boton_salir', 'Btn_salir', 'Btn_Salir', 'btn_salir', 'Boton_salir', 'Btn_cancelar', 'btn_cancelar', 'actionSalir'):
-            if hasattr(widget, nombre_btn):
-                btn = getattr(widget, nombre_btn)
-                if hasattr(btn, 'clicked'):
-                    try:
-                        btn.clicked.connect(lambda: QTimer.singleShot(0, self.volver_estado_trabajo))
-                    except Exception:
-                        pass
-                elif hasattr(btn, 'triggered'):
-                    try:
-                        btn.triggered.connect(lambda: QTimer.singleShot(0, self.volver_estado_trabajo))
-                    except Exception:
-                        pass
 
         print(f"Subprograma {widget.__class__.__name__} cargado exitosamente")
         return True
@@ -289,12 +270,6 @@ class VentanaPrincipal(QMainWindow):
                     print(f"Aviso al limpiar widget activo: {e}")
 
             self.widget_activo = None
-
-        import gc
-        gc.collect()
-
-        # Limpiar variables no permitidas acumuladas en la ventana principal
-        self.limpiar_variables_temporales()
 
     def notificar_cierre_subprograma(self):
         """Notificación de cierre desde subprogramas"""
@@ -321,9 +296,6 @@ class VentanaPrincipal(QMainWindow):
 
             self.setCentralWidget(QWidget(self))
             self.desapilar_y_restaurar_estado()
-            
-            import gc
-            gc.collect()
         finally:
             self._retomando_control = False
 
@@ -730,30 +702,38 @@ class VentanaPrincipal(QMainWindow):
         if self.widget_activo is not None:
             return
 
-        painter = QPainter(self)
         ruta_marca = resolver_ruta_recurso('logo rsa.png')
         if not os.path.exists(ruta_marca):
             ruta_marca = resolver_ruta_recurso('logo ucuenca.png')
 
-        pixmap = QPixmap(ruta_marca)
-        if not pixmap.isNull():
-            tamano_ventana = self.size()
-            
-            # Escalar proporcionalmente (+50% de tamaño: ~68% de la ventana)
-            ancho_deseado = int(tamano_ventana.width() * 0.68)
-            alto_deseado = int(tamano_ventana.height() * 0.68)
-            pixmap_escalado = pixmap.scaled(
-                ancho_deseado, alto_deseado,
-                Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
+        if not os.path.exists(ruta_marca):
+            return
 
-            # Posicionar centrado en la zona de gráficos
-            centro_graficos_x = int(tamano_ventana.width() * 0.60)
-            x = centro_graficos_x - (pixmap_escalado.width() // 2)
-            y = (tamano_ventana.height() - pixmap_escalado.height()) // 2
+        painter = QPainter(self)
+        try:
+            pixmap = QPixmap(ruta_marca)
+            if not pixmap.isNull():
+                tamano_ventana = self.size()
+                
+                # Escalar proporcionalmente (+50% de tamaño: ~68% de la ventana)
+                ancho_deseado = int(tamano_ventana.width() * 0.68)
+                alto_deseado = int(tamano_ventana.height() * 0.68)
+                pixmap_escalado = pixmap.scaled(
+                    ancho_deseado, alto_deseado,
+                    Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
 
-            painter.setOpacity(0.18)
-            painter.drawPixmap(x, y, pixmap_escalado)
+                # Posicionar centrado en la zona de gráficos
+                centro_graficos_x = int(tamano_ventana.width() * 0.60)
+                x = centro_graficos_x - (pixmap_escalado.width() // 2)
+                y = (tamano_ventana.height() - pixmap_escalado.height()) // 2
+
+                painter.setOpacity(0.18)
+                painter.drawPixmap(x, y, pixmap_escalado)
+        except Exception as e:
+            print(f"Aviso en paintEvent: {e}")
+        finally:
+            painter.end()
 
 
 if __name__ == '__main__':

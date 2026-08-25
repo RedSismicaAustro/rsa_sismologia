@@ -28,29 +28,55 @@ class PanelEstadoJornada(QWidget):
         self.inicializar_ui()
 
     def inicializar_ui(self):
+        # Estilos modernos para evitar el bug de recorte de títulos de QGroupBox en Windows
+        self.setStyleSheet("""
+            QGroupBox {
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 11px;
+                font-weight: bold;
+                color: #1a237e;
+                border: 1px solid #b0bec5;
+                border-radius: 6px;
+                margin-top: 14px;
+                padding-top: 12px;
+                background-color: #fafafa;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 0 6px;
+                background-color: #fafafa;
+            }
+            QLabel {
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 9pt;
+            }
+        """)
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(12)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(10)
 
         # 1. Cabecera de Estado General
         self.grupo_general = QGroupBox("ESTADO GENERAL DE LA JORNADA")
-        self.grupo_general.setFont(QFont("Arial", 10, QFont.Bold))
         layout_general = QVBoxLayout(self.grupo_general)
+        layout_general.setContentsMargins(12, 12, 12, 10)
+        layout_general.setSpacing(5)
 
         self.lbl_fecha = QLabel("📅 Fecha: --")
         self.lbl_directorio = QLabel("📁 Directorio Base: --")
         self.lbl_estado_dia = QLabel("⚪ Estado de Estructura: Sin verificar")
 
         for lbl in (self.lbl_fecha, self.lbl_directorio, self.lbl_estado_dia):
-            lbl.setFont(QFont("Arial", 9))
             layout_general.addWidget(lbl)
 
         layout.addWidget(self.grupo_general)
 
         # 2. Estado por Estaciones Sísmicas (Grid dinámico)
         self.grupo_estaciones = QGroupBox("CONDICIÓN Y REGISTRO POR ESTACIONES SÍSMICAS (MONITOREO CONTINUO)")
-        self.grupo_estaciones.setFont(QFont("Arial", 10, QFont.Bold))
         layout_est = QVBoxLayout(self.grupo_estaciones)
+        layout_est.setContentsMargins(10, 12, 10, 10)
 
         self.scroll_estaciones = QScrollArea()
         self.scroll_estaciones.setWidgetResizable(True)
@@ -58,6 +84,7 @@ class PanelEstadoJornada(QWidget):
 
         self.widget_grid_estaciones = QWidget()
         self.grid_estaciones = QGridLayout(self.widget_grid_estaciones)
+        self.grid_estaciones.setContentsMargins(4, 4, 4, 4)
         self.grid_estaciones.setSpacing(8)
         self.scroll_estaciones.setWidget(self.widget_grid_estaciones)
 
@@ -66,8 +93,9 @@ class PanelEstadoJornada(QWidget):
 
         # 3. Estado de Turnos y Reportes Oficiales
         self.grupo_turnos = QGroupBox("EVACUACIÓN DE TURNOS Y REPORTES INSTITUCIONALES")
-        self.grupo_turnos.setFont(QFont("Arial", 10, QFont.Bold))
         layout_turnos = QGridLayout(self.grupo_turnos)
+        layout_turnos.setContentsMargins(12, 12, 12, 10)
+        layout_turnos.setSpacing(8)
 
         self.lbl_turno1 = QLabel("🕒 Turno 00:00 - 12:00: ⚪ Pendiente")
         self.lbl_turno2 = QLabel("🕒 Turno 12:00 - 18:00: ⚪ Pendiente")
@@ -75,7 +103,6 @@ class PanelEstadoJornada(QWidget):
         self.lbl_reporte_pdf = QLabel("📄 Reporte Diario PDF: ⚪ No generado")
 
         for i, lbl in enumerate((self.lbl_turno1, self.lbl_turno2, self.lbl_turno3, self.lbl_reporte_pdf)):
-            lbl.setFont(QFont("Arial", 9))
             layout_turnos.addWidget(lbl, i // 2, i % 2)
 
         layout.addWidget(self.grupo_turnos, 1)
@@ -166,22 +193,29 @@ class PanelEstadoJornada(QWidget):
 
             tarjeta = QFrame()
             tarjeta.setFrameShape(QFrame.StyledPanel)
+            tarjeta.setMinimumHeight(34)
             layout_t = QHBoxLayout(tarjeta)
-            layout_t.setContentsMargins(8, 6, 8, 6)
+            layout_t.setContentsMargins(8, 4, 8, 4)
+            layout_t.setSpacing(6)
 
             lbl_est = QLabel(f"<b>{nom_total}</b> ({nombre_c})")
-            lbl_est.setFont(QFont("Arial", 9))
+            lbl_est.setFont(QFont("Segoe UI", 9))
+            lbl_est.setStyleSheet("border: none; background: transparent; color: #212121;")
+
+            texto_tag = "🟢 OK" if existe_registro else "⚪ Sin Reg."
+            lbl_tag = QLabel(texto_tag)
+            lbl_tag.setFont(QFont("Segoe UI", 9))
+            lbl_tag.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            lbl_tag.setMinimumWidth(80)
+            lbl_tag.setStyleSheet("border: none; background: transparent;")
 
             if existe_registro:
-                lbl_tag = QLabel("🟢 OK")
                 tarjeta.setStyleSheet("QFrame { background-color: #e8f5e9; border: 1px solid #81c784; border-radius: 4px; }")
             else:
-                lbl_tag = QLabel("⚪ Sin Reg.")
                 tarjeta.setStyleSheet("QFrame { background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 4px; }")
 
-            layout_t.addWidget(lbl_est)
-            layout_t.addStretch()
-            layout_t.addWidget(lbl_tag)
+            layout_t.addWidget(lbl_est, 1)
+            layout_t.addWidget(lbl_tag, 0)
 
             self.grid_estaciones.addWidget(tarjeta, fila, col)
             col += 1

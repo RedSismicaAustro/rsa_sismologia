@@ -54,11 +54,41 @@ class Inicio_proceso(QMainWindow):
 
         # Extraer el widget central original de inicio.ui para montarlo a la izquierda
         widget_formulario = self.centralWidget()
-        layout_principal.addWidget(widget_formulario, 1)
+        widget_formulario.setFixedWidth(280)
+
+        # Asignar layout vertical al contenedor para acomodar cmbx_resposables_2
+        layout_form = QVBoxLayout(widget_formulario)
+        layout_form.setContentsMargins(2, 2, 2, 2)
+        layout_form.addWidget(self.cmbx_resposables_2)
+
+        # Estilo para el agrupador de parámetros de inicio
+        self.cmbx_resposables_2.setTitle("PARÁMETROS DEL DÍA")
+        self.cmbx_resposables_2.setStyleSheet("""
+            QGroupBox#cmbx_resposables_2 {
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 11px;
+                font-weight: bold;
+                color: #1a237e;
+                border: 1px solid #b0bec5;
+                border-radius: 6px;
+                margin-top: 14px;
+                padding-top: 12px;
+                background-color: #fafafa;
+            }
+            QGroupBox#cmbx_resposables_2::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 0 6px;
+                background-color: #fafafa;
+            }
+        """)
+
+        layout_principal.addWidget(widget_formulario, 0)
 
         # Panel derecho: Dashboard Nativo de Estado de Jornada
         self.panel_estado = PanelEstadoJornada(self)
-        layout_principal.addWidget(self.panel_estado, 2)
+        layout_principal.addWidget(self.panel_estado, 1)
 
         # Establecer layout central contenedor definitivo
         widget_contenedor_total = QWidget(self)

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>EXTRACCION_EVENTOS</class>
- <widget class="QMainWindow" name="EXTRACCION_EVENTOS">
+ <widget class="QWidget" name="EXTRACCION_EVENTOS">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -11,9 +11,9 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>EXTRACCION_EVENTOS</string>
   </property>
-  <widget class="QWidget" name="centralwidget">
+
    <widget class="QGroupBox" name="grupo_carga">
     <property name="enabled">
      <bool>true</bool>
@@ -624,28 +624,6 @@
     <property name="title">
      <string>MENSAJES</string>
     </property>
-    <widget class="QLabel" name="Lbl_Mensajes_2">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="geometry">
-      <rect>
-       <x>9</x>
-       <y>52</y>
-       <width>211</width>
-       <height>31</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <family>Arial</family>
-       <pointsize>12</pointsize>
-      </font>
-     </property>
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
     <widget class="QLabel" name="Lbl_Mensajes">
      <property name="enabled">
       <bool>true</bool>
@@ -653,22 +631,49 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>15</y>
+       <y>20</y>
        <width>211</width>
-       <height>31</height>
+       <height>20</height>
       </rect>
      </property>
      <property name="font">
       <font>
        <family>Arial</family>
-       <pointsize>8</pointsize>
+       <pointsize>9</pointsize>
+       <weight>75</weight>
+       <bold>true</bold>
       </font>
      </property>
      <property name="text">
       <string/>
      </property>
      <property name="alignment">
-      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+    <widget class="QLabel" name="Lbl_Mensajes_2">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>42</y>
+       <width>211</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>9</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
      </property>
     </widget>
    </widget>
@@ -692,7 +697,7 @@
     <property name="geometry">
      <rect>
       <x>6</x>
-      <y>660</y>
+      <y>570</y>
       <width>231</width>
       <height>21</height>
      </rect>
@@ -711,18 +716,7 @@
     </property>
    </widget>
   </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>284</width>
-     <height>21</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QStatusBar" name="statusbar"/>
- </widget>
  <resources/>
  <connections/>
 </ui>
+

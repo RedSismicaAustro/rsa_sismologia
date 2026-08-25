@@ -669,8 +669,12 @@ def ordenar_y_eliminar_duplicados(catalogo, indice, bandera=True):
         # Agregar el encabezado
         sin_duplicados.insert(0, encabezado)
     else:
-        for i,evento in enumerate(sin_duplicados):
-            evento[0]=i+1
+        for i, evento in enumerate(sin_duplicados):
+            if isinstance(evento, list):
+                evento[0] = str(i + 1)
+            elif isinstance(evento, tuple):
+                sin_duplicados[i] = [str(i + 1)] + list(evento[1:])
+
 
     return sin_duplicados
 
