@@ -418,37 +418,16 @@ def obtener_directorios(ruta_archivo: str) -> dict:
 
 
 def cargar_parametros():
-        # Asignar todos los parámetros de una sola llamada
-        (
-            nombre_canal_total,   # NOMBRE
-            nombre_canal,         # CODIGO
-            tipo_sensor,          # SENSOR
-            n_canales,            # CANALES
-            hab_canal,            # HAB_CANAL
-            componente_canal,     # COMPONENTE
-            grafico,              # HAB_GRAFICO
-            hab_plt,              # HAB_PLT
-            gan_plt,              # GAN_PLT
-            ganancia,             # GANANCIA
-            diez_plt,             # DIEZ_PLT
-            factor_mult,          # FACTOR_MUL
-            longitud,             # LONGITUD
-            latitud,              # LATITUD
-            altura,               # ALTITUD
-            ruido,                # RUIDO
-            calidad,              # CALIDAD
-            ubicacion,            # UBICACIÓN
-            tipo_canal,           # CANAL
-            red,                  # RED
-            muestreo,             # MUESTREO
-            numero_est,           # N° ESTACION
-            filtro,               # FILTRO
-            polaridad,            # Polaridad
-            reserva_1             # Reserva 2
-        ) = parametros_estaciones()
-        # Crear un diccionario para mapear nombres cortos a los nombres completos y el componente a graficar
-        mapa_estaciones = dict(zip(nombre_canal, zip(nombre_canal_total, componente_canal)))
-        return mapa_estaciones
+    """
+    Retorna un diccionario que mapea el código de estación a una tupla
+    (nombre_completo, componente), extrayéndolo de parametros_estaciones().
+    """
+    parametros = parametros_estaciones()
+    mapa_estaciones = dict(zip(
+        parametros['CODIGO'],
+        zip(parametros['NOMBRE'], parametros['COMPONENTE'])
+    ))
+    return mapa_estaciones
 
 
 def obtencion_hora(archivo):

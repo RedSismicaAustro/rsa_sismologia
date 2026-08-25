@@ -6,175 +6,363 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>278</width>
-    <height>714</height>
+    <width>320</width>
+    <height>740</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Marcador de Fases Sísmicas - RSA</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QLabel" name="label">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>70</y>
-      <width>111</width>
-      <height>16</height>
-     </rect>
+   <layout class="QVBoxLayout" name="verticalLayoutCentral">
+    <property name="spacing">
+     <number>6</number>
     </property>
-    <property name="text">
-     <string>Estaciones disponibles</string>
+    <property name="leftMargin">
+     <number>9</number>
     </property>
-   </widget>
-   <widget class="QPushButton" name="boton_directorio">
-    <property name="geometry">
-     <rect>
-      <x>40</x>
-      <y>430</y>
-      <width>75</width>
-      <height>23</height>
-     </rect>
+    <property name="topMargin">
+     <number>9</number>
     </property>
-    <property name="text">
-     <string>..dia\</string>
+    <property name="rightMargin">
+     <number>9</number>
     </property>
-   </widget>
-   <widget class="QPushButton" name="boton_salir">
-    <property name="geometry">
-     <rect>
-      <x>130</x>
-      <y>430</y>
-      <width>75</width>
-      <height>23</height>
-     </rect>
+    <property name="bottomMargin">
+     <number>9</number>
     </property>
-    <property name="text">
-     <string>Salir</string>
-    </property>
-   </widget>
-   <widget class="QDateEdit" name="date_edit">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>40</y>
-      <width>211</width>
-      <height>22</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_2">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>20</y>
-      <width>111</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Seleccionar Fecha:</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="boton_anterior">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>390</y>
-      <width>91</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>16</pointsize>
-      <weight>75</weight>
-      <bold>true</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>←</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="boton_siguiente">
-    <property name="geometry">
-     <rect>
-      <x>124</x>
-      <y>390</y>
-      <width>91</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>16</pointsize>
-      <weight>75</weight>
-      <bold>true</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>→</string>
-    </property>
-   </widget>
-   <widget class="QComboBox" name="combo_sis">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>90</y>
-      <width>211</width>
-      <height>22</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="checkbox_filtro">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>120</y>
-      <width>91</width>
-      <height>17</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Aplicar filtro</string>
-    </property>
-    <property name="checked">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QListWidget" name="lista_mseed">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>140</y>
-      <width>211</width>
-      <height>241</height>
-     </rect>
-    </property>
-   </widget>
+    <item>
+     <widget class="QLabel" name="label_2">
+      <property name="text">
+       <string>Seleccionar Fecha:</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QDateEdit" name="date_edit">
+      <property name="calendarPopup">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>Estaciones disponibles</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QComboBox" name="combo_sis"/>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="layoutCheckboxes">
+      <item>
+       <widget class="QCheckBox" name="checkbox_filtro">
+        <property name="text">
+         <string>Aplicar filtro</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="checkbox_estaciones_aportantes">
+        <property name="text">
+         <string>Estaciones aportantes</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QListWidget" name="lista_mseed">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>120</height>
+       </size>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="layoutPaginacion">
+      <item>
+       <widget class="QPushButton" name="boton_anterior">
+        <property name="font">
+         <font>
+          <pointsize>14</pointsize>
+          <weight>75</weight>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="text">
+         <string>←</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="boton_siguiente">
+        <property name="font">
+         <font>
+          <pointsize>14</pointsize>
+          <weight>75</weight>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="text">
+         <string>→</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="grupo_parametros">
+      <property name="title">
+       <string>Configuración de Estación y Fases</string>
+      </property>
+      <layout class="QVBoxLayout" name="layoutGrupoParams">
+       <property name="spacing">
+        <number>4</number>
+       </property>
+       <property name="leftMargin">
+        <number>8</number>
+       </property>
+       <property name="topMargin">
+        <number>6</number>
+       </property>
+       <property name="rightMargin">
+        <number>8</number>
+       </property>
+       <property name="bottomMargin">
+        <number>6</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="lbl_estacion_activa">
+         <property name="styleSheet">
+          <string notr="true">font-weight: bold; color: navy;</string>
+         </property>
+         <property name="text">
+          <string>Estación: [Seleccione estación]</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grupo_csv">
+         <property name="title">
+          <string>Configuración CSV (Matriz Evento)</string>
+         </property>
+         <layout class="QGridLayout" name="gridCsv">
+          <property name="horizontalSpacing">
+           <number>4</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>3</number>
+          </property>
+          <item row="0" column="0" colspan="2">
+           <widget class="QCheckBox" name="chk_csv_aporta">
+            <property name="text">
+             <string>Aporta a solución (B=1)</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="2">
+           <widget class="QLabel" name="label_csv_canal">
+            <property name="text">
+             <string>Canal:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="3">
+           <widget class="QSpinBox" name="spbox_csv_canal">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>6</number>
+            </property>
+            <property name="value">
+             <number>1</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_csv_orden">
+            <property name="text">
+             <string>Ord:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="spbox_csv_orden">
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>10</number>
+            </property>
+            <property name="value">
+             <number>0</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="label_csv_finf">
+            <property name="text">
+             <string>f inf:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="QDoubleSpinBox" name="spbox_csv_finf">
+            <property name="suffix">
+             <string> Hz</string>
+            </property>
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <double>50.0</double>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="2">
+           <widget class="QLabel" name="label_csv_fsup">
+            <property name="text">
+             <string>f sup:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="2" colspan="2">
+           <widget class="QDoubleSpinBox" name="spbox_csv_fsup">
+            <property name="suffix">
+             <string> Hz</string>
+            </property>
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <double>50.0</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <layout class="QGridLayout" name="gridParametros">
+         <property name="horizontalSpacing">
+          <number>6</number>
+         </property>
+         <property name="verticalSpacing">
+          <number>4</number>
+         </property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_tipo_p">
+           <property name="text">
+            <string>Tipo P:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="combo_tipo_p"/>
+         </item>
+         <item row="0" column="2">
+          <widget class="QLabel" name="label_pol_p">
+           <property name="text">
+            <string>Disparo P:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="3">
+          <widget class="QComboBox" name="combo_pol_p"/>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_peso_p">
+           <property name="text">
+            <string>Peso P:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QComboBox" name="combo_peso_p"/>
+         </item>
+         <item row="1" column="2">
+          <widget class="QLabel" name="label_pol_s">
+           <property name="text">
+            <string>Disparo S:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="3">
+          <widget class="QComboBox" name="combo_pol_s"/>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="label_peso_s">
+           <property name="text">
+            <string>Peso S:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QComboBox" name="combo_peso_s"/>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="lbl_tiempos_estacion">
+         <property name="styleSheet">
+          <string notr="true">font-size: 8pt; font-weight: bold; color: #2c3e50;</string>
+         </property>
+         <property name="text">
+          <string>P: -- | S: -- | Coda: -- | Ts-Tp: --</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="layoutBotonesInferiores">
+      <item>
+       <widget class="QPushButton" name="boton_directorio">
+        <property name="text">
+         <string>..dia\</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="boton_salir">
+        <property name="text">
+         <string>Salir</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>278</width>
+     <width>320</width>
      <height>21</height>
     </rect>
    </property>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <widget class="QToolBar" name="toolBar">
-   <property name="windowTitle">
-    <string>toolBar</string>
-   </property>
-   <attribute name="toolBarArea">
-    <enum>TopToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
-  </widget>
  </widget>
  <resources/>
  <connections/>

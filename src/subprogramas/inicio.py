@@ -54,12 +54,7 @@ class Inicio_proceso(QMainWindow):
 
         # Extraer el widget central original de inicio.ui para montarlo a la izquierda
         widget_formulario = self.centralWidget()
-        widget_formulario.setFixedWidth(280)
-
-        # Asignar layout vertical al contenedor para acomodar cmbx_resposables_2
-        layout_form = QVBoxLayout(widget_formulario)
-        layout_form.setContentsMargins(2, 2, 2, 2)
-        layout_form.addWidget(self.cmbx_resposables_2)
+        widget_formulario.setFixedWidth(295)
 
         # Estilo para el agrupador de parámetros de inicio
         self.cmbx_resposables_2.setTitle("PARÁMETROS DEL DÍA")

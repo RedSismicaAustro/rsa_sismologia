@@ -65,8 +65,10 @@ graph TD
 ## 4. Decisiones de Diseño y Algoritmos
 
 1. **Diseño Ergonómico de Doble Panel**:
-   * Panel izquierdo de ancho fijo (280 px) para captura de parámetros; panel derecho expansible para visualización de tarjetas de estado de estaciones y turnos.
-2. **Filtro Estricto de Monitoreo Continuo**:
+   * Panel izquierdo de ancho controlado (295 px) para captura de parámetros; panel derecho expansible para visualización de tarjetas de estado de estaciones y turnos.
+2. **Calendario Compacto y TextEdit Informativo**:
+   * `QCalendarWidget` ajustado a altura máxima de 145 px sin cabecera vertical redundante, permitiendo que el área de `mensajes` (`DÍA`, `DIRECTORIO`, `RESPONSABLE`, `TURNO`) tenga altura suficiente (mínimo 95 px) y sea completamente visible.
+3. **Filtro Estricto de Monitoreo Continuo**:
    * En el diagnóstico solo se evalúan estaciones que satisfacen:
      $$\text{HAB\_CANAL} == \text{'1'} \quad \land \quad \text{HAB\_GRAFICO} == \text{'1'}$$
 

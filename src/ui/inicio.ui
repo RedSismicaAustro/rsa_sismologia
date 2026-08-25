@@ -6,182 +6,168 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>558</width>
-    <height>609</height>
+    <width>320</width>
+    <height>680</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Inicialización de Jornada - RSA</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QGroupBox" name="cmbx_resposables_2">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>10</y>
-      <width>251</width>
-      <height>541</height>
-     </rect>
+   <layout class="QVBoxLayout" name="verticalLayoutCentral">
+    <property name="spacing">
+     <number>6</number>
     </property>
-    <property name="title">
-     <string>PARAMETROS DIA</string>
+    <property name="leftMargin">
+     <number>8</number>
     </property>
-    <widget class="QPushButton" name="Btn_Iniciar">
-     <property name="geometry">
-      <rect>
-       <x>0</x>
-       <y>510</y>
-       <width>101</width>
-       <height>23</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Inicializar</string>
-     </property>
-    </widget>
-    <widget class="QPushButton" name="Btn_drive">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="geometry">
-      <rect>
-       <x>140</x>
-       <y>510</y>
-       <width>91</width>
-       <height>23</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>.../dia/</string>
-     </property>
-    </widget>
-    <widget class="QTextEdit" name="mensajes">
-     <property name="geometry">
-      <rect>
-       <x>5</x>
-       <y>350</y>
-       <width>241</width>
-       <height>141</height>
-      </rect>
-     </property>
-    </widget>
-    <widget class="QComboBox" name="cmbx_resposables">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="geometry">
-      <rect>
-       <x>90</x>
-       <y>312</y>
-       <width>141</width>
-       <height>22</height>
-      </rect>
-     </property>
-    </widget>
-    <widget class="QLabel" name="label_3">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>312</y>
-       <width>81</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>RESPONSABLE</string>
-     </property>
-    </widget>
-    <widget class="QComboBox" name="cmbx_periodo">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="geometry">
-      <rect>
-       <x>90</x>
-       <y>280</y>
-       <width>141</width>
-       <height>22</height>
-      </rect>
-     </property>
-    </widget>
-    <widget class="QLabel" name="label_4">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>280</y>
-       <width>81</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>PERIODO</string>
-     </property>
-    </widget>
-    <widget class="QCalendarWidget" name="dia">
-     <property name="geometry">
-      <rect>
-       <x>0</x>
-       <y>100</y>
-       <width>248</width>
-       <height>170</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <pointsize>7</pointsize>
-      </font>
-     </property>
-    </widget>
-    <widget class="QGroupBox" name="cmbx_resposables_3">
-     <property name="geometry">
-      <rect>
-       <x>70</x>
-       <y>20</y>
-       <width>121</width>
-       <height>61</height>
-      </rect>
-     </property>
-     <property name="title">
-      <string/>
-     </property>
-     <widget class="QRadioButton" name="radioButton_periodo">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>30</y>
-        <width>82</width>
-        <height>17</height>
-       </rect>
+    <property name="topMargin">
+     <number>8</number>
+    </property>
+    <property name="rightMargin">
+     <number>8</number>
+    </property>
+    <property name="bottomMargin">
+     <number>8</number>
+    </property>
+    <item>
+     <widget class="QGroupBox" name="cmbx_resposables_2">
+      <property name="title">
+       <string>PARÁMETROS DEL DÍA</string>
       </property>
-      <property name="text">
-       <string>Periodo</string>
-      </property>
+      <layout class="QVBoxLayout" name="layoutGrupoParams">
+       <property name="spacing">
+        <number>6</number>
+       </property>
+       <property name="leftMargin">
+        <number>8</number>
+       </property>
+       <property name="topMargin">
+        <number>10</number>
+       </property>
+       <property name="rightMargin">
+        <number>8</number>
+       </property>
+       <property name="bottomMargin">
+        <number>8</number>
+       </property>
+       <item>
+        <layout class="QHBoxLayout" name="layoutModo">
+         <item>
+          <widget class="QRadioButton" name="radioButton_diario">
+           <property name="text">
+            <string>Diario</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QRadioButton" name="radioButton_periodo">
+           <property name="text">
+            <string>Periodo</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QCalendarWidget" name="dia">
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>145</height>
+          </size>
+         </property>
+         <property name="font">
+          <font>
+           <pointsize>8</pointsize>
+          </font>
+         </property>
+         <property name="gridVisible">
+          <bool>true</bool>
+         </property>
+         <property name="verticalHeaderFormat">
+          <enum>QCalendarWidget::NoVerticalHeader</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QGridLayout" name="gridOpciones">
+         <property name="horizontalSpacing">
+          <number>6</number>
+         </property>
+         <property name="verticalSpacing">
+          <number>4</number>
+         </property>
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_4">
+           <property name="text">
+            <string>PERÍODO:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="cmbx_periodo"/>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_3">
+           <property name="text">
+            <string>RESPONSABLE:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QComboBox" name="cmbx_resposables"/>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QTextEdit" name="mensajes">
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>95</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">background-color: #f8f9fa; border: 1px solid #dcdde1; border-radius: 4px; padding: 4px; font-family: 'Segoe UI', Arial; font-size: 9pt;</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="layoutBotones">
+         <item>
+          <widget class="QPushButton" name="Btn_Iniciar">
+           <property name="text">
+            <string>Inicializar</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="Btn_drive">
+           <property name="text">
+            <string>.../dia/</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
      </widget>
-     <widget class="QRadioButton" name="radioButton_diario">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>10</y>
-        <width>82</width>
-        <height>17</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Diario</string>
-      </property>
-      <property name="checked">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </widget>
-   </widget>
+    </item>
+   </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>558</width>
+     <width>320</width>
      <height>21</height>
     </rect>
    </property>

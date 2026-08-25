@@ -81,7 +81,9 @@ stateDiagram-v2
    * Ejecutado con `QTimer.singleShot(0, self.volver_estado_trabajo)` con guarda de reentrada `self._retomando_control`.
 2. **Invariante C++ (Cero `delattr`)**:
    * No se invoca `delattr` sobre atributos de `QMainWindow` para no corromper punteros internos del binding de PyQt5/C++.
-3. **Cierre Controlado en `paintEvent`**:
+3. **Barra Superior Institucional y Ergonomía Visual**:
+   * Logo RSA escalado a $155 \times 65$ px con `SmoothTransformation` y espaciado lateral respecto a las 4 líneas de estado de sesión (`Directorio`, `Día`, `Periodo`, `Usuario`), garantizando visibilidad nítida y sin solapamiento.
+4. **Cierre Controlado en `paintEvent`**:
    * Manejo con `try/finally` asegurando siempre la llamada a `painter.end()`.
 
 ---

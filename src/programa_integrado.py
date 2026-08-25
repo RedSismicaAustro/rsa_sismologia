@@ -415,18 +415,20 @@ class VentanaPrincipal(QMainWindow):
         self.accion_acerca_de.triggered.connect(self.acerca_de)
         self.menu_ayuda.addAction(self.accion_acerca_de)
 
-        # Configurar barra de herramientas
+        # Configurar barra de herramientas superior con logo y datos generales
         self.barra_herramientas = QToolBar('Barra Principal')
         self.addToolBar(Qt.TopToolBarArea, self.barra_herramientas)
 
         self.etiqueta_logo = QLabel()
         ruta_logo_banner = resolver_ruta_recurso('logo rsa.png')
-        self.logo_pixmap = QPixmap(ruta_logo_banner).scaled(110, 50, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.logo_pixmap = QPixmap(ruta_logo_banner).scaled(155, 65, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.etiqueta_logo.setPixmap(self.logo_pixmap)
+        self.etiqueta_logo.setStyleSheet("margin-right: 15px; margin-left: 5px;")
         self.barra_herramientas.addWidget(self.etiqueta_logo)
 
         self.etiqueta_titulo = QLabel('PROCESAMIENTO INTEGRADO')
-        self.etiqueta_titulo.setFont(QFont('Arial', 12))
+        self.etiqueta_titulo.setFont(QFont('Arial', 10))
+        self.etiqueta_titulo.setStyleSheet("margin-left: 15px; line-height: 120%; font-weight: bold; color: #2c3e50;")
         self.barra_herramientas.addWidget(self.etiqueta_titulo)
 
         self.barra_herramientas.setIconSize(self.logo_pixmap.size())
@@ -582,7 +584,7 @@ class VentanaPrincipal(QMainWindow):
 
     def mostrar_fases(self):
         """Cargar menú de fases"""
-        widget_fases = FasesVentana()
+        widget_fases = FasesVentana(self.archivo)
         self.cargar_widget_menu(
             widget_fases,
             'PROCESAMIENTO INTEGRADO - MARCAR FASES SÍSMICAS',
