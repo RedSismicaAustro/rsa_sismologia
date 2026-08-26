@@ -110,6 +110,9 @@ El módulo define y gestiona 7 modos de generación de catálogos y boletines PD
 * `archivo_auxiliar` (`*_aux.csv`): Registro temporal de intentos de procesamiento y flags de revisión.
 * `archivo_reporte` (`Reporte_*.pdf`): Documentos PDF oficiales generados por ReportLab con gráficos de fases e intensidades.
 
+### 5.3. Filtrado Dinámico de Eventos en GUI
+* `cargar_combo_eventos(self, text)`: Soporta filtrado selectivo por clasificación (`SISMO`, `FF`, `FC`, `INDEFINIDO`, etc.) y el modo global `'TODOS'`, que lista todos los eventos registrados del día sin importar su categoría.
+
 ---
 
 ## 6. Riesgos Específicos y Checklist de Estabilidad

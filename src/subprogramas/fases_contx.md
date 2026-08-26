@@ -2,7 +2,7 @@
 proyecto: rsa_sismologia
 tipo: contexto_tecnico
 archivo: src/subprogramas/fases.py
-temas: [marcado_fases, formato_fas, hypo71, persitencia_json_fas, configuracion_csv, pyqt5, obspy]
+temas: [marcado_fases, formato_fas, hypo71, persitencia_json_fas, configuracion_csv, pyqt5, obspy, ventana_grafico]
 generado: 2026-08-25
 ---
 
@@ -21,25 +21,25 @@ generado: 2026-08-25
 
 ```mermaid
 graph TD
-    A[Inicio: Cargar Evento .sis] --> B{Existe .fas binario?}
-    B -- Sí --> C[decodificar_archivo_fas: P, S, Coda, Tipo, Disparo, Peso]
-    B -- No --> D{Existe .json?}
-    D -- Sí --> E[Cargar fases desde .json]
-    D -- No --> F[Detección automática ObsPy / Valores por defecto]
+    A[Inicio: Cargar Día Inicializado self.archivo] --> B[obtener_directorios y lectura_archivo CSV]
+    B --> C{Filtrar filas con tipo_evento == 'SISMO'}
+    C -- Hay Sismos --> D[Poblar self.combo_sis y cargar primer sismo]
+    C -- 0 Sismos --> E[Mostrar mensaje en canvas: 'No existen eventos clasificados como SISMO']
     
-    C --> G[Sincronizar self.fases_detectadas y guardar .json]
-    E --> G
-    F --> G
+    D --> F{Existe .fas binario en dia/?}
+    F -- Sí --> G[decodificar_archivo_fas: P, S, Coda, Tipo, Disparo, Peso]
+    F -- No --> H{Existe .json?}
+    H -- Sí --> I[Cargar fases desde .json]
+    H -- No --> J[Detección automática ObsPy / Valores iniciales]
     
-    G --> H[Renderizar Trazas en VentanaPrincipal: 4 slots fijos]
-    H --> I[Mostrar Tiempos y Parámetros en Rojo en Cabecera de Traza]
-    H --> J[Panel Izquierdo: Configuración CSV interactiva y Parámetros .fas]
+    G --> K[Sincronizar self.fases_detectadas y guardar .json]
+    I --> K
+    J --> K
     
-    K[Modificar Controles CSV] --> L[guardar_config_csv_estacion -> Actualizar matriz y escribir AAAAMMDD000000.csv]
-    M[Modificar Controles HYPO71] --> N[al_modificar_parametros_estacion -> Guardar .json y binario .fas]
-    
-    O[Doble Clic en Traza o Lista] --> P[VentanaGrafico: Marcado Fino Interactivo con GestorFases]
-    P --> Q[Al cerrar: Actualizar fases, persistir .json / .fas y refrescar vista]
+    K --> L[Renderizar Trazas en VentanaPrincipal: 4 slots fijos]
+    L --> M[Doble Clic en Traza o Lista -> Abrir VentanaGrafico]
+    M --> N[VentanaGrafico: Nombre completo estacion, sin leyenda, zoom clic derecho]
+    N --> O[Al cerrar VentanaGrafico: Guardar .json/.fas, actualizar combos y graficos]
 ```
 
 ---
@@ -81,44 +81,37 @@ Cada ranura de estación contiene bloques binarios estructurados de longitud fij
 | Método / Clase | Tipo | Descripción |
 |---|---|---|
 | `VentanaPrincipal` | `QMainWindow` | Ventana principal que incrusta controles y visualizador paginado. |
+| `cargar_dia()` / `cambio_de_fecha()` | Método | Resuelve directorios del día inicializado, lee el CSV y extrae exclusivamente sismos. |
 | `decodificar_archivo_fas(ruta_fas)` | Método | Realiza ingeniería inversa sobre el archivo `.fas` extrayendo marcas, polaridades y pesos. |
 | `construir_archivo_fas(ruta_fas)` | Método | Genera el archivo binario estructurado de 16 ranuras canónicas `.fas`. |
 | `al_cambiar_estacion_seleccionada(current)` | Slot | Sincroniza los combos y controles interactivos al cambiar de estación en la lista. |
+| `actualizar_controles_estacion_activa(archivo)` | Método | Helper para sincronizar los controles al cerrar la subventana de detalle. |
 | `al_modificar_parametros_estacion()` | Slot | Actualiza `fases_detectadas` y guarda concurrentemente `{evento}.json` y `{evento}.fas`. |
 | `al_modificar_config_csv_estacion()` | Slot | Actualiza el token `EEEECBFFIISS`, guarda el archivo `.csv` y refresca el filtrado. |
-| `al_hacer_click_en_canvas(event)` | Slot | Gestiona selección con clic simple y apertura de `VentanaGrafico` con doble clic en traza. |
-| `VentanaGrafico` | `QMainWindow` | Subventana de zoom y marcado interactivo mediante `GestorFases`. |
+| `VentanaGrafico` | `QMainWindow` | Subventana de zoom y marcado interactivo con nombre oficial de estación, sin leyenda, zoom con clic derecho, cálculo de distancia y sincronización total al salir. |
 
 ---
 
 ## 4. Decisiones de Diseño y Algoritmos
 
-1. **Incrustación 100% en Ventana Principal**:
-   * Todos los controles de edición de parámetros sísmicos y del CSV están ubicados en el panel izquierdo de la ventana principal, evitando ventanas modales forzadas.
-2. **Prioridad y Coexistencia `.fas` $\leftrightarrow$ `.json`**:
-   * Prevalencia del archivo binario `.fas` como fuente de verdad histórica; al cargar se traduce a `.json`, y al guardar se sincronizan ambos formatos en paralelo.
-3. **Colores Institucionales de Fases**:
-   * Fase P: Rojo (`'red'`).
-   * Fase S: Naranja (`'darkorange'`).
-   * Coda: Verde (`'green'`).
-4. **Resumen en Cabecera de Traza**:
-   * Visualización en rojo en la esquina superior derecha de cada gráfico con la descripción compacta: `P: 4.87s [IP+0] | S: 16.11s [S 2] | Coda: 20.47s | Ts-Tp: 11.24s`.
+1. **Unificación con la Arquitectura Global del Sistema**:
+   * Se eliminó el selector de fecha independiente dentro de `marcar_fases.ui`. La fecha de trabajo proviene exclusivamente del día inicializado en `programa_integrado.py`.
+2. **Matriz CSV como Fuente Única de Clasificación**:
+   * Los sismos se filtran estrictamente evaluando `fila[2] == 'SISMO'` en el archivo CSV delimitado por `;`.
+3. **Optimización de la Subventana `VentanaGrafico`**:
+   * Visualización limpia de borde a borde sin cuadro flotante de leyenda (`ax.legend()` removido).
+   * **Clic Derecho**: Alterna el modo Zoom rectangular (o doble clic derecho para restaurar vista global *Home*).
+   * **Clic Izquierdo**: Pica y arrastra marcas P, S y Coda sin interferencias.
+   * **Barra Superior**: Permite modificar parámetros HYPO71 in situ y ver el cálculo de `Ts-Tp` y la distancia epicentral aproximada en tiempo real.
+4. **Sincronización Bidireccional `.fas` $\leftrightarrow$ `.json`**:
+   * Persistencia transparente al mover marcas o cerrar ventanas.
 
 ---
 
-## 5. Riesgos Técnicos y Deuda Técnica
+## 5. Checklist de Verificación y Regresión
 
-* **Límite de 16 Ranuras en `.fas`**:
-  * El formato HYPO71 legado de la RSA admite hasta 16 ranuras fijas; si una red cuenta con más de 16 canales, se priorizan las primeras 16 estaciones aportantes.
-* **Tokens CSV de Longitud Variable**:
-  * El analizador soporta tolerancias para tokens con o sin espacios en códigos de estación de 3 o 4 letras.
-
----
-
-## 6. Checklist de Verificación y Regresión
-
-- [x] Sincronización bidireccional `.fas` y `.json` funcional y probada con coincidencia binaria.
-- [x] Panel interactivo CSV (`chk_csv_aporta`, `spbox_csv_canal`, `spbox_csv_orden`, `spbox_csv_finf`, `spbox_csv_fsup`) persiste cambios en `AAAAMMDD000000.csv`.
-- [x] Tiempos y parámetros HYPO71 visibles en rojo en la esquina superior derecha de cada traza.
-- [x] Doble clic abre la subventana de detalle tanto desde la lista como directamente sobre el gráfico.
-
+- [x] Carga automática de los sismos del día inicializado desde `programa_integrado.py`.
+- [x] Mensaje informativo claro en el canvas cuando la jornada no contiene sismos clasificados.
+- [x] Apertura de `VentanaGrafico` con nombre completo de estación (ej. `LOMA DE LA VIRGEN (LABR)`).
+- [x] Zoom con clic derecho y restauración con doble clic derecho.
+- [x] Sincronización instantánea de marcas, archivo `.json` y archivo binario canónico `.fas` al cerrar la subventana.

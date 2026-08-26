@@ -584,7 +584,12 @@ class VentanaPrincipal(QMainWindow):
 
     def mostrar_fases(self):
         """Cargar menú de fases"""
-        widget_fases = FasesVentana(self.archivo)
+        widget_fases = FasesVentana(
+            self.archivo,
+            self.directorio_trabajo,
+            self.responsable,
+            self.periodo
+        )
         self.cargar_widget_menu(
             widget_fases,
             'PROCESAMIENTO INTEGRADO - MARCAR FASES SÍSMICAS',

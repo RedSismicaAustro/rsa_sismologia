@@ -16,6 +16,8 @@ class GestorFases:
     def al_presionar(self, evento, ax, canvas):
         if evento.xdata is None or evento.inaxes is None:
             return
+        if getattr(evento, 'button', 1) != 1:
+            return
         if not evento.dblclick:
             x = evento.xdata
             tipo_fase = self.encontrar_fase_mas_cercana(x, ax)

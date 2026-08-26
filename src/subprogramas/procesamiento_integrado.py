@@ -54,12 +54,12 @@ MODO_FACULTAD_RESUMEN         = 5   # M5 – Facultad resumen (Facultad/redes), 
 MODO_INSTITUCIONAL_DETALLADO  = 6   # M6 – Institucional detallado (solo catálogo), sin extras ni responsables
 MODO_INSTITUCIONAL_RESUMEN    = 7   # M7 – Institucional, sin detalle
 
-def cargar_combo_eventos(self,text):
-    self.sismos_procesar=[]
+def cargar_combo_eventos(self, text):
+    self.sismos_procesar = []
     self.ui.cmbx_eventos.clear()
-    for i in range(0,len(self.eventos)):
-        if self.eventos[i][2]==text:
-            aux_sismo=(int(self.eventos[i][0]),self.eventos[i][1])#aux_sismo tiene el numero de evento del csv y todo el registro
+    for i in range(0, len(self.eventos)):
+        if text == 'TODOS' or self.eventos[i][2] == text:
+            aux_sismo = (int(self.eventos[i][0]), self.eventos[i][1])  # aux_sismo tiene el numero de evento del csv y todo el registro
             self.sismos_procesar.append(aux_sismo)
             self.ui.cmbx_eventos.addItem(self.eventos[i][1])
     self.preparar_evento('')

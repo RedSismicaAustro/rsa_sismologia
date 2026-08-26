@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import struct
+import re
 from pathlib import Path
 import obspy
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -47,14 +48,34 @@ from gestor_fases import GestorFases
 class VentanaPrincipal(QMainWindow):
     cerrado = pyqtSignal()
 
-    def __init__(self, directorio_trabajo=None, parent=None):
+    def __init__(self, archivo=None, directorio_trabajo=None, responsable=None, periodo=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Marcador de Fases Sísmicas - RSA")
         self.showMaximized()
 
-        # Configuración de directorio de trabajo base
+        # Compatibilidad de parámetros: si el primer argumento es un QWidget parent
+        if isinstance(archivo, QWidget):
+            parent = archivo
+            archivo = None
+
+        self.archivo = str(archivo) if archivo else ""
+        self.responsable = responsable or "RSA"
+        self.periodo = periodo or "00:00 - 12:00"
+
+        # Configuración y resolución del directorio de trabajo base
         if directorio_trabajo and os.path.exists(directorio_trabajo):
-            self.directorio_trabajo = directorio_trabajo
+            self.directorio_trabajo = str(directorio_trabajo)
+        elif self.archivo and os.path.exists(self.archivo):
+            if os.path.isdir(self.archivo):
+                self.directorio_trabajo = self.archivo
+            else:
+                self.directorio_trabajo = str(Path(self.archivo).parent)
+        elif self.archivo:
+            dir_padre = str(Path(self.archivo).parent)
+            if os.path.exists(dir_padre):
+                self.directorio_trabajo = dir_padre
+            else:
+                self.directorio_trabajo = "G:\\Mi unidad\\DIA"
         else:
             self.directorio_trabajo = "G:\\Mi unidad\\DIA"
 
@@ -69,6 +90,7 @@ class VentanaPrincipal(QMainWindow):
         self.matriz_eventos = []
         self.archivo_sis = ""
         self.archivo_json = ""
+        self.archivo_estacion_activa = ""
 
         # Cargar parámetros reales de estaciones y orden canónico de estaciones.csv
         try:
@@ -143,7 +165,6 @@ class VentanaPrincipal(QMainWindow):
 
         # Conectar señales de la interfaz
         self.boton_directorio.clicked.connect(self.cambiar_directorio)
-        self.date_edit.dateChanged.connect(self.cambio_de_fecha)
         self.combo_sis.currentIndexChanged.connect(self.cargar_evento)
         self.checkbox_filtro.stateChanged.connect(self.graficar_evento)
         if hasattr(self, 'checkbox_estaciones_aportantes'):
@@ -172,28 +193,7 @@ class VentanaPrincipal(QMainWindow):
         self.combo_pol_s.currentIndexChanged.connect(self.al_modificar_parametros_estacion)
         self.combo_peso_s.currentIndexChanged.connect(self.al_modificar_parametros_estacion)
 
-        # Extraer fecha del directorio de trabajo si está disponible
-        fecha_inicial = QDate.currentDate()
-        nombre_dir = Path(self.directorio_trabajo).name.replace('_', '')
-        if len(nombre_dir) >= 8 and nombre_dir[:8].isdigit():
-            try:
-                y = int(nombre_dir[:4])
-                m = int(nombre_dir[4:6])
-                d = int(nombre_dir[6:8])
-                fecha_inicial = QDate(y, m, d)
-            except Exception:
-                pass
-        elif len(nombre_dir) >= 6 and nombre_dir[:6].isdigit():
-            try:
-                y = 2000 + int(nombre_dir[:2])
-                m = int(nombre_dir[2:4])
-                d = int(nombre_dir[4:6])
-                fecha_inicial = QDate(y, m, d)
-            except Exception:
-                pass
-
-        self.date_edit.setDate(fecha_inicial)
-        self.cambio_de_fecha()
+        self.cargar_dia()
 
     def cerrar_ventana(self):
         self.cerrado.emit()
@@ -209,76 +209,89 @@ class VentanaPrincipal(QMainWindow):
         )
         if nuevo_dir:
             self.directorio_trabajo = nuevo_dir
-            self.cambio_de_fecha()
+            self.cargar_dia()
 
-    def cambio_de_fecha(self):
+    def cargar_dia(self):
+        import datetime
         self.fases_detectadas = {}
-        self.fecha_seleccionada = self.date_edit.date().toPyDate()
-        fecha_qdate = self.date_edit.date()
-        yy = fecha_qdate.year()
-        mm = fecha_qdate.month()
-        dd = fecha_qdate.day()
-        marca_14 = f"{yy:04d}{mm:02d}{dd:02d}000000"
-        marca_12 = f"{yy % 100:02d}{mm:02d}{dd:02d}000000"
 
-        # Búsqueda dinámica de directorios con marca de 14 y 12 dígitos
-        rutas_posibles = [
-            os.path.join(self.directorio_trabajo, marca_14),
-            os.path.join(self.directorio_trabajo, marca_12),
-            self.directorio_trabajo
-        ]
-        self.directorios = {}
-        for r_pos in rutas_posibles:
-            try:
-                self.directorios = obtener_directorios(r_pos)
-                if self.directorios and os.path.exists(self.directorios.get('Directorio_base', '')):
-                    break
-            except Exception:
-                continue
+        # 1. Resolver directorios estándar del día inicializado
+        try:
+            self.directorios = obtener_directorios(self.archivo)
+        except Exception as e:
+            print(f"Error al obtener directorios para {self.archivo}: {e}")
+            self.directorios = {}
 
-        # Cargar matriz de eventos si el CSV existe
+        # Determinar fecha seleccionada
+        try:
+            nombre_base = Path(self.archivo).stem.replace('_', '')
+            if len(nombre_base) >= 8 and nombre_base[:8].isdigit():
+                y = int(nombre_base[:4])
+                m = int(nombre_base[4:6])
+                d = int(nombre_base[6:8])
+                self.fecha_seleccionada = datetime.date(y, m, d)
+            else:
+                self.fecha_seleccionada = datetime.date.today()
+        except Exception:
+            self.fecha_seleccionada = datetime.date.today()
+
+        # 2. Leer matriz CSV (fuente de verdad de la clasificación)
         archivo_csv = self.directorios.get('archivo_csv', '')
-        if not (archivo_csv and os.path.exists(archivo_csv)):
-            dir_base = self.directorios.get('Directorio_base', self.directorio_trabajo)
-            posibles_csv = [
-                os.path.join(dir_base, f"{marca_14}.csv"),
-                os.path.join(dir_base, f"{marca_12}.csv"),
-                os.path.join(self.directorio_trabajo, f"{marca_14}.csv"),
-                os.path.join(self.directorio_trabajo, f"{marca_12}.csv"),
-            ]
-            for p_csv in posibles_csv:
-                if os.path.exists(p_csv):
-                    archivo_csv = p_csv
-                    self.directorios['archivo_csv'] = p_csv
-                    break
-
         if archivo_csv and os.path.exists(archivo_csv):
             self.matriz_eventos = lectura_archivo(archivo_csv) or []
         else:
             self.matriz_eventos = []
 
-        directorio_dia = self.directorios.get('Directorio_dia', '')
-        if directorio_dia and os.path.exists(directorio_dia):
-            archivos_sis = sorted([f for f in os.listdir(directorio_dia) if f.endswith('.sis')])
-            self.combo_sis.blockSignals(True)
-            self.combo_sis.clear()
-            self.combo_sis.addItems(archivos_sis)
-            self.combo_sis.blockSignals(False)
+        # 3. Extraer única y exclusivamente eventos clasificados como SISMO en el CSV
+        archivos_sis = []
+        if self.matriz_eventos:
+            for fila in self.matriz_eventos:
+                if len(fila) > 2 and str(fila[1]).strip():
+                    tipo_ev = str(fila[2]).strip().upper()
+                    if tipo_ev == 'SISMO':
+                        nombre_ev = str(fila[1]).strip()
+                        if not nombre_ev.lower().endswith('.sis'):
+                            nombre_ev += '.sis'
+                        if nombre_ev not in archivos_sis:
+                            archivos_sis.append(nombre_ev)
 
-            if archivos_sis:
-                self.combo_sis.setCurrentIndex(0)
-                self.cargar_evento()
-            else:
-                self.limpiar_vista()
+        # 4. Actualizar selector de eventos
+        self.combo_sis.blockSignals(True)
+        self.combo_sis.clear()
+        self.combo_sis.addItems(archivos_sis)
+        self.combo_sis.blockSignals(False)
+
+        if archivos_sis:
+            self.combo_sis.setCurrentIndex(0)
+            self.cargar_evento()
         else:
-            self.limpiar_vista()
+            fecha_txt = self.fecha_seleccionada.strftime('%Y-%m-%d') if hasattr(self, 'fecha_seleccionada') else ""
+            msg = f"No existen eventos clasificados como SISMO en la jornada ({fecha_txt})."
+            self.limpiar_vista(msg)
 
-    def limpiar_vista(self):
+    cambio_de_fecha = cargar_dia
+
+    def limpiar_vista(self, mensaje="No existen eventos clasificados como SISMO en esta jornada."):
         self.lista_mseed.clear()
         self.archivos_mseed_todos = []
         self.archivos_mseed = []
         self.fases_detectadas = {}
+        if hasattr(self, 'lbl_estacion_activa'):
+            self.lbl_estacion_activa.setText("Estación: [Sin sismos]")
+        if hasattr(self, 'lbl_tiempos_estacion'):
+            self.lbl_tiempos_estacion.setText("P: -- | S: -- | Coda: -- | Ts-Tp: --")
         self.figura.clear()
+        ax = self.figura.add_subplot(111)
+        ax.axis('off')
+        ax.text(
+            0.5, 0.5,
+            mensaje,
+            fontsize=12,
+            color='#546e7a',
+            ha='center',
+            va='center',
+            fontweight='bold'
+        )
         self.canvas.draw()
 
     def cargar_evento(self):
@@ -287,23 +300,26 @@ class VentanaPrincipal(QMainWindow):
             self.limpiar_vista()
             return
 
-        nombre_base = os.path.splitext(self.archivo_sis)[0]
+        stem_sis = Path(self.archivo_sis).stem
         directorio_dia = self.directorios.get('Directorio_dia', '')
-        self.archivo_json = os.path.join(directorio_dia, f"{nombre_base}.json")
+        self.archivo_json = os.path.join(directorio_dia, f"{stem_sis}.json")
 
-        # Extraer hora del archivo .sis
-        partes = self.archivo_sis.split('_')
-        hora_sis = partes[1].split('.')[0] if len(partes) > 1 else ""
-
-        patron_corto = f"_{hora_sis}.mseed"
-        patron_largo = f"_{self.fecha_seleccionada.strftime('%Y%m%d')}_{hora_sis}.mseed"
+        # Extraer hora y fecha del evento
+        partes = stem_sis.split('_')
+        if len(partes) > 1:
+            hora_sis = partes[-1]
+            fecha_str_ev = partes[0]
+        else:
+            hora_sis = stem_sis[-6:] if len(stem_sis) >= 6 and stem_sis[-6:].isdigit() else stem_sis
+            fecha_str_ev = ""
 
         dir_eventos = self.directorios.get('Directorio_eventos', '')
         if dir_eventos and os.path.exists(dir_eventos):
             archivos_encontrados = [
                 f for f in os.listdir(dir_eventos)
-                if (f.endswith(patron_largo) or f.endswith(patron_corto) or hora_sis in f)
+                if f.lower().endswith(('.mseed', '.miniseed')) and (stem_sis in f or (hora_sis and f"_{hora_sis}." in f))
             ]
+
             # Ordenar según el orden oficial de estaciones.csv
             def clave_orden_estacion(nombre_archivo):
                 cod = nombre_archivo.split('_')[0].strip().upper()
@@ -314,10 +330,10 @@ class VentanaPrincipal(QMainWindow):
             self.archivos_mseed_todos = []
 
         # Buscar archivo .fas binario para traducción directa a .json
-        archivo_fas = os.path.join(directorio_dia, f"{nombre_base}.fas")
+        archivo_fas = os.path.join(directorio_dia, f"{stem_sis}.fas")
         if not os.path.exists(archivo_fas) and os.path.exists(directorio_dia):
             for f in os.listdir(directorio_dia):
-                if f.endswith('.fas') and (hora_sis in f or self._evento_coincide(f, self.archivo_sis)):
+                if f.lower().endswith('.fas') and (hora_sis in f or self._evento_coincide(f, self.archivo_sis)):
                     archivo_fas = os.path.join(directorio_dia, f)
                     break
 
@@ -510,10 +526,14 @@ class VentanaPrincipal(QMainWindow):
             self.checkbox_estaciones_aportantes.isChecked()
         )
         if solo_aportantes:
-            self.archivos_mseed = [
+            candidatos = [
                 arch for arch in self.archivos_mseed_todos
                 if self.obtener_info_estacion(arch.split('_')[0])[0]
             ]
+            if not candidatos and self.archivos_mseed_todos:
+                self.archivos_mseed = list(self.archivos_mseed_todos)
+            else:
+                self.archivos_mseed = candidatos
         else:
             self.archivos_mseed = list(self.archivos_mseed_todos)
 
@@ -829,6 +849,9 @@ class VentanaPrincipal(QMainWindow):
         # Guardar inmediatamente en .json y en .fas
         self.guardar_evento()
 
+    def actualizar_controles_estacion_activa(self, archivo):
+        self.al_cambiar_estacion_seleccionada(archivo)
+
     def al_modificar_config_csv_estacion(self):
         if not hasattr(self, 'archivo_estacion_activa') or not self.archivo_estacion_activa:
             return
@@ -962,7 +985,7 @@ class VentanaPrincipal(QMainWindow):
         self.ventana_detalle = VentanaGrafico(
             dir_eventos,
             archivo_seleccionado,
-            self.date_edit.date().toPyDate(),
+            self.fecha_seleccionada,
             self.fases_detectadas,
             self.gestor_fases,
             self
@@ -995,6 +1018,8 @@ class VentanaPrincipal(QMainWindow):
                 return
 
             directorio_dia = self.directorios.get('Directorio_dia', '')
+            if directorio_dia:
+                os.makedirs(directorio_dia, exist_ok=True)
             nombre_base = os.path.splitext(self.archivo_sis)[0]
             if not self.archivo_json:
                 self.archivo_json = os.path.join(directorio_dia, f"{nombre_base}.json")
@@ -1140,43 +1165,171 @@ class VentanaPrincipal(QMainWindow):
 class VentanaGrafico(QMainWindow):
     def __init__(self, directorio_eventos, archivo_seleccionado, fecha, fases_detectadas, gestor_fases, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Gráfico de Detalle - {archivo_seleccionado}")
-        self.setGeometry(150, 150, 850, 600)
         self.directorio_eventos = directorio_eventos
         self.archivo_seleccionado = archivo_seleccionado
         self.fecha = fecha
         self.fases_detectadas = fases_detectadas
         self.gestor_fases = gestor_fases
         self.parent = parent
+
+        nombre_corto = self.archivo_seleccionado.split('_')[0]
+        if self.parent and hasattr(self.parent, 'mapa_estaciones') and nombre_corto in self.parent.mapa_estaciones:
+            self.nombre_estacion, _ = self.parent.mapa_estaciones[nombre_corto]
+        else:
+            self.nombre_estacion = nombre_corto
+
+        self.setWindowTitle(f"Señal a Detalle - {self.nombre_estacion} ({nombre_corto}) - {archivo_seleccionado}")
+        self.setGeometry(150, 150, 920, 620)
         self.init_ui()
 
     def init_ui(self):
-        layout = QVBoxLayout()
+        widget_central = QWidget()
+        layout_principal = QVBoxLayout(widget_central)
+        layout_principal.setContentsMargins(8, 8, 8, 8)
+        layout_principal.setSpacing(6)
+
+        # -------------------------------------------------------------
+        # BARRA SUPERIOR COMPACTA: Parámetros HYPO71 y Tiempos en vivo
+        # -------------------------------------------------------------
+        barra_superior = QHBoxLayout()
+        nombre_corto = self.archivo_seleccionado.split('_')[0]
+
+        lbl_nombre = QLabel(f"<b>{self.nombre_estacion} ({nombre_corto})</b>")
+        lbl_nombre.setStyleSheet("font-size: 11px; color: #1a252f;")
+        barra_superior.addWidget(lbl_nombre)
+
+        barra_superior.addSpacing(10)
+
+        # Parámetros HYPO71 compactos
+        barra_superior.addWidget(QLabel("Tipo P:"))
+        self.combo_tipo_p = QComboBox()
+        self.combo_tipo_p.addItems(["I", "E"])
+        barra_superior.addWidget(self.combo_tipo_p)
+
+        barra_superior.addWidget(QLabel("Pol P:"))
+        self.combo_pol_p = QComboBox()
+        self.combo_pol_p.addItems([" ", "C", "D", "+", "-"])
+        barra_superior.addWidget(self.combo_pol_p)
+
+        barra_superior.addWidget(QLabel("Peso P:"))
+        self.combo_peso_p = QComboBox()
+        self.combo_peso_p.addItems(["0", "1", "2", "3", "4"])
+        barra_superior.addWidget(self.combo_peso_p)
+
+        barra_superior.addSpacing(6)
+
+        barra_superior.addWidget(QLabel("Pol S:"))
+        self.combo_pol_s = QComboBox()
+        self.combo_pol_s.addItems([" ", "C", "D", "+", "-"])
+        barra_superior.addWidget(self.combo_pol_s)
+
+        barra_superior.addWidget(QLabel("Peso S:"))
+        self.combo_peso_s = QComboBox()
+        self.combo_peso_s.addItems(["0", "1", "2", "3", "4"])
+        barra_superior.addWidget(self.combo_peso_s)
+
+        barra_superior.addSpacing(10)
+
+        # Etiqueta en vivo de tiempos delta y distancia
+        self.lbl_delta = QLabel("Ts-Tp: -- | Dist: --")
+        self.lbl_delta.setStyleSheet("font-weight: bold; color: #c0392b; font-size: 11px;")
+        barra_superior.addWidget(self.lbl_delta)
+
+        barra_superior.addStretch()
+        layout_principal.addLayout(barra_superior)
+
+        # -------------------------------------------------------------
+        # ÁREA DE GRÁFICO MATPLOTLIB (Sin leyenda superior)
+        # -------------------------------------------------------------
         self.figura = Figure(figsize=(8, 5), dpi=100)
         self.canvas = FigureCanvas(self.figura)
-        layout.addWidget(self.canvas)
+        layout_principal.addWidget(self.canvas, 1)
 
+        # Barra de navegación inferior
         self.toolbar = NavigationToolbar(self.canvas, self)
-        layout.addWidget(self.toolbar)
+        layout_principal.addWidget(self.toolbar)
 
-        widget_central = QWidget()
-        widget_central.setLayout(layout)
         self.setCentralWidget(widget_central)
+
+        # Cargar valores iniciales en los combos
+        fases_est = self.gestor_fases.obtener_fases() if self.gestor_fases else {}
+        self.combo_tipo_p.setCurrentText(fases_est.get('tipo_p', 'I'))
+        self.combo_pol_p.setCurrentText(fases_est.get('polaridad_p', ' '))
+        self.combo_peso_p.setCurrentText(str(fases_est.get('peso_p', 0)))
+        self.combo_pol_s.setCurrentText(fases_est.get('polaridad_s', ' '))
+        self.combo_peso_s.setCurrentText(str(fases_est.get('peso_s', 2)))
+
+        # Conectar cambios de combos a actualización interna
+        self.combo_tipo_p.currentIndexChanged.connect(self.al_modificar_combos)
+        self.combo_pol_p.currentIndexChanged.connect(self.al_modificar_combos)
+        self.combo_peso_p.currentIndexChanged.connect(self.al_modificar_combos)
+        self.combo_pol_s.currentIndexChanged.connect(self.al_modificar_combos)
+        self.combo_peso_s.currentIndexChanged.connect(self.al_modificar_combos)
+
+        # Asignar callback en GestorFases para refrescar la información en vivo al arrastrar
+        if self.gestor_fases:
+            self.gestor_fases.al_actualizar_callback = self.actualizar_info_fases
+
         self.graficar_mseed()
+
+    def al_modificar_combos(self):
+        if self.gestor_fases:
+            fases_est = self.gestor_fases.obtener_fases()
+            fases_est['tipo_p'] = self.combo_tipo_p.currentText()
+            fases_est['polaridad_p'] = self.combo_pol_p.currentText()
+            try:
+                fases_est['peso_p'] = int(self.combo_peso_p.currentText())
+            except ValueError:
+                fases_est['peso_p'] = 0
+            fases_est['polaridad_s'] = self.combo_pol_s.currentText()
+            try:
+                fases_est['peso_s'] = int(self.combo_peso_s.currentText())
+            except ValueError:
+                fases_est['peso_s'] = 2
+        self.actualizar_info_fases()
+
+    def actualizar_info_fases(self):
+        fases_est = self.gestor_fases.obtener_fases() if self.gestor_fases else {}
+        t_p = fases_est.get('P', [0.0])[0] if fases_est.get('P') else 0.0
+        t_s = fases_est.get('S', [0.0])[0] if fases_est.get('S') else 0.0
+        t_coda = fases_est.get('Coda', [0.0])[0] if fases_est.get('Coda') else 0.0
+
+        partes_fases = []
+        if t_p > 0:
+            desc_p = f"{self.combo_tipo_p.currentText()}P{self.combo_pol_p.currentText()}{self.combo_peso_p.currentText()}".replace(' ', '')
+            partes_fases.append(f"P: {t_p:.2f}s [{desc_p}]")
+        if t_s > 0:
+            desc_s = f"S{self.combo_pol_s.currentText()}{self.combo_peso_s.currentText()}".replace(' ', '')
+            partes_fases.append(f"S: {t_s:.2f}s [{desc_s}]")
+        if t_coda > 0:
+            partes_fases.append(f"Coda: {t_coda:.2f}s")
+
+        if t_s > t_p and t_p > 0:
+            ts_tp = t_s - t_p
+            dist_aprox = ts_tp * 8.0  # Vp/Vs estándar ~ 8 km/s para corteza
+            partes_fases.append(f"Ts-Tp: {ts_tp:.2f}s")
+            self.lbl_delta.setText(f"Ts-Tp: {ts_tp:.2f}s | Dist ~ {dist_aprox:.1f} km")
+        else:
+            self.lbl_delta.setText("Ts-Tp: -- | Dist: --")
+
+        texto_fases = " | ".join(partes_fases) if partes_fases else "Sin marcas"
+        if hasattr(self, 'ax') and self.ax:
+            self.ax.set_title(texto_fases, fontsize=8.5, color='darkred', fontweight='bold', pad=3, loc='right')
+            self.canvas.draw_idle()
 
     def graficar_mseed(self):
         self.figura.clear()
         ruta_completa = os.path.join(self.directorio_eventos, self.archivo_seleccionado)
         try:
             st = obspy.read(ruta_completa)
-            ax = self.figura.add_subplot(111)
+            self.ax = self.figura.add_subplot(111)
 
             nombre_corto = self.archivo_seleccionado.split('_')[0]
             aporta, comp_token, orden, f_inf, f_sup = (
                 self.parent.obtener_info_estacion(nombre_corto) if self.parent and hasattr(self.parent, 'obtener_info_estacion')
                 else (True, '1', 0, 0.0, 0.0)
             )
-            color_traza = "blue" if aporta else "gray"
+            color_traza = "#1b4f72" if aporta else "#7f8c8d"
 
             indice_stream = 0
             if self.parent and hasattr(self.parent, 'mapa_estaciones'):
@@ -1206,7 +1359,7 @@ class VentanaGrafico(QMainWindow):
                     print(f"Advertencia al filtrar en detalle {nombre_corto}: {e}")
 
             self.id_estacion = tr_mostrar.id
-            estado_texto = "Aporta (B=1)" if aporta else "No Aporta (B=0)"
+            estado_texto = "Aporta" if aporta else "No Aporta"
 
             if orden > 0:
                 if f_inf > 0 and f_sup > f_inf:
@@ -1218,49 +1371,30 @@ class VentanaGrafico(QMainWindow):
                 else:
                     texto_filtro = f"Filtro: Ord {orden}"
             else:
-                texto_filtro = "Sin filtro (Ord 0)"
+                texto_filtro = "Sin filtro"
 
             if self.parent and hasattr(self.parent, 'checkbox_filtro') and not self.parent.checkbox_filtro.isChecked() and orden > 0:
                 texto_filtro += " [Inactivo]"
 
-            fases_est = self.gestor_fases.obtener_fases() if self.gestor_fases else {}
-            t_p = fases_est.get('P', [0.0])[0] if fases_est.get('P') else 0.0
-            t_s = fases_est.get('S', [0.0])[0] if fases_est.get('S') else 0.0
-            t_coda = fases_est.get('Coda', [0.0])[0] if fases_est.get('Coda') else 0.0
-            tipo_p = fases_est.get('tipo_p', 'I')
-            pol_p = fases_est.get('polaridad_p', ' ')
-            peso_p = fases_est.get('peso_p', 0)
-            pol_s = fases_est.get('polaridad_s', ' ')
-            peso_s = fases_est.get('peso_s', 2)
-
-            partes_fases = []
-            if t_p > 0:
-                desc_p = f"{tipo_p}P{pol_p}{peso_p}".replace(' ', '')
-                partes_fases.append(f"P: {t_p:.2f}s [{desc_p}]")
-            if t_s > 0:
-                desc_s = f"S{pol_s}{peso_s}".replace(' ', '')
-                partes_fases.append(f"S: {t_s:.2f}s [{desc_s}]")
-            if t_coda > 0:
-                partes_fases.append(f"Coda: {t_coda:.2f}s")
-            if t_s > t_p and t_p > 0:
-                partes_fases.append(f"Ts-Tp: {(t_s - t_p):.2f}s")
-
-            texto_fases_rojo = " | ".join(partes_fases) if partes_fases else "Sin marcas"
-
-            ax.plot(tr_mostrar.times(), tr_mostrar.data, label=f"{self.id_estacion} [{estado_texto}]", color=color_traza, linewidth=0.9)
-            ax.set_title(f"Estación: {self.id_estacion} ({estado_texto}) | {texto_filtro} | Archivo: {self.archivo_seleccionado}", fontsize=8.5, pad=2, loc='left')
-            ax.set_title(texto_fases_rojo, fontsize=8, color='darkred', fontweight='bold', pad=2, loc='right')
-            ax.set_xlabel("Tiempo (s)")
-            ax.set_yticks([])
-            ax.tick_params(axis='y', which='both', left=False, labelleft=False)
-            ax.legend(loc='upper right')
-            ax.grid(True, linestyle=':', alpha=0.6)
+            # Graficar traza completa (sin recuadro de leyenda flotante)
+            self.ax.plot(tr_mostrar.times(), tr_mostrar.data, color=color_traza, linewidth=0.9)
+            self.ax.set_title(
+                f"Estación: {self.nombre_estacion} ({nombre_corto}) | {texto_filtro} | Estado: {estado_texto}",
+                fontsize=9, pad=3, loc='left', color='#1a252f', fontweight='bold'
+            )
+            self.ax.set_xlabel("Tiempo (s)", fontsize=9)
+            self.ax.set_yticks([])
+            self.ax.tick_params(axis='y', which='both', left=False, labelleft=False)
+            self.ax.grid(True, linestyle=':', alpha=0.6)
 
             # Dibujar líneas verticales a través del gestor de fases
-            self.gestor_fases.inicializar_fases(ax)
+            self.gestor_fases.inicializar_fases(self.ax)
+            self.actualizar_info_fases()
 
-            # Conexión limpia de eventos interactivos
-            self.canvas.mpl_connect('button_press_event', lambda event: self.gestor_fases.al_presionar(event, ax, self.canvas))
+            # Conexión limpia de eventos interactivos:
+            # - Clic Izquierdo (button=1): Picar / arrastrar marcas de fase
+            # - Clic Derecho (button=3): Alternar herramienta de Zoom (o doble clic para Home)
+            self.canvas.mpl_connect('button_press_event', self.al_presionar_mouse)
             self.canvas.mpl_connect('button_release_event', self.gestor_fases.al_soltar)
             self.canvas.mpl_connect('motion_notify_event', lambda event: self.gestor_fases.al_mover(event, self.canvas))
 
@@ -1270,12 +1404,49 @@ class VentanaGrafico(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al cargar el archivo {self.archivo_seleccionado}: {e}")
 
+    def al_presionar_mouse(self, event):
+        """Maneja clics de mouse: clic derecho alterna Zoom, clic izquierdo pica marcas"""
+        if event.button == 3:  # Clic derecho
+            if getattr(event, 'dblclick', False):
+                self.toolbar.home()  # Doble clic derecho restaura escala original
+            else:
+                self.toolbar.zoom()  # Clic derecho alterna modo Zoom
+        elif event.button == 1:  # Clic izquierdo
+            # Solo permitir arrastre/marcado si no se está usando activamente el zoom rectangular
+            if getattr(self.toolbar, 'mode', '') != 'zoom rect':
+                self.gestor_fases.al_presionar(event, self.ax, self.canvas)
+
+    def keyPressEvent(self, event):
+        """Atajos de teclado para agilizar el análisis"""
+        if event.key() == Qt.Key_Z:
+            self.toolbar.zoom()
+        elif event.key() == Qt.Key_R or event.key() == Qt.Key_H:
+            self.toolbar.home()
+        elif event.key() == Qt.Key_Escape:
+            self.close()
+        else:
+            super().keyPressEvent(event)
+
     def closeEvent(self, event):
         fases_actualizadas = self.gestor_fases.obtener_fases()
+        fases_est = fases_actualizadas if isinstance(fases_actualizadas, dict) else {}
+        fases_est['tipo_p'] = self.combo_tipo_p.currentText()
+        fases_est['polaridad_p'] = self.combo_pol_p.currentText()
+        try:
+            fases_est['peso_p'] = int(self.combo_peso_p.currentText())
+        except ValueError:
+            fases_est['peso_p'] = 0
+        fases_est['polaridad_s'] = self.combo_pol_s.currentText()
+        try:
+            fases_est['peso_s'] = int(self.combo_peso_s.currentText())
+        except ValueError:
+            fases_est['peso_s'] = 2
+
         if self.parent:
-            self.parent.fases_detectadas[self.archivo_seleccionado] = fases_actualizadas
+            self.parent.fases_detectadas[self.archivo_seleccionado] = fases_est
             self.parent.guardar_evento()
             self.parent.graficar_evento()
+            self.parent.actualizar_controles_estacion_activa(self.archivo_seleccionado)
             self.parent.actualizar_etiqueta_tiempos_estacion(self.archivo_seleccionado)
         super().closeEvent(event)
 
