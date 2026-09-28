@@ -23,7 +23,9 @@ if ruta_librerias not in sys.path:
 if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
+import math
 import numpy as np
+import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -94,6 +96,8 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.boton_siguiente_ciclo.clicked.connect(self.ir_a_siguiente_ciclo_esperado)
         self.boton_guardar_marcas.clicked.connect(self.guardar_marcas)
         self.boton_ignorar_caudal.clicked.connect(self.ignorar_punto_caudal_seleccionado)
+        if hasattr(self, "boton_exportar_grafico"):
+            self.boton_exportar_grafico.clicked.connect(self.abrir_dialogo_exportar_grafico)
         self.boton_salir.clicked.connect(self.close)
         
         # === Incrustar los 3 Lienzos de Matplotlib ===
@@ -107,23 +111,25 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.showMaximized()
 
     def inicializar_lienzos_graficos(self):
-        """Inicializa los 3 lienzos Matplotlib con área gráfica al 100%, sin eje Y ni títulos redundantes."""
+        """Inicializa los 3 lienzos Matplotlib con margen para unidades en caudales y alineación vertical."""
         # 1. Contenedor Superior: Serie Temporal de Caudales
         self.fig_caudales = Figure(figsize=(10, 2.0))
-        self.fig_caudales.subplots_adjust(left=0.01, right=0.99, top=0.96, bottom=0.16)
+        self.fig_caudales.subplots_adjust(left=0.065, right=0.99, top=0.94, bottom=0.18)
         self.canvas_caudales = FigureCanvas(self.fig_caudales)
         self.toolbar_caudales = NavigationToolbar(self.canvas_caudales, self)
         self.toolbar_caudales.setMaximumHeight(24)
         self.ax_caudales = self.fig_caudales.add_subplot(111)
         self.ax_caudales.grid(True, linestyle='--', alpha=0.3)
-        self.ax_caudales.yaxis.set_visible(False)
+        self.ax_caudales.yaxis.set_visible(True)
+        self.ax_caudales.set_ylabel('Caudal\n(cm³/s)', fontsize=8, fontweight='bold')
+        self.ax_caudales.tick_params(axis='y', labelsize=8, pad=2)
         self.ax_caudales.tick_params(axis='x', labelsize=7.5, pad=1)
         self.layout_grafico_caudales.addWidget(self.toolbar_caudales)
         self.layout_grafico_caudales.addWidget(self.canvas_caudales)
 
         # 2. Contenedor Medio: Sismograma Diario 24h
         self.fig_sismograma = Figure(figsize=(10, 2.0))
-        self.fig_sismograma.subplots_adjust(left=0.01, right=0.99, top=0.96, bottom=0.16)
+        self.fig_sismograma.subplots_adjust(left=0.065, right=0.99, top=0.96, bottom=0.16)
         self.canvas_sismograma = FigureCanvas(self.fig_sismograma)
         self.toolbar_sismograma = NavigationToolbar(self.canvas_sismograma, self)
         self.toolbar_sismograma.setMaximumHeight(24)
@@ -136,7 +142,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # 3. Contenedor Inferior: Zoom de Forma de Onda para Marcado
         self.fig_zoom = Figure(figsize=(10, 2.5))
-        self.fig_zoom.subplots_adjust(left=0.01, right=0.99, top=0.96, bottom=0.16)
+        self.fig_zoom.subplots_adjust(left=0.065, right=0.99, top=0.96, bottom=0.16)
         self.canvas_zoom = FigureCanvas(self.fig_zoom)
         self.toolbar_zoom = NavigationToolbar(self.canvas_zoom, self)
         self.toolbar_zoom.setMaximumHeight(24)
@@ -928,9 +934,12 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                     break
 
         self.ax_caudales.set_ylim(bottom=0)
+        self.ax_caudales.yaxis.set_visible(True)
+        self.ax_caudales.set_ylabel('Caudal\n(cm³/s)', fontsize=8, fontweight='bold')
+        self.ax_caudales.tick_params(axis='y', labelsize=8, pad=2)
         self.ax_caudales.tick_params(axis='x', labelsize=7.5, pad=1)
         self.ax_caudales.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-        self.fig_caudales.subplots_adjust(left=0.01, right=0.99, top=0.96, bottom=0.16)
+        self.fig_caudales.subplots_adjust(left=0.065, right=0.99, top=0.94, bottom=0.18)
         self.canvas_caudales.draw_idle()
 
         # Guardar periodo graficado en caudales_periodo.csv
@@ -1043,6 +1052,564 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"[ERROR] No se pudo guardar caudales.csv al cerrar: {e}")
         event.accept()
+
+    def abrir_dialogo_exportar_grafico(self):
+        """Abre la ventana emergente para configurar el marco de caudales y exportar el gráfico en DXF."""
+        fecha_ini = self.selector_fecha_inicio.date().toPyDate()
+        fecha_fin = self.selector_fecha_fin.date().toPyDate()
+        dialogo = DialogoExportarGraficoCaudales(
+            self,
+            self.caudales,
+            fecha_ini,
+            fecha_fin,
+            self.directorio_trabajo
+        )
+        dialogo.exec_()
+
+
+def calcular_paso_optimo(rango, divisiones_deseadas=7):
+    """Calcula un paso estético (1, 2, 4, 5 o 10 x 10^k) para graduar los ejes."""
+    if rango <= 0:
+        return 1.0
+    paso_bruto = rango / divisiones_deseadas
+    potencia = 10 ** math.floor(math.log10(paso_bruto))
+    fraccion = paso_bruto / potencia
+    if fraccion <= 1.5:
+        multiplicador = 1.0
+    elif fraccion <= 3.0:
+        multiplicador = 2.0
+    elif fraccion <= 4.5:
+        multiplicador = 4.0
+    elif fraccion <= 7.5:
+        multiplicador = 5.0
+    else:
+        multiplicador = 10.0
+    return potencia * multiplicador
+
+
+def calcular_ticks_eje_y(y0, y1, divisiones_deseadas=7):
+    """Calcula los ticks y cotas principales entre y0 e y1."""
+    rango = y1 - y0
+    if rango <= 0:
+        return [y0, y0 + 10.0], 10.0
+    paso = calcular_paso_optimo(rango, divisiones_deseadas)
+    num_div = round(rango / paso)
+    if abs(rango - num_div * paso) < 1e-4:
+        ticks = [round(y0 + i * paso, 4) for i in range(num_div + 1)]
+    else:
+        primer_tick = math.ceil(y0 / paso) * paso
+        ticks = []
+        t = primer_tick
+        while t <= y1 + 1e-5:
+            ticks.append(round(t, 4))
+            t += paso
+        if not ticks or ticks[0] > y0:
+            ticks.insert(0, round(y0, 4))
+        if ticks[-1] < y1:
+            ticks.append(round(y1, 4))
+    return ticks, paso
+
+
+def escribir_dxf_caudales(ruta_dxf, fecha_inicio, fecha_final, y_min, y_max, puntos):
+    """
+    Genera un archivo DXF con la maquetación exacta para Caudal Total (cm³/s):
+    - Marco rectangular superior con cuadrícula horizontal en cotas principales.
+    - Líneas continuas verticales y compartimentos para los meses correspondientes.
+    - Franja inferior sombreada en gris con nombres de mes centrados en blanco.
+    - Eje vertical rotado a 90° con la etiqueta 'CAUDAL TOTAL (cm³/s)'.
+    - Curva continua de caudales como LWPOLYLINE en capa CAUDAL.
+    """
+    NOMBRES_MESES = [
+        "", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+        "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+    ]
+
+    duracion_segundos = max((fecha_final - fecha_inicio).total_seconds(), 3600.0)
+    x0 = 0.0
+    x1 = duracion_segundos / 86400.0
+    y0 = float(y_min)
+    y1 = float(y_max)
+
+    rango_x = x1 - x0
+    rango_y = max(y1 - y0, 0.1)
+
+    alto_barra_meses = max(rango_y * 0.075, 0.6)
+    y_barra_fondo = y0 - alto_barra_meses
+
+    margen_x = max(rango_x * 0.05, 0.5)
+    margen_y = max(rango_y * 0.08, 0.5)
+
+    contenido = []
+
+    def agregar(codigo, valor):
+        contenido.append(str(codigo))
+        contenido.append(str(valor))
+
+    def agregar_linea(xa, ya, xb, yb, capa="MARCO", color=7):
+        agregar(0, "LINE")
+        agregar(8, capa)
+        agregar(62, color)
+        agregar(10, f"{xa:.4f}")
+        agregar(20, f"{ya:.4f}")
+        agregar(30, "0.0")
+        agregar(11, f"{xb:.4f}")
+        agregar(21, f"{yb:.4f}")
+        agregar(31, "0.0")
+
+    def agregar_texto(x, y, texto, alto=0.25, rotacion=0.0, alineacion_h=0, alineacion_v=0, capa="TEXTOS", color=7):
+        agregar(0, "TEXT")
+        agregar(8, capa)
+        agregar(62, color)
+        agregar(10, f"{x:.4f}")
+        agregar(20, f"{y:.4f}")
+        agregar(30, "0.0")
+        agregar(40, f"{alto:.4f}")
+        agregar(1, str(texto))
+        if rotacion != 0.0:
+            agregar(50, f"{rotacion:.1f}")
+        agregar(7, "STANDARD")
+        if alineacion_h != 0 or alineacion_v != 0:
+            agregar(72, alineacion_h)
+            agregar(11, f"{x:.4f}")
+            agregar(21, f"{y:.4f}")
+            agregar(31, "0.0")
+            agregar(73, alineacion_v)
+
+    # 1. Encabezado DXF (AutoCAD R12 / AC1009: estándar universal para ODA y Vectorworks)
+    agregar(0, "SECTION")
+    agregar(2, "HEADER")
+    agregar(9, "$ACADVER")
+    agregar(1, "AC1009")
+    agregar(9, "$LTSCALE")
+    agregar(40, "1.0")
+    agregar(0, "ENDSEC")
+
+    # 2. Tablas
+    agregar(0, "SECTION")
+    agregar(2, "TABLES")
+
+    # Tabla de tipos de línea
+    agregar(0, "TABLE")
+    agregar(2, "LTYPE")
+    agregar(70, 1)
+    agregar(0, "LTYPE")
+    agregar(2, "CONTINUOUS")
+    agregar(70, 0)
+    agregar(3, "Solid line")
+    agregar(72, 65)
+    agregar(73, 0)
+    agregar(40, "0.0")
+    agregar(0, "ENDTAB")
+
+    # Tabla de capas
+    capas = [
+        ("0", 7),
+        ("MARCO", 7),
+        ("MALLA_HORIZONTAL", 8),
+        ("MALLA_MESES", 7),
+        ("FONDO_MESES", 8),
+        ("CAUDAL", 7),
+        ("TEXTOS", 7),
+        ("TEXTOS_MESES", 7)
+    ]
+    agregar(0, "TABLE")
+    agregar(2, "LAYER")
+    agregar(70, len(capas))
+    for nom, col in capas:
+        agregar(0, "LAYER")
+        agregar(2, nom)
+        agregar(70, 0)
+        agregar(62, col)
+        agregar(6, "CONTINUOUS")
+    agregar(0, "ENDTAB")
+
+    # Tabla de estilos de texto
+    agregar(0, "TABLE")
+    agregar(2, "STYLE")
+    agregar(70, 1)
+    agregar(0, "STYLE")
+    agregar(2, "STANDARD")
+    agregar(70, 0)
+    agregar(40, "0.0")
+    agregar(41, "1.0")
+    agregar(50, "0.0")
+    agregar(71, 0)
+    agregar(42, "0.2")
+    agregar(3, "ARIAL")
+    agregar(0, "ENDTAB")
+
+    agregar(0, "ENDSEC")
+
+    # 3. Bloques (requerido por parsers ODA de Vectorworks)
+    agregar(0, "SECTION")
+    agregar(2, "BLOCKS")
+    agregar(0, "ENDSEC")
+
+    # 4. Entidades gráficas
+    agregar(0, "SECTION")
+    agregar(2, "ENTITIES")
+
+    # Marco rectangular del gráfico
+    agregar_linea(x0, y0, x1, y0, "MARCO", 7)
+    agregar_linea(x1, y0, x1, y1, "MARCO", 7)
+    agregar_linea(x1, y1, x0, y1, "MARCO", 7)
+    agregar_linea(x0, y1, x0, y0, "MARCO", 7)
+
+    # Marco de la barra de meses inferior
+    agregar_linea(x0, y_barra_fondo, x1, y_barra_fondo, "MARCO", 7)
+    agregar_linea(x0, y_barra_fondo, x0, y0, "MARCO", 7)
+    agregar_linea(x1, y_barra_fondo, x1, y0, "MARCO", 7)
+
+    # Ticks horizontales y cotas (Eje Y)
+    ticks_y, paso_y = calcular_ticks_eje_y(y0, y1, 7)
+    alto_texto_y = max(rango_y * 0.025, 0.18)
+    for t_y in ticks_y:
+        agregar_linea(x0, t_y, x1, t_y, "MALLA_HORIZONTAL", 8)
+        agregar_linea(x0 - margen_x * 0.015, t_y, x0, t_y, "MARCO", 7)
+        etiqueta_y = f"{int(round(t_y))}" if paso_y >= 1 and abs(t_y - round(t_y)) < 1e-4 else f"{t_y:.1f}"
+        agregar_texto(x0 - margen_x * 0.025, t_y, etiqueta_y, alto=alto_texto_y, alineacion_h=2, alineacion_v=2, capa="TEXTOS", color=7)
+
+    # Rótulo vertical del eje Y
+    alto_rotulo_y = max(rango_y * 0.032, 0.25)
+    agregar_texto(
+        x0 - margen_x * 0.08,
+        (y0 + y1) / 2.0,
+        "CAUDAL TOTAL (cm3/s)",
+        alto=alto_rotulo_y,
+        alineacion_h=1,
+        alineacion_v=2,
+        rotacion=90.0,
+        capa="TEXTOS",
+        color=7
+    )
+
+    # Líneas verticales continuas en los cambios de mes
+    cur_dia = datetime(fecha_inicio.year, fecha_inicio.month, fecha_inicio.day)
+    while cur_dia <= fecha_final:
+        pos_x = (cur_dia - fecha_inicio).total_seconds() / 86400.0
+        if x0 < pos_x < x1 and cur_dia.day == 1:
+            agregar_linea(pos_x, y_barra_fondo, pos_x, y1, "MALLA_MESES", 7)
+        cur_dia += timedelta(days=1)
+
+    # Compartimentos y nombres de mes en la barra inferior
+    cursor_mes = datetime(fecha_inicio.year, fecha_inicio.month, 1)
+    alto_texto_mes = alto_barra_meses * 0.40
+    while cursor_mes <= fecha_final:
+        ini_seg = max(fecha_inicio, cursor_mes)
+        if cursor_mes.month == 12:
+            siguiente_mes = datetime(cursor_mes.year + 1, 1, 1)
+        else:
+            siguiente_mes = datetime(cursor_mes.year, cursor_mes.month + 1, 1)
+        fin_seg = min(fecha_final, siguiente_mes)
+
+        if fin_seg > ini_seg:
+            xa = (ini_seg - fecha_inicio).total_seconds() / 86400.0
+            xb = (fin_seg - fecha_inicio).total_seconds() / 86400.0
+
+            # Fondo gris de cada compartimento de mes
+            agregar(0, "SOLID")
+            agregar(8, "FONDO_MESES")
+            agregar(62, 8)
+            agregar(10, f"{xa:.4f}")
+            agregar(20, f"{y_barra_fondo:.4f}")
+            agregar(30, "0.0")
+            agregar(11, f"{xb:.4f}")
+            agregar(21, f"{y_barra_fondo:.4f}")
+            agregar(31, "0.0")
+            agregar(12, f"{xa:.4f}")
+            agregar(22, f"{y0:.4f}")
+            agregar(32, "0.0")
+            agregar(13, f"{xb:.4f}")
+            agregar(23, f"{y0:.4f}")
+            agregar(33, "0.0")
+
+            # Nombre del mes centrado en mayúsculas
+            nom_mes = NOMBRES_MESES[cursor_mes.month]
+            x_centro = (xa + xb) / 2.0
+            y_centro = (y_barra_fondo + y0) / 2.0
+            agregar_texto(x_centro, y_centro, nom_mes, alto=alto_texto_mes, alineacion_h=1, alineacion_v=2, capa="TEXTOS_MESES", color=7)
+
+        cursor_mes = siguiente_mes
+
+    # Polilínea universal R12 de caudales
+    puntos_caudal = []
+    for dt, val in puntos:
+        t_dias = (dt - fecha_inicio).total_seconds() / 86400.0
+        puntos_caudal.append((t_dias, float(val)))
+
+    if puntos_caudal:
+        agregar(0, "POLYLINE")
+        agregar(8, "CAUDAL")
+        agregar(62, 7)
+        agregar(66, 1)  # Banderín obligatorio: vértices siguen
+        agregar(10, "0.0")
+        agregar(20, "0.0")
+        agregar(30, "0.0")
+        agregar(70, 0)
+        for px, py in puntos_caudal:
+            agregar(0, "VERTEX")
+            agregar(8, "CAUDAL")
+            agregar(10, f"{px:.4f}")
+            agregar(20, f"{py:.4f}")
+            agregar(30, "0.0")
+        agregar(0, "SEQEND")
+        agregar(8, "CAUDAL")
+
+    agregar(0, "ENDSEC")
+    agregar(0, "EOF")
+
+    with open(ruta_dxf, "w", encoding="ascii", errors="replace") as archivo:
+        archivo.write("\n".join(contenido) + "\n")
+
+
+class DialogoExportarGraficoCaudales(QtWidgets.QDialog):
+    """
+    Ventana emergente interactiva para configurar límites de caudal y exportar a DXF.
+    """
+    def __init__(self, padre, datos_caudales, fecha_ini_def, fecha_fin_def, dir_trabajo):
+        super().__init__(padre)
+        self.padre = padre
+        self.datos_caudales = datos_caudales
+        self.dir_trabajo = dir_trabajo
+        self.setWindowTitle("Exportar Gráfico de Caudales — DXF")
+        self.resize(520, 240)
+        self.inicializar_interfaz(fecha_ini_def, fecha_fin_def)
+
+    def inicializar_interfaz(self, fecha_ini_def, fecha_fin_def):
+        layout = QtWidgets.QVBoxLayout(self)
+
+        grupo_params = QtWidgets.QGroupBox("Parámetros del Marco y Período")
+        layout_grid = QtWidgets.QGridLayout(grupo_params)
+
+        layout_grid.addWidget(QtWidgets.QLabel("<b>Fecha Inicio:</b>"), 0, 0)
+        self.selector_fecha_ini = QtWidgets.QDateEdit(self)
+        self.selector_fecha_ini.setCalendarPopup(True)
+        self.selector_fecha_ini.setDate(fecha_ini_def)
+        layout_grid.addWidget(self.selector_fecha_ini, 0, 1)
+
+        layout_grid.addWidget(QtWidgets.QLabel("<b>Fecha Fin:</b>"), 0, 2)
+        self.selector_fecha_fin = QtWidgets.QDateEdit(self)
+        self.selector_fecha_fin.setCalendarPopup(True)
+        self.selector_fecha_fin.setDate(fecha_fin_def)
+        layout_grid.addWidget(self.selector_fecha_fin, 0, 3)
+
+        min_sug, max_sug = self.calcular_sugerencia_caudal(fecha_ini_def, fecha_fin_def)
+
+        layout_grid.addWidget(QtWidgets.QLabel("<b>Caudal Mínimo [cm³/s]:</b>"), 1, 0)
+        self.spin_caudal_min = QtWidgets.QDoubleSpinBox(self)
+        self.spin_caudal_min.setRange(-1000.0, 100000.0)
+        self.spin_caudal_min.setDecimals(1)
+        self.spin_caudal_min.setSingleStep(5.0)
+        self.spin_caudal_min.setValue(min_sug)
+        layout_grid.addWidget(self.spin_caudal_min, 1, 1)
+
+        layout_grid.addWidget(QtWidgets.QLabel("<b>Caudal Máximo [cm³/s]:</b>"), 1, 2)
+        self.spin_caudal_max = QtWidgets.QDoubleSpinBox(self)
+        self.spin_caudal_max.setRange(-1000.0, 100000.0)
+        self.spin_caudal_max.setDecimals(1)
+        self.spin_caudal_max.setSingleStep(5.0)
+        self.spin_caudal_max.setValue(max_sug)
+        layout_grid.addWidget(self.spin_caudal_max, 1, 3)
+
+        self.selector_fecha_ini.dateChanged.connect(self.al_cambiar_fechas_dialogo)
+        self.selector_fecha_fin.dateChanged.connect(self.al_cambiar_fechas_dialogo)
+
+        layout.addWidget(grupo_params)
+
+        layout_botones = QtWidgets.QHBoxLayout()
+
+        self.boton_previsualizar = QtWidgets.QPushButton("👁️ Previsualizar Gráfico")
+        self.boton_previsualizar.clicked.connect(self.previsualizar_grafico)
+        layout_botones.addWidget(self.boton_previsualizar)
+
+        self.boton_generar_dxf = QtWidgets.QPushButton("📐 Generar Archivo DXF")
+        self.boton_generar_dxf.clicked.connect(self.generar_archivo_dxf)
+        layout_botones.addWidget(self.boton_generar_dxf)
+
+        self.boton_cerrar = QtWidgets.QPushButton("Cerrar")
+        self.boton_cerrar.clicked.connect(self.close)
+        layout_botones.addWidget(self.boton_cerrar)
+
+        layout.addLayout(layout_botones)
+
+    def al_cambiar_fechas_dialogo(self):
+        f_ini = self.selector_fecha_ini.date().toPyDate()
+        f_fin = self.selector_fecha_fin.date().toPyDate()
+        if f_ini < f_fin:
+            min_sug, max_sug = self.calcular_sugerencia_caudal(f_ini, f_fin)
+            self.spin_caudal_min.setValue(min_sug)
+            self.spin_caudal_max.setValue(max_sug)
+
+    def calcular_sugerencia_caudal(self, f_ini, f_fin):
+        valores = []
+        for fila in self.datos_caudales:
+            try:
+                if len(fila) < 3 or str(fila[2]).strip() != "1":
+                    continue
+                dt = datetime.strptime(fila[0].replace(".sis", ""), "%Y%m%d_%H%M%S")
+                if f_ini <= dt.date() <= f_fin:
+                    val = float(fila[1])
+                    if val > 0:
+                        valores.append(val)
+            except Exception:
+                continue
+        if valores:
+            v_min = min(valores)
+            v_max = max(valores)
+            sug_min = math.floor(v_min / 10.0) * 10.0
+            sug_max = math.ceil(v_max / 10.0) * 10.0
+            if sug_max <= sug_min:
+                sug_max = sug_min + 10.0
+            return sug_min, sug_max
+        return 120.0, 190.0
+
+    def obtener_datos_filtrados(self):
+        f_ini_date = self.selector_fecha_ini.date().toPyDate()
+        f_fin_date = self.selector_fecha_fin.date().toPyDate()
+        if f_ini_date >= f_fin_date:
+            QMessageBox.warning(self, "Rango de fechas inválido", "La fecha de inicio debe ser anterior a la fecha de fin.")
+            return None, None, None, None, []
+
+        c_min = self.spin_caudal_min.value()
+        c_max = self.spin_caudal_max.value()
+        if c_min >= c_max:
+            QMessageBox.warning(self, "Rango de caudal inválido", "El caudal mínimo debe ser menor que el caudal máximo.")
+            return None, None, None, None, []
+
+        f_ini_dt = datetime.combine(f_ini_date, datetime.min.time())
+        f_fin_dt = datetime.combine(f_fin_date, datetime.max.time())
+
+        puntos = []
+        for fila in self.datos_caudales:
+            try:
+                if len(fila) < 3 or str(fila[2]).strip() != "1":
+                    continue
+                dt = datetime.strptime(fila[0].replace(".sis", ""), "%Y%m%d_%H%M%S")
+                if f_ini_dt <= dt <= f_fin_dt:
+                    val = float(fila[1])
+                    if val > 0:
+                        puntos.append((dt, val))
+            except Exception:
+                continue
+
+        if not puntos:
+            QMessageBox.warning(self, "Sin datos", "No existen registros de caudal confirmados (bandera=1) en el período seleccionado.")
+            return None, None, None, None, []
+
+        puntos.sort(key=lambda x: x[0])
+        return f_ini_dt, f_fin_dt, c_min, c_max, puntos
+
+    def previsualizar_grafico(self):
+        f_ini, f_fin, c_min, c_max, puntos = self.obtener_datos_filtrados()
+        if not puntos:
+            return
+
+        fechas = [p[0] for p in puntos]
+        valores = [p[1] for p in puntos]
+
+        NOMBRES_MESES = [
+            "", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+            "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+        ]
+
+        ticks_y, paso_y = calcular_ticks_eje_y(c_min, c_max, 7)
+
+        # Configuración tipográfica estilo técnico Arial AutoCAD
+        plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
+        plt.rcParams['font.family'] = 'sans-serif'
+
+        fig, (ax_grafico, ax_meses) = plt.subplots(
+            2, 1, figsize=(12, 4.8),
+            gridspec_kw={'height_ratios': [8.5, 1.2], 'hspace': 0.0}
+        )
+
+        # Curva de caudales destacada (grosor equivalente a 0.50 mm de AutoCAD)
+        ax_grafico.plot(fechas, valores, color='black', lw=1.8, zorder=4)
+        ax_grafico.set_ylabel('CAUDAL TOTAL (cm³/s)', fontname='Arial', fontweight='bold', fontsize=11)
+        ax_grafico.set_ylim(c_min, c_max)
+        ax_grafico.set_yticks(ticks_y)
+        ax_grafico.set_yticklabels(
+            [f"{int(round(t))}" if paso_y >= 1 and abs(t - round(t)) < 1e-4 else f"{t:.1f}" for t in ticks_y],
+            fontname='Arial', fontsize=10
+        )
+        # Malla horizontal fina (grosor equivalente a 0.15 mm de AutoCAD)
+        ax_grafico.grid(True, which='major', axis='y', color='black', linestyle='-', linewidth=0.6, zorder=1)
+
+        ax_grafico.set_xlim(f_ini, f_fin)
+        ax_grafico.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+        ax_grafico.tick_params(axis='y', which='both', direction='out', length=5, width=1.0)
+
+        # Marco exterior con grosor medio (0.35 mm de AutoCAD)
+        for spine in ax_grafico.spines.values():
+            spine.set_linewidth(1.3)
+            spine.set_color('black')
+
+        # Líneas verticales continuas en los cambios de mes (0.30 mm de AutoCAD)
+        cur_dia = datetime(f_ini.year, f_ini.month, f_ini.day)
+        while cur_dia <= f_fin:
+            if cur_dia > f_ini and cur_dia.day == 1:
+                ax_grafico.axvline(cur_dia, color='black', linestyle='-', linewidth=1.2, zorder=2)
+                ax_meses.axvline(cur_dia, color='black', linestyle='-', linewidth=1.2, zorder=3)
+            cur_dia += timedelta(days=1)
+
+        cursor_mes = datetime(f_ini.year, f_ini.month, 1)
+        while cursor_mes <= f_fin:
+            ini_seg = max(f_ini, cursor_mes)
+            if cursor_mes.month == 12:
+                siguiente_mes = datetime(cursor_mes.year + 1, 1, 1)
+            else:
+                siguiente_mes = datetime(cursor_mes.year, cursor_mes.month + 1, 1)
+            fin_seg = min(f_fin, siguiente_mes)
+
+            if fin_seg > ini_seg:
+                nom_mes = NOMBRES_MESES[cursor_mes.month]
+                dt_centro = ini_seg + (fin_seg - ini_seg) / 2
+                ax_meses.axvspan(ini_seg, fin_seg, facecolor='#666666', edgecolor='black', linewidth=1.2)
+                ax_meses.text(
+                    dt_centro, 0.5, nom_mes, color='white', fontname='Arial',
+                    fontweight='bold', fontsize=10.5, ha='center', va='center'
+                )
+            cursor_mes = siguiente_mes
+
+        ax_meses.set_xlim(f_ini, f_fin)
+        ax_meses.set_ylim(0, 1)
+        ax_meses.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+        for spine in ax_meses.spines.values():
+            spine.set_linewidth(1.3)
+            spine.set_color('black')
+
+        fig.tight_layout()
+        plt.show()
+
+    def generar_archivo_dxf(self):
+        f_ini, f_fin, c_min, c_max, puntos = self.obtener_datos_filtrados()
+        if not puntos:
+            return
+
+        nombre_sug = f"caudal_{f_ini.strftime('%Y%m%d')}_a_{f_fin.strftime('%Y%m%d')}.dxf"
+        ruta_sug = os.path.join(self.dir_trabajo or "", nombre_sug)
+
+        ruta_dxf, _ = QFileDialog.getSaveFileName(
+            self,
+            "Guardar Gráfico de Caudales en DXF",
+            ruta_sug,
+            "Archivos DXF (*.dxf)"
+        )
+        if not ruta_dxf:
+            return
+
+        try:
+            escribir_dxf_caudales(ruta_dxf, f_ini, f_fin, c_min, c_max, puntos)
+            QMessageBox.information(
+                self,
+                "DXF Generado Exitosamente",
+                f"El archivo DXF se guardó correctamente en:\n{ruta_dxf}\n\n"
+                f"Total de registros exportados: {len(puntos)}\n"
+                f"Marco de caudal: {c_min:.1f} a {c_max:.1f} cm³/s\n"
+                f"Período: {f_ini.strftime('%d/%m/%Y')} a {f_fin.strftime('%d/%m/%Y')}"
+            )
+        except Exception as ex:
+            QMessageBox.critical(self, "Error al generar DXF", f"No se pudo escribir el archivo DXF:\n{ex}")
 
 
 if __name__ == '__main__':

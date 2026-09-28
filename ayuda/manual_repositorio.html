@@ -705,7 +705,38 @@
                 <li><strong>Compatibilidad de Rutas:</strong> Evitar barras diagonales codificadas a mano. Usar siempre `os.path.join` o `pathlib.Path` para asegurar que el código funcione tanto en entornos de desarrollo de Windows como en servidores.</li>
                 <li><strong>Traducciones idiomáticas prohibidas:</strong> Respeta el idioma establecido en cada archivo (español o inglés). No intentes "corregir" o traducir nombres de variables ya declaradas.</li>
             </ul>
+
+            <div class="collapsible-container" style="margin-top: 20px;">
+                <div class="collapsible-header">🔄 Protocolo Estándar de Sesión (Prompts de Inicio y Fin)</div>
+                <div class="collapsible-content">
+                    <p><strong>🟢 Prompt de Inicio (Scope Lock):</strong></p>
+                    <pre><code class="block">Considera las reglas y skills definidos en .agents/rules y .agents/skills.
+Para esta sesión, nuestro directorio de trabajo exclusivo será [DIRECTORIO]. No modifiques ni busques archivos fuera de esta ruta a menos que te lo pida. 
+Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto actual del proyecto. Todavia no modifiques ni crees ningun archivo.</code></pre>
+
+                    <p style="margin-top: 15px;"><strong>🔴 Prompts de Cierre de Sesión (Secuencia de 4 Pasos):</strong></p>
+                    <ol class="styled-list" style="margin-top: 8px;">
+                        <li><code>Genera o actualiza el contexto tecnico de los archivos que fueron modificados durante la sesión, según la skill generar_contexto.md.</code></li>
+                        <li><code>Extrae o actualiza el ADR de las decisiones tomadas durante la sesión, según la skill extraer_adr.md.</code></li>
+                        <li><code>Genera la transición técnica de esta sesión según la skill crear_transicion_tecnica.md.</code></li>
+                        <li><code>Genera un resumen detallado de todos los cambios y archivos modificados durante esta sesión.</code></li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="collapsible-container" style="margin-top: 12px;">
+                <div class="collapsible-header">🛠️ Suite de Skills Especializadas (.agents/skills)</div>
+                <div class="collapsible-content">
+                    <ul class="styled-list">
+                        <li><strong>generar_contexto.md:</strong> Crea o actualiza archivos <code>_contx.md</code> con 6 secciones estructuradas (Mermaid, contratos, métodos, riesgos y checklist).</li>
+                        <li><strong>extraer_adr.md:</strong> Registra Architecture Decision Records en <code>docs/adr/</code>.</li>
+                        <li><strong>crear_transicion_tecnica.md:</strong> Genera el traspaso técnico (<em>handover</em>) en <code>docs/transiciones/</code> para reanudar el trabajo en sesiones futuras.</li>
+                        <li><strong>auditoria_librerias_e_integracion.md:</strong> Audita llamadores de librerías e integra módulos hacia <code>src/programa_integrado.py</code>.</li>
+                    </ul>
+                </div>
+            </div>
         </section>
+
 
         <!-- Sección 5: Ejecución de Tareas -->
         <section id="ejecucion">

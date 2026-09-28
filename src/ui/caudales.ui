@@ -132,6 +132,16 @@
             </property>
            </widget>
           </item>
+          <item>
+           <widget class="QPushButton" name="boton_exportar_grafico">
+            <property name="toolTip">
+             <string>Abre la ventana para seccionar cotas y exportar el gráfico de caudal total a DXF</string>
+            </property>
+            <property name="text">
+             <string>📊 Exportar Gráfico (DXF)...</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>

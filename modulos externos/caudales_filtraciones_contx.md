@@ -98,8 +98,12 @@ Ubicado en `directorio_trabajo/caudales.csv` (por defecto `G:/Mi unidad/DIA/caud
 | `actualizar_grafico_zoom(centro_tiempo)` | Slot / Plot | Extrae y grafica un corte en alta resolución ($\pm 10$ min) alrededor de `centro_tiempo`, superponiendo la franja predictiva sombreada. |
 | `gestionar_marca_tiempo(tiempo_click)` | Lógica | Inserta o elimina hasta 2 marcas temporales rojas sincronizándolas entre el sismograma 24h y el zoom. |
 | `guardar_marcas()` | Extracción Sísmica | Valida 2 marcas, extrae el `.sis`, actualiza catálogos diarios, fija `bandera='1'` en `caudales.csv`, refresca el diagnóstico y gráficos. |
-| `graficar_caudales(silencioso)` | Visualización | Grafica los caudales confirmados (`bandera='1'`) en el periodo histórico y resalta en rojo la selección activa. |
+| `graficar_caudales(silencioso)` | Visualización | Grafica los caudales confirmados (`bandera='1'`) en el periodo histórico con eje Y visible, unidades `Caudal (cm³/s)` y resalta en rojo la selección activa. |
 | `limpiar_graficos_sismograma(mensaje)` | Contención | Dibuja un mensaje limpio en los lienzos cuando un archivo MiniSEED no existe o falla su lectura. |
+| `abrir_dialogo_exportar_grafico()` | UI / Exportación | Despliega `DialogoExportarGraficoCaudales` para configurar el marco de caudales y exportar la serie en CAD DXF. |
+| `DialogoExportarGraficoCaudales` | Ventana Diálogo | Diálogo con selectores de fecha de inicio/fin, límites de caudal min/max con sugerencias automáticas, previsualización en Matplotlib y exportación a DXF. |
+| `calcular_ticks_eje_y(y0, y1, div)` | Algoritmo | Calcula divisiones y pasos estéticos optimizados para el eje vertical de caudales. |
+| `escribir_dxf_caudales(...)` | Exportador CAD | Genera archivo DXF universal AutoCAD R12 (`AC1009`) compatible con motores ODA (Vectorworks/AutoCAD): sección `BLOCKS`, coordenadas 3D completas, `POLYLINE` con banderín `66 1`, `VERTEX`, `SEQEND`, estilo `ARIAL`, codificación ASCII pura y rotulación `CAUDAL TOTAL (cm3/s)`. |
 
 ---
 
@@ -109,6 +113,8 @@ Ubicado en `directorio_trabajo/caudales.csv` (por defecto `G:/Mi unidad/DIA/caud
 2. **Conversión de Zonas Horarias en Matplotlib**: Se utiliza `tzinfo=None` al convertir `mdates.num2date` para evitar inconsistencias de tiempo ingenuo (*naive*) vs consciente (*aware*) al interactuar con ObsPy `UTCDateTime`.
 3. **Inmutabilidad de Datos Históricos en `caudales.csv`**: Las filas ya existentes en `caudales.csv` son registros permanentes e inmutables; no se someten a recálculos automáticos al cargar la aplicación. Los nuevos caudales se computan exclusivamente para marcas nuevas respecto al último evento confirmado anterior.
 4. **Residente de Vigilancia (`vigilante_caudales.py`)**: Monitorea `caudales.csv` en segundo plano para notificar al usuario en Windows si transcurren más de $1.5 \times \Delta t$ sin bombeo o si no se ha revisado la aplicación hoy.
+5. **División Temporal Dinámica en DXF/Preview**: Los meses y sus límites se calculan estrictamente a partir del rango de fechas ingresado (`fecha_inicio` a `fecha_final`). Si el rango abarca meses parciales, los segmentos y etiquetas se centran proporcionalmente en la barra inferior.
+6. **Compatibilidad Estricta ODA / Vectorworks**: Para evitar el error de biblioteca `ODA Platform Error: Internal Error`, el exportador genera estándar R12 (`AC1009`) con sección `BLOCKS` explícita, secuencias `POLYLINE` + `VERTEX` + `SEQEND`, coordenadas tridimensionales en todas las entidades y caracteres ASCII limpios (ej. `cm3/s`), asegurando compatibilidad con Vectorworks, AutoCAD, Civil 3D y LibreCAD.
 
 ---
 
@@ -116,6 +122,7 @@ Ubicado en `directorio_trabajo/caudales.csv` (por defecto `G:/Mi unidad/DIA/caud
 
 Antes de validar cualquier modificación en `caudales_filtraciones.py`, verificar:
 - [ ] La ventana inicia maximizada con el panel de control compacto a la izquierda y 3 lienzos apilados a la derecha.
+- [ ] El lienzo superior de caudales muestra el eje Y visible con las marcas numéricas y la etiqueta `Caudal (cm³/s)`.
 - [ ] El panel izquierdo muestra el diagnóstico dinámico de bombeo (último evento, caudal, horas transcurridas y badge de estado).
 - [ ] El botón `🎯 Ir a Siguiente Ciclo Esperado` calcula la hora estimada del próximo bombeo y enfoca directamente la fecha y zoom en la franja estimada.
 - [ ] El sismograma 24h y el Zoom dibujan la franja sombreada tenue (`axvspan`) en la zona donde se espera el pulso del motor.
@@ -126,3 +133,6 @@ Antes de validar cualquier modificación en `caudales_filtraciones.py`, verifica
 - [ ] Colocar 2 marcas con clic derecho en el zoom y pulsar `💾 Guardar marcas (.SIS)` extrae el evento, pone bandera 1 y mantiene intactos `xlim` y `ylim`.
 - [ ] El proceso residente `vigilante_caudales.py` se ejecuta en la bandeja del sistema emitiendo notificaciones según el estado del sistema.
 - [ ] Fechas sin MiniSEED no lanzan excepciones y muestran el aviso gris de ausencia de datos.
+- [ ] El botón `Exportar Gráfico...` abre la ventana emergente con fechas y cotas de caudal sugeridas.
+- [ ] La previsualización de Matplotlib despliega el marco hidrológico idéntico a la referencia con tipografía Arial, grosores diferenciados (curva destacada, malla fina, marco y meses) y rotulación vertical `CAUDAL TOTAL (cm³/s)`.
+- [ ] El archivo `.dxf` generado importa limpiamente en Vectorworks y abre en AutoCAD sin arrojar fallos de ODA ni errores internos.

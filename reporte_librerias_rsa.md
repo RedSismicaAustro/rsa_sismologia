@@ -50,7 +50,6 @@ Imports:
 
 - PyQt5
 - PyQt5.QtWidgets
-- PyQt5.QtWidgets
 - metodos_gestion
 - os
 - pathlib
@@ -119,6 +118,7 @@ Imports:
 - obspy
 - os
 - pathlib
+- re
 - subprocess
 
 
@@ -220,6 +220,26 @@ Imports:
 - obspy
 - obspy.signal.trigger
 - scipy.signal
+
+
+## librerias/panel_estado.py
+
+Categorías detectadas:
+
+- io
+- qt
+
+Imports:
+
+- PyQt5.QtCore
+- PyQt5.QtGui
+- PyQt5.QtWidgets
+- datetime
+- metodos_gestion
+- metodos_rsa
+- os
+- pathlib
+- sys
 
 
 ## librerias/rsa_dominio.py
@@ -480,7 +500,6 @@ Imports:
 - matplotlib
 - matplotlib.pyplot
 - os
-- os
 - pathlib
 - rsa_procesamiento
 - subprogramas.extraer_integrado
@@ -491,39 +510,6 @@ Imports:
 - subprogramas.procesamiento_integrado
 - subprogramas.reporte_acumulado
 - subprogramas.reporte_diario
-- sys
-- sys
-
-
-## programa_integrado_alt.py
-
-Categorías detectadas:
-
-- graficos
-- io
-- qt
-
-Imports:
-
-- PyQt5
-- PyQt5.QtCore
-- PyQt5.QtGui
-- PyQt5.QtWidgets
-- csv
-- datetime
-- matplotlib
-- metodos_gestion
-- metodos_rsa
-- os
-- os
-- pathlib
-- subprocess
-- subprogramas.extraer_integrado
-- subprogramas.fases
-- subprogramas.inicio
-- subprogramas.marcar_eventos
-- subprogramas.procesamiento_integrado
-- sys
 - sys
 
 
@@ -543,14 +529,13 @@ Imports:
 - PyQt5
 - PyQt5
 - PyQt5.QtCore
+- PyQt5.QtCore
 - PyQt5.QtWidgets
 - PyQt5.QtWidgets
 - datetime
 - gc
 - matplotlib.backends.backend_qt5agg
 - matplotlib.figure
-- matplotlib.pyplot
-- matplotlib.pyplot
 - matplotlib.pyplot
 - metodos_gestion
 - metodos_rsa
@@ -560,9 +545,7 @@ Imports:
 - os
 - os
 - os
-- os
 - pathlib
-- psutil
 - rsa_io
 - rsa_procesamiento
 - sys
@@ -582,40 +565,41 @@ Imports:
 - PyQt5
 - PyQt5.QtCore
 - PyQt5.QtWidgets
+- datetime
+- gestor_fases
 - json
-- librerias.gestor_fases
-- librerias.metodos_gestion
-- librerias.metodos_rsa
-- librerias.metodos_sismicos
 - matplotlib.backends.backend_qt5agg
 - matplotlib.backends.backend_qt5agg
 - matplotlib.figure
+- metodos_gestion
+- metodos_rsa
+- metodos_sismicos
 - obspy
 - os
+- pathlib
+- re
+- struct
+- sys
 
 
 ## subprogramas/inicio.py
 
 Categorías detectadas:
 
-- graficos
 - io
 - qt
 
 Imports:
 
 - PyQt5
-- PyQt5
-- PyQt5.QtCore
 - PyQt5.QtCore
 - PyQt5.QtWidgets
+- PyQt5.QtWidgets
 - datetime
-- matplotlib.backends.backend_qt5agg
-- matplotlib.figure
-- matplotlib.pyplot
 - metodos_gestion
 - metodos_rsa
 - os
+- panel_estado
 - pathlib
 - sys
 
@@ -636,6 +620,7 @@ Imports:
 - PyQt5.QtCore
 - PyQt5.QtCore
 - PyQt5.QtWidgets
+- gc
 - json
 - librerias.metodos_gestion
 - librerias.metodos_rsa

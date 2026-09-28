@@ -167,13 +167,30 @@ flowchart TD
 
 ## 🚨 7. Reglas de Oro Inviolables para el Agente
 
-1. **PROHIBICIÓN ABSOLUTA DE EJECUTAR COMMITS**: Solo redactar y proponer mensajes para GitHub Desktop. Nunca ejecutar `git commit` ni `git push`.
-2. **CERO ACCESO A GITHUB REMOTO**: No asumir sincronización remota ni invocar APIs de GitHub.
-3. **Código y Nomenclatura en Español**: Variables, funciones y comentarios descriptivos en español sismológico.
-4. **Respeto a los 12 Caracteres de Token**: Cualquier edición a filtros o aportes debe mantener exactamente `EEEECBFFIISS` (12 caracteres).
-5. **Offset de Estaciones $+3$**: En `AAAAMMDD000000.csv`, la estación $i$ de `estaciones.csv` está siempre en la columna $i+3$.
-6. **Resolución Dinámica de Rutas**: Usar siempre `obtener_directorios(archivo)` y `extraer_hasta_directorio()` en lugar de concatenaciones fijas con `G:\`.
-7. **Estabilidad C++ / PyQt5 / Matplotlib**:
+1. **Entorno de Trabajo Local**: Este proyecto se gestiona directamente en el sistema de archivos local.
+2. **Código y Nomenclatura en Español**: Variables, funciones y comentarios descriptivos en español sismológico.
+3. **Respeto a los 12 Caracteres de Token**: Cualquier edición a filtros o aportes debe mantener exactamente `EEEECBFFIISS` (12 caracteres).
+4. **Offset de Estaciones $+3$**: En `AAAAMMDD000000.csv`, la estación $i$ de `estaciones.csv` está siempre en la columna $i+3$.
+5. **Resolución Dinámica de Rutas**: Usar siempre `obtener_directorios(archivo)` y `extraer_hasta_directorio()` en lugar de concatenaciones fijas con `G:\`.
+6. **Estabilidad C++ / PyQt5 / Matplotlib**:
    * *Nunca* usar `delattr` sobre instancias de `QMainWindow`.
    * *Nunca* llamar `plt.close()` sobre figuras incrustadas en `FigureCanvasQTAgg`.
    * Usar `self.figura.clear()` y `self.canvas.draw()`.
+
+---
+
+## 🔄 8. Protocolo Estándar de Sesión (Prompts de Inicio y Fin)
+
+### 🟢 Prompt Inicial (Inicio con Scope Lock):
+```text
+Considera las reglas y skills definidos en .agents/rules y .agents/skills.
+Para esta sesión, nuestro directorio de trabajo exclusivo será [DIRECTORIO]. No modifiques ni busques archivos fuera de esta ruta a menos que te lo pida. 
+Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto actual del proyecto. Todavia no modifiques ni crees ningun archivo.
+```
+
+### 🔴 Prompts de Cierre de Sesión (Secuencia de Cierre):
+1. `Genera o actualiza el contexto tecnico de los archivos que fueron modificados durante la sesión, según la skill generar_contexto.md.`
+2. `Extrae o actualiza el ADR de las decisiones tomadas durante la sesión, según la skill extraer_adr.md.`
+3. `Genera la transición técnica de esta sesión según la skill crear_transicion_tecnica.md.`
+4. `Genera un resumen detallado de todos los cambios y archivos modificados durante esta sesión.`
+

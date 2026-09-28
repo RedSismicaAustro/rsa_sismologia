@@ -1051,9 +1051,9 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
             <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-left: 5px solid var(--accent-primary); border-radius: 12px; padding: 20px 24px; margin-top: 24px; box-shadow: var(--card-shadow);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <div style="font-family:'Outfit', sans-serif; font-size:17px; font-weight:800; color:var(--accent-primary); display:flex; align-items:center; gap:8px;">
-                        <span>🔴</span> C. Prompts de Cierre de Sesión (Ejecución en 5 Pasos)
+                        <span>🔴</span> C. Prompts de Cierre de Sesión (Ejecución en 4 Pasos)
                     </div>
-                    <button class="copy-btn" style="background:var(--accent-primary); color:#fff; border:none; padding:6px 14px; border-radius:8px;" onclick="copyText('1. Genera o actualiza el contexto tecnico de los archivos que fueron modificados durante la sesión, según la skill generar_contexto.md.\n2. Extrae o actualiza el ADR de las decisiones tomadas durante la sesión, según la skill extraer_adr.md.\n3. Genera la transición técnica de esta sesión según la skill crear_transicion_tecnica.md.\n4. Ejecuta el volcado de bitácora de esta sesión según la skill volcado_bitacora.md.\n5. Genera el texto de los commits para los repositorio modificados en las ultimas 4 intrucciones (modificacioens de la documentacion)', this)">📋 Copiar Protocolo Completo</button>
+                    <button class="copy-btn" style="background:var(--accent-primary); color:#fff; border:none; padding:6px 14px; border-radius:8px;" onclick="copyText('1. Genera o actualiza el contexto tecnico de los archivos que fueron modificados durante la sesión, según la skill generar_contexto.md.\n2. Extrae o actualiza el ADR de las decisiones tomadas durante la sesión, según la skill extraer_adr.md.\n3. Genera la transición técnica de esta sesión según la skill crear_transicion_tecnica.md.\n4. Genera un resumen detallado de todos los cambios y archivos modificados durante esta sesión.', this)">📋 Copiar Protocolo Completo</button>
                 </div>
                 <p style="font-size:13.5px; color:var(--text-secondary); margin-bottom:14px;">
                     Al terminar tu jornada de trabajo, envía estos comandos secuencialmente o en bloque para consolidar la memoria técnica del repositorio:
@@ -1083,20 +1083,14 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
 
                     <div class="prompt-card" style="margin:0;">
                         <div class="prompt-code">
-                            <span><strong>Paso 4:</strong> Ejecuta el volcado de bitácora de esta sesión según la skill volcado_bitacora.md.</span>
-                            <button class="copy-btn" onclick="copyText('Ejecuta el volcado de bitácora de esta sesión según la skill volcado_bitacora.md.', this)">Copiar</button>
-                        </div>
-                    </div>
-
-                    <div class="prompt-card" style="margin:0;">
-                        <div class="prompt-code">
-                            <span><strong>Paso 5:</strong> Genera el texto de los commits para los repositorio modificados en las ultimas 4 intrucciones (modificacioens de la documentacion)</span>
-                            <button class="copy-btn" onclick="copyText('Genera el texto de los commits para los repositorio modificados en las ultimas 4 intrucciones (modificacioens de la documentacion)', this)">Copiar</button>
+                            <span><strong>Paso 4:</strong> Genera un resumen detallado de todos los cambios y archivos modificados durante esta sesión.</span>
+                            <button class="copy-btn" onclick="copyText('Genera un resumen detallado de todos los cambios y archivos modificados durante esta sesión.', this)">Copiar</button>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
+
 
         <!-- 4. Directiva de Interfaces Gráficas (.ui / Qt Creator & UX/UI) -->
         <section id="interfaz-ui">
@@ -1170,18 +1164,10 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
             </div>
         </section>
 
-        <!-- 6. Control y Redacción de Commits -->
+        <!-- 6. Control y Registro de Cambios Locales -->
         <section id="commits">
-            <h3><span class="section-icon">✍️</span> 6. Control y Redacción de Commits (Solo Redacción, Prohibido Ejecutar)</h3>
-            <p>De acuerdo a las <strong>Reglas Madres Insalvables</strong>, el agente tiene prohibido ejecutar <code>git commit</code> o <code>git push</code>. Su tarea consiste exclusivamente en auditar los cambios y redactar la propuesta estructurada para el usuario:</p>
-
-            <div class="alert-box alert-danger">
-                <div class="alert-icon">🚫</div>
-                <div class="alert-content">
-                    <strong>Regla Inviolable de Control de Versiones</strong>
-                    El agente <strong>NUNCA ejecuta el commit</strong>. Al recibir la instrucción <strong><code>REDACTA COMMIT</code></strong> o <strong><code>GENERA COMMIT</code></strong>, únicamente analizará las modificaciones y generará el texto del mensaje en un bloque de código para que el usuario lo ejecute manualmente.
-                </div>
-            </div>
+            <h3><span class="section-icon">✍️</span> 6. Control y Registro de Cambios Locales</h3>
+            <p>Este proyecto se gestiona directamente en el sistema de archivos local. Al finalizar tareas o sesiones, el agente presenta un resumen estructurado de las modificaciones:</p>
 
             <div class="step-list">
                 <div class="step-item">
@@ -1194,37 +1180,20 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
                 <div class="step-item">
                     <div class="step-number">2</div>
                     <div class="step-text">
-                        <strong>Redacción del Mensaje Descriptivo e Integral</strong>
-                        <p>El agente elabora una propuesta de mensaje clara, categorizada y detallando los componentes modificados.</p>
+                        <strong>Actualización de Contextos y Transición</strong>
+                        <p>Se actualizan los archivos <code>_contx.md</code> y se genera el archivo de transición en <code>docs/transiciones/</code>.</p>
                     </div>
                 </div>
                 <div class="step-item">
                     <div class="step-number">3</div>
                     <div class="step-text">
-                        <strong>Entrega de la Propuesta al Usuario</strong>
-                        <p>El agente muestra el mensaje en pantalla dentro de un bloque de código listo para copiar.</p>
+                        <strong>Resumen Ejecutivo de la Sesión</strong>
+                        <p>El agente entrega una lista clara de componentes modificados, variables añadidas y pruebas sugeridas.</p>
                     </div>
-                </div>
-                <div class="step-item">
-                    <div class="step-number">4</div>
-                    <div class="step-text">
-                        <strong>Ejecución y Sincronización Manual por el Usuario</strong>
-                        <p>El usuario revisa la propuesta, realiza el <code>git commit</code> y gestiona el repositorio en GitHub según su propio criterio.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="prompt-card" style="margin-top: 20px;">
-                <div class="prompt-card-header">
-                    <span class="prompt-title">Instrucción para Solicitar Redacción de Commit</span>
-                    <span class="badge badge-green">Solo Redacción</span>
-                </div>
-                <div class="prompt-code">
-                    <span>REDACTA COMMIT</span>
-                    <button class="copy-btn" onclick="copyText('REDACTA COMMIT', this)">Copiar</button>
                 </div>
             </div>
         </section>
+
 
         <!-- 7. Slash Commands -->
         <section id="slash-commands">
@@ -1332,16 +1301,17 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
 
             <div class="prompt-card">
                 <div class="prompt-card-header">
-                    <span class="prompt-title">✍️ 5. Solicitar Redacción de Mensaje de Commit</span>
-                    <span class="badge badge-green">Propuesta de Commit</span>
+                    <span class="prompt-title">📋 5. Resumen de Cambios de la Sesión</span>
+                    <span class="badge badge-green">Resumen Final</span>
                 </div>
-                <div class="prompt-desc">Al terminar los cambios de la sesión para que el agente redacte el texto que usarás en tu commit.</div>
+                <div class="prompt-desc">Al terminar la jornada para obtener un desglose claro de todos los archivos y funciones modificadas.</div>
                 <div class="prompt-code">
-                    <span>Revisa todos los cambios realizados en esta sesión y REDACTA COMMIT con un resumen detallado y estructurado.</span>
-                    <button class="copy-btn" onclick="copyText('Revisa todos los cambios realizados en esta sesión y REDACTA COMMIT con un resumen detallado y estructurado.', this)">Copiar</button>
+                    <span>Genera un resumen detallado de todos los cambios y archivos modificados durante esta sesión.</span>
+                    <button class="copy-btn" onclick="copyText('Genera un resumen detallado de todos los cambios y archivos modificados durante esta sesión.', this)">Copiar</button>
                 </div>
             </div>
         </section>
+
 
         <!-- 9. Buenas Prácticas Técnicas -->
         <section id="buenas-practicas">

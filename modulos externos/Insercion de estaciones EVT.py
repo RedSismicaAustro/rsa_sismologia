@@ -2,6 +2,7 @@ import sys
 import os
 import hashlib
 import csv
+import numpy as np
 from pathlib import Path
 from collections import deque
 from datetime import datetime, timedelta
@@ -207,15 +208,123 @@ def ajustar_tiempos_stream_con_catalogo(eventos, stream, tolerancia_minutos=5):
     return stream, bandera, mejor_tipo, archivo_mseed
 
 
+def seleccionar_encoding_mseed(stream, contexto=""):
+    """
+    Determina la codificación MiniSEED que representa el Stream sin pérdida alguna, de modo que
+    convivan de forma transparente los dos orígenes de datos de la RSA:
+
+    * Recuentos enteros (registro continuo, ETNA leído nativamente y reconstrucción ASCII con
+      valores enteros): se codifican en 'STEIM1', la codificación canónica comprimida del proyecto.
+    * Datos en punto flotante con decimales (registros ETNA calibrados en m/s², por ejemplo): se
+      conservan íntegros en 'FLOAT32' o 'FLOAT64' según su precisión. No se redondea ni se descarta
+      ningún decimal.
+    * 'FLOAT64' se elige además cuando en un mismo Stream conviven trazas enteras y flotantes,
+      porque es la única codificación que representa ambas sin pérdida.
+
+    La adaptación es in situ sobre las trazas recibidas y sólo convierte cuando la conversión es
+    exacta. Devuelve (encoding, informe), donde el informe documenta dtypes de origen, trazas
+    adaptadas, presencia de valores no finitos y un aviso legible para consola y reporte.
+    """
+    if stream is None or len(stream) == 0:
+        raise ValueError(f"No hay trazas para escribir el archivo MiniSEED: {contexto}")
+
+    dtypes_origen = []
+    hay_enteros = False
+    hay_float64 = False
+    requiere_flotante = False
+    hay_no_finito = False
+
+    for traza in stream:
+        datos = np.asarray(traza.data)
+        nombre_dtype = np.dtype(datos.dtype).name
+        if nombre_dtype not in dtypes_origen:
+            dtypes_origen.append(nombre_dtype)
+
+        if np.issubdtype(datos.dtype, np.integer):
+            hay_enteros = True
+            if datos.size and float(np.max(np.abs(datos))) > 2147483647.0:
+                requiere_flotante = True
+            continue
+
+        if not np.issubdtype(datos.dtype, np.floating):
+            raise ValueError(
+                f"La traza ({traza.id}) tiene dtype no numérico '{nombre_dtype}' y no puede "
+                f"codificarse en MiniSEED. Archivo: {contexto}"
+            )
+
+        if datos.dtype == np.float64:
+            hay_float64 = True
+        if datos.size:
+            if not np.all(np.isfinite(datos)):
+                hay_no_finito = True
+                requiere_flotante = True
+            elif np.any(datos != np.rint(datos)):
+                # Hay decimales reales: el registro viaja en punto flotante, sin redondear.
+                requiere_flotante = True
+            elif float(np.max(np.abs(datos))) > 2147483647.0:
+                requiere_flotante = True
+
+    if not requiere_flotante:
+        encoding = 'STEIM1'
+    elif hay_enteros or hay_float64:
+        encoding = 'FLOAT64'
+    else:
+        encoding = 'FLOAT32'
+
+    dtypes_destino = {'STEIM1': np.int32, 'FLOAT32': np.float32, 'FLOAT64': np.float64}
+    dtype_destino = dtypes_destino[encoding]
+    trazas_adaptadas = 0
+    for traza in stream:
+        if np.dtype(traza.data.dtype) == np.dtype(dtype_destino):
+            continue
+        datos = np.asarray(traza.data)
+        if encoding == 'STEIM1' and np.issubdtype(datos.dtype, np.floating):
+            traza.data = np.rint(datos).astype(np.int32)
+        else:
+            traza.data = datos.astype(dtype_destino)
+        trazas_adaptadas += 1
+
+    detalle_dtypes = ", ".join(dtypes_origen)
+    if encoding == 'STEIM1':
+        aviso = f"STEIM1 (recuentos enteros en {detalle_dtypes})"
+    else:
+        aviso = f"{encoding} (punto flotante en {detalle_dtypes}, conservado sin redondeo)"
+    if trazas_adaptadas:
+        aviso += f" | {trazas_adaptadas} traza(s) ajustadas a {np.dtype(dtype_destino).name}"
+
+    informe = {
+        'encoding': encoding,
+        'dtypes_origen': dtypes_origen,
+        'trazas_adaptadas': trazas_adaptadas,
+        'hay_no_finito': hay_no_finito,
+        'aviso': aviso,
+    }
+    return encoding, informe
+
+
 def escribir_atomico_mseed(stream, destino):
     """
-    Escribe un Stream en formato MSEED de manera atómica con compresión STEIM1 y reclen=512.
+    Escribe un Stream en formato MiniSEED de manera atómica (reclen=512) eligiendo la codificación
+    que preserve los datos sin pérdida:
+
+    * 'STEIM1' para recuentos enteros (canónica del proyecto, comprimida).
+    * 'FLOAT32' / 'FLOAT64' para registros en punto flotante (p. ej. ETNA calibrados en m/s²),
+      que con STEIM1 forzado provocaban el error
+      "Wrong dtype for Stream[0].data for encoding STEIM1".
+
+    Devuelve el nombre de la codificación utilizada para dejarlo constancia en el reporte.
     """
     import time
+    encoding, informe = seleccionar_encoding_mseed(stream, contexto=os.path.basename(destino))
+    if informe['hay_no_finito']:
+        print(f"[AVISO] {os.path.basename(destino)}: el registro contiene valores NaN/infinitos; "
+              f"se escribe en {encoding} tal como llegó.")
+    print(f"[MSEED] {os.path.basename(destino)} | encoding {informe['aviso']}")
+
     carpeta = os.path.dirname(destino)
     base = os.path.basename(destino)
     tmp = os.path.join(carpeta, "." + base + ".tmp")
-    stream.write(tmp, format='MSEED', encoding='STEIM1', reclen=512)
+    stream.write(tmp, format='MSEED', encoding=encoding, reclen=512)
     try:
         with open(tmp, 'rb') as _f:
             os.fsync(_f.fileno())
@@ -224,7 +333,7 @@ def escribir_atomico_mseed(stream, destino):
     for intento in range(3):
         try:
             os.replace(tmp, destino)
-            return
+            return encoding
         except (PermissionError, OSError):
             if intento < 2:
                 time.sleep(0.1)
@@ -233,16 +342,26 @@ def escribir_atomico_mseed(stream, destino):
                     if os.path.exists(destino):
                         os.remove(destino)
                     os.replace(tmp, destino)
-                    return
+                    return encoding
                 except Exception as e:
                     raise e
 
 
-def insertar_evento_en_catalogo(directorio_grabar: str, eventos: list, st: Stream, serial_equipo: str = None) -> list:
+def insertar_evento_en_catalogo(directorio_grabar: str, eventos: list, st: Stream, serial_equipo: str = None,
+                                reporte: dict = None) -> list:
     """
-    Inserta un evento en la lista de eventos, guardando el archivo MiniSEED (STEIM1)
-    y marcando en 'eventos' la columna correspondiente a la estación.
+    Inserta un evento en la lista de eventos, guardando el archivo MiniSEED y marcando en 'eventos'
+    la columna correspondiente a la estación.
+
+    `reporte` es un diccionario opcional de salida que documenta el resultado real de la operación
+    (insertado, motivo, ruta del MiniSEED, codificación utilizada), para que el llamador no dé por
+    supuesta una inserción que no llegó a ocurrir.
     """
+    if reporte is not None:
+        reporte.clear()
+        reporte.update({'insertado': False, 'motivo': '', 'ruta_mseed': '', 'encoding_mseed': '',
+                        'estacion': '', 'token': '', 'columna': '', 'archivo_evento': ''})
+
     tr = st[0]
     estacion = normalizar_codigo_estacion_desde_evt(str(tr.stats.station).strip().upper())
     inicio = tr.stats.starttime
@@ -263,7 +382,11 @@ def insertar_evento_en_catalogo(directorio_grabar: str, eventos: list, st: Strea
     try:
         idx_est = estaciones.index(estacion)
     except ValueError:
-        print(f"[ADVERTENCIA] Estación '{estacion}' no está en la configuración.")
+        motivo = (f"estación '{estacion}' de la cabecera EVT no figura en datos/estaciones.csv "
+                  f"(no se escribió MiniSEED ni se marcó el catálogo)")
+        print(f"[ADVERTENCIA] {motivo}")
+        if reporte is not None:
+            reporte.update({'motivo': motivo, 'estacion': estacion})
         return eventos
 
     archivo_evento = f"{inicio.strftime('%Y%m%d_%H%M%S')}.sis"
@@ -274,22 +397,41 @@ def insertar_evento_en_catalogo(directorio_grabar: str, eventos: list, st: Strea
         try:
             n_evento = segundos_elementos[1:].index(archivo_evento) + 1
         except ValueError:
+            motivo = (f"el evento '{archivo_evento}' no figura en la matriz del día "
+                      f"(no se escribió MiniSEED ni se marcó el catálogo)")
+            print(f"[ADVERTENCIA] {motivo}")
+            if reporte is not None:
+                reporte.update({'motivo': motivo, 'estacion': estacion,
+                                'archivo_evento': archivo_evento})
             return eventos
 
     for tr in st:
         if not hasattr(tr.stats, "calib"):
             tr.stats.calib = 1.0
 
-    escribir_atomico_mseed(st, ruta_completa)
+    encoding_mseed = escribir_atomico_mseed(st, ruta_completa)
     print(f"\n[MSEED] Insertando evento consolidado: {ruta_completa}")
 
     col_destino = idx_est + 3
+    token_estacion = estacion + componentes[idx_est] + '1000000'
     if col_destino < len(eventos[n_evento]):
-        eventos[n_evento][col_destino] = estacion + componentes[idx_est] + '1000000'
+        eventos[n_evento][col_destino] = token_estacion
     else:
         faltan = col_destino - len(eventos[n_evento]) + 1
         eventos[n_evento].extend([''] * faltan)
-        eventos[n_evento][col_destino] = estacion + componentes[idx_est] + '1000000'
+        eventos[n_evento][col_destino] = token_estacion
+
+    if reporte is not None:
+        reporte.update({
+            'insertado': True,
+            'motivo': '',
+            'ruta_mseed': ruta_completa,
+            'encoding_mseed': encoding_mseed,
+            'estacion': estacion,
+            'token': token_estacion,
+            'columna': col_destino,
+            'archivo_evento': archivo_evento,
+        })
 
     return eventos
 
@@ -318,6 +460,7 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
     resultado_str = ''
     archivo_mseed = ''
     archivo = ''
+    encoding_mseed = ''
     estacion = 'Ninguna'
     equipo_modelo, equipo_version, equipo_serial = 'Desconocido', 'Desconocida', 'Desconocido'
     aviso_tiempo = ''
@@ -343,7 +486,7 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
             mensaje_1 = "No insertado"
             datos_grabar = [archivo_evt, archivo_mseed, mensaje, "", mensaje_1,
                             "", directorio_estacion_almacenado, "Desconocido",
-                            "Desconocido", "Desconocida", "Desconocido"]
+                            "Desconocido", "Desconocida", "Desconocido", ""]
             datos_completos.append(datos_grabar)
             return datos_completos
 
@@ -433,20 +576,33 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
                             QMessageBox.Yes | QMessageBox.No
                         )
                         if respuesta == QMessageBox.No:
-                            mensaje_1 = 'No insertado'
+                            mensaje_1 = 'No insertado: descartado en la verificación'
                             bandera_localizacion = False
                     else:
                         QMessageBox.information(None, "AVISO", f"EVT: {nombre_evt}  {mensaje}")
                 except Exception as e:
                     print(f"[AVISO] Verificación falló: {e}")
 
-            if bandera_insertar and bandera_localizacion:
+            if not bandera_insertar:
+                mensaje_1 = mensaje_1 or 'Inserción desactivada'
+            elif bandera_localizacion:
                 try:
-                    eventos = insertar_evento_en_catalogo(directorio_final, eventos, st, serial_para_nombre)
-                    escritura_archivo(ruta_csv, eventos)
-                    mensaje_1 = 'Insertado'
+                    reporte_insercion = {}
+                    eventos = insertar_evento_en_catalogo(
+                        directorio_final, eventos, st, serial_para_nombre, reporte_insercion
+                    )
+                    if reporte_insercion.get('insertado'):
+                        escritura_archivo(ruta_csv, eventos)
+                        mensaje_1 = 'Insertado'
+                        encoding_mseed = reporte_insercion.get('encoding_mseed', '')
+                        archivo_mseed = reporte_insercion.get('ruta_mseed', archivo_mseed)
+                    else:
+                        # No se reescribe la matriz: no hubo ningún cambio real que guardar.
+                        mensaje_1 = 'No insertado: ' + str(reporte_insercion.get('motivo', 'sin detalle'))
                 except Exception as e:
                     mensaje_1 = f"No insertado: {e}"
+            elif not mensaje_1:
+                mensaje_1 = 'No insertado: sin evento coincidente en la matriz del día'
         else:
             archivo_mseed = f"No encontrado csv del dia: {ruta_csv}"
             mensaje = "Sin CSV, no se puede localizar/insertar"
@@ -461,7 +617,7 @@ def procesar_archivo_evt(archivo_evt, directorio_trabajo, bandera_verificar, ban
 
     datos_grabar = [archivo_evt, archivo_mseed, mensaje, archivo, mensaje_1,
                     resultado_str, directorio_estacion_almacenado, estacion,
-                    equipo_modelo, equipo_version, equipo_serial]
+                    equipo_modelo, equipo_version, equipo_serial, encoding_mseed]
     datos_completos.append(datos_grabar)
     return datos_completos
 
@@ -687,6 +843,11 @@ def generar_inventario_evt_directorio(ruta_base, ruta_salida_csv):
     return rutas_evt, total, duplicados
 
 
+ENCABEZADO_RESUMEN_EVT = ['archivo_evt', 'archivo_mseed', 'mensaje', 'archivo', 'insercion',
+                          'resultado_str', 'directorio_estacion_almacenado', 'estacion',
+                          'equipo_modelo', 'equipo_version', 'equipo_serial', 'encoding_mseed']
+
+
 def construir_fila_resumen_error(ruta_evt, mensaje_error):
     return [
         ruta_evt,
@@ -700,15 +861,13 @@ def construir_fila_resumen_error(ruta_evt, mensaje_error):
         "Desconocido",
         "Desconocida",
         "Desconocido",
+        "",
     ]
 
 
 def procesar_lista_archivos_evt(ventana, lista_rutas_evt):
     resumen_procesamiento = []
-    encabezado = ['archivo_evt', 'archivo_mseed', 'mensaje', 'archivo', 'insercion',
-                  'resultado_str', 'directorio_estacion_almacenado', 'estacion',
-                  'equipo_modelo', 'equipo_version', 'equipo_serial']
-    resumen_procesamiento.append(encabezado)
+    resumen_procesamiento.append(list(ENCABEZADO_RESUMEN_EVT))
     total_archivos = len(lista_rutas_evt)
 
     ventana.progressBar.setMaximum(total_archivos)
@@ -915,6 +1074,129 @@ class VentanaInsercionEVT(QMainWindow):
 
     def cerrar_ventana(self):
         self.close()
+
+    def verificar_encoding_mseed(self):
+        """
+        Autocomprobación de la codificación MiniSEED y del reporte de inserción.
+
+        Trabaja íntegramente en la carpeta temporal del sistema: no lee ni escribe datos operativos.
+        Comprueba:
+          1. recuentos enteros (int32/int64) y flotantes con valores enteros -> STEIM1;
+          2. registros en punto flotante con decimales (m/s²) -> FLOAT32/FLOAT64, sin redondeo;
+          3. stream mixto (enteros + flotantes) y enteros fuera del rango int32 -> FLOAT64;
+          4. lo no codificable (stream vacío, dtype no numérico) se rechaza con claridad;
+          5. el reporte de inserción declara el estado real y deja la matriz intacta si no inserta.
+
+        Imprime el resultado de cada comprobación y devuelve el número de fallos.
+        Ejecución desde el IDE:  ventana.verificar_encoding_mseed()
+        """
+        import shutil
+        import tempfile
+        import numpy as np
+        from obspy import Trace
+
+        fallos = 0
+
+        def comprobar(condicion, descripcion):
+            nonlocal fallos
+            print("   {} {}".format("OK   " if condicion else "FALLA", descripcion))
+            if not condicion:
+                fallos += 1
+
+        def traza(datos, estacion="TEST", canal="Z", hora=0):
+            nueva = Trace(data=datos)
+            nueva.stats.station = estacion
+            nueva.stats.channel = canal
+            nueva.stats.starttime = UTCDateTime(2026, 1, 1, hora, 0, 0)
+            nueva.stats.sampling_rate = 200.0
+            return nueva
+
+        print("=" * 78)
+        print("AUTOCOMPROBACION DE CODIFICACION MINISEED E INSERCION")
+        print("=" * 78)
+
+        carpeta = tempfile.mkdtemp(prefix="rsa_evt_verificacion_")
+        try:
+            enteros = np.arange(200) + 4096
+            fisicas = ((np.arange(200) - 100) * 0.000440599).astype(np.float32)
+
+            casos = [
+                ("int32 (registro continuo)", Stream([traza(enteros.astype(np.int32))]),
+                 'STEIM1', [enteros.astype(np.int32)]),
+                ("int64", Stream([traza(enteros.astype(np.int64))]),
+                 'STEIM1', [enteros.astype(np.int32)]),
+                ("float32 con valores enteros (ETNA VM)",
+                 Stream([traza(enteros.astype(np.float32))]),
+                 'STEIM1', [enteros.astype(np.int32)]),
+                ("float32 en m/s2 (ETNA calibrado)", Stream([traza(fisicas)]),
+                 'FLOAT32', [fisicas]),
+                ("float64 en m/s2", Stream([traza(fisicas.astype(np.float64))]),
+                 'FLOAT64', [fisicas.astype(np.float64)]),
+                ("mixto int32 + float32 m/s2", Stream([
+                    traza(enteros.astype(np.int32), "LABR", "Z"),
+                    traza(fisicas, "UCHU", "0")]),
+                 'FLOAT64', [enteros.astype(np.float64), fisicas.astype(np.float64)]),
+                ("int64 fuera del rango int32",
+                 Stream([traza(np.array([0, 3000000000], dtype=np.int64))]),
+                 'FLOAT64', [np.array([0.0, 3000000000.0])]),
+            ]
+            for etiqueta, stream, encoding_esperado, esperados in casos:
+                ruta = os.path.join(carpeta, "prueba.mseed")
+                encoding = escribir_atomico_mseed(stream, ruta)
+                lectura = read(ruta, format='MSEED')
+                comprobar(encoding == encoding_esperado,
+                          "{}: encoding {} (esperado {})".format(etiqueta, encoding, encoding_esperado))
+                comprobar(all(np.array_equal(traza_leida.data, esperado)
+                              and traza_leida.data.dtype == esperado.dtype
+                              for traza_leida, esperado in zip(lectura, esperados)),
+                          "{}: datos idénticos al original, sin redondeo".format(etiqueta))
+
+            for etiqueta, stream, codificable in (
+                    ("stream vacío", Stream(), False),
+                    ("dtype no numérico", Stream([traza(np.array(["a", "b"]))]), False)):
+                try:
+                    escribir_atomico_mseed(stream, os.path.join(carpeta, "guarda.mseed"))
+                    comprobar(codificable, "{}: escrito (no debería)".format(etiqueta))
+                except Exception as error:
+                    comprobar(not codificable, "{}: rechazado ({})".format(
+                        etiqueta, type(error).__name__))
+
+            fila_matriz = ["1", "20260101_000000.sis", "SISMO"] + ["-"] * 110
+            eventos = [["ID", "archivo_sis", "tipo"] + ["estacion_%d" % i for i in range(110)],
+                       fila_matriz]
+
+            reporte = {}
+            insertar_evento_en_catalogo(carpeta, [list(f) for f in eventos],
+                                        Stream([traza(fisicas, "CHB", "0")]), None, reporte)
+            comprobar(reporte.get('insertado') is True, "inserción real: reporte.insertado = True")
+            comprobar(reporte.get('encoding_mseed') == 'FLOAT32',
+                      "inserción real: encoding informado = {}".format(reporte.get('encoding_mseed')))
+            comprobar(len(reporte.get('token', '')) == 12,
+                      "inserción real: token de 12 caracteres = {}".format(reporte.get('token')))
+
+            reporte = {}
+            matriz_antes = [list(f) for f in eventos]
+            resultado = insertar_evento_en_catalogo(
+                carpeta, [list(f) for f in eventos],
+                Stream([traza(enteros.astype(np.int32), "ZZZZ", "0")]), None, reporte)
+            comprobar(reporte.get('insertado') is False,
+                      "estación no catalogada: reporte.insertado = False (antes decía 'Insertado')")
+            comprobar(resultado == matriz_antes, "estación no catalogada: matriz del día intacta")
+
+            reporte = {}
+            insertar_evento_en_catalogo(
+                carpeta, [list(f) for f in eventos],
+                Stream([traza(enteros.astype(np.int32), "CHB", "0", hora=5)]), None, reporte)
+            comprobar(reporte.get('insertado') is False
+                      and 'no figura en la matriz' in str(reporte.get('motivo')),
+                      "evento ausente en la matriz: reporte.insertado = False")
+        finally:
+            shutil.rmtree(carpeta, ignore_errors=True)
+
+        print("=" * 78)
+        print("RESULTADO: {} comprobaciones fallidas".format(fallos))
+        print("=" * 78)
+        return fallos
 
 
 if __name__ == '__main__':

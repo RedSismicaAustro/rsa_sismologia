@@ -46,6 +46,7 @@ Antes de modificar o depurar cualquier script Python, el agente **DEBE** buscar 
 | :--- | :--- |
 | [`obsoletos/modulos externos/acelerografo.py`](file:///c:/proyectos/rsa_sismologia/obsoletos/modulos%20externos/acelerografo.py) | [`acelerografo_contx.md`](file:///c:/proyectos/rsa_sismologia/obsoletos/modulos%20externos/acelerografo_contx.md) |
 | [`obsoletos/modulos externos/automatico.py`](file:///c:/proyectos/rsa_sismologia/obsoletos/modulos%20externos/automatico.py) | [`automatico_contx.md`](file:///c:/proyectos/rsa_sismologia/obsoletos/modulos%20externos/automatico_contx.md) |
+| [`obsoletos/src/programa_integrado_alt.py`](file:///c:/proyectos/rsa_sismologia/obsoletos/src/programa_integrado_alt.py) | [`programa_integrado_alt_contx.md`](file:///c:/proyectos/rsa_sismologia/obsoletos/src/programa_integrado_alt_contx.md) |
 | [`modulos externos/arbol_directorios.py`](file:///c:/proyectos/rsa_sismologia/modulos%20externos/arbol_directorios.py) | [`arbol_directorios_contx.md`](file:///c:/proyectos/rsa_sismologia/modulos%20externos/arbol_directorios_contx.md) |
 | [`modulos externos/caudales_filtraciones.py`](file:///c:/proyectos/rsa_sismologia/modulos%20externos/caudales_filtraciones.py) | [`caudales_filtraciones_contx.md`](file:///c:/proyectos/rsa_sismologia/modulos%20externos/caudales_filtraciones_contx.md) |
 | [`modulos externos/consolidacion_mseed.py`](file:///c:/proyectos/rsa_sismologia/modulos%20externos/consolidacion_mseed.py) | [`consolidacion_mseed_contx.md`](file:///c:/proyectos/rsa_sismologia/modulos%20externos/consolidacion_mseed_contx.md) |
@@ -96,22 +97,29 @@ Antes de modificar o depurar cualquier script Python, el agente **DEBE** buscar 
 
 ---
 
-## 5. Control y Redacción de Commits (Regla `GENERA COMMIT` / `REDACTA COMMIT` — GitHub Desktop)
+## 5. Control y Registro de Cambios Locales
 
-* **Prohibido Ejecutar Commits**: El agente **NUNCA** ejecuta `git commit` ni `git push`.
-* **Entorno de Control de Versiones**: El usuario utiliza **GitHub Desktop** para gestionar los commits. Por lo tanto, las propuestas deben presentarse formateadas directamente para los campos de GitHub Desktop (**Título/Summary** y **Descripción extendida**).
-* **Procedimiento al Recibir la Instrucción del Usuario**:
-  1. Revisar exhaustivamente los cambios realizados (`git status` o inspección de archivos modificados/creados).
-  2. Redactar una propuesta integral, precisa y estructurada:
-     * **Título / Summary**: Título conciso, representativo y con prefijo convencional (`refactor:`, `docs:`, `feat:`, `fix:`) de máximo 72 caracteres.
-     * **Descripción / Description**: Detalle completo en viñetas claras y concretas que explique qué se hizo, por qué y qué archivos/módulos fueron afectados, sin omitir detalles relevantes.
-  3. Presentar la propuesta en bloques de texto listos para copiar y pegar en GitHub Desktop.
+* **Entorno de Trabajo Local**: Este proyecto se gestiona directamente en el sistema de archivos local (sin integración con Git ni GitHub).
+* **Resumen de Modificaciones**: Al finalizar una tarea o sesión, el agente debe presentar un resumen claro y estructurado de los archivos modificados, creados o depurados.
 
 ---
 
-## 6. Subagentes y Protocolo de Ciclo de Vida de Sesión (.agents/skills)
+## 6. Subagentes y Protocolo de Ciclo de Vida de Sesión (.agents/rules y .agents/skills)
 
-El repositorio cuenta con una suite de **4 habilidades especializadas (Skills)** para garantizar la consistencia, trazabilidad, estabilidad de librerías y memoria técnica en cada sesión de trabajo con el agente:
+El repositorio cuenta con **dos capas de gobernanza**: una **capa normativa de reglas** (`.agents/rules/`) y una **suite de 4 habilidades especializadas (Skills)** (`.agents/skills/`), para garantizar la consistencia, trazabilidad, estabilidad de librerías y memoria técnica en cada sesión de trabajo con el agente.
+
+### 📏 Capa Normativa de Reglas Oficiales (`.agents/rules/`):
+
+Estas reglas **referencian y desarrollan** lo dispuesto en este `AGENTS.md`; **no lo duplican**. Ante cualquier contradicción entre ambos, **prevalece `AGENTS.md`**.
+
+| Regla | Archivo de Instrucciones | Alcance |
+|---|---|---|
+| **00. Prioridad y Alcance** | [`.agents/rules/00-prioridad-y-alcance.md`](file:///c:/proyectos/rsa_sismologia/.agents/rules/00-prioridad-y-alcance.md) | Jerarquía de precedencia, reglas de desempate, Scope Lock y vigencia de las reglas. |
+| **10. Código Python** | [`.agents/rules/10-codigo-python.md`](file:///c:/proyectos/rsa_sismologia/.agents/rules/10-codigo-python.md) | Entorno oficial (**Python 3.9**), estilo y nomenclatura, rutas Windows, excepciones y retrocompatibilidad. |
+| **20. Interfaz PyQt5** | [`.agents/rules/20-interfaz-pyqt5.md`](file:///c:/proyectos/rsa_sismologia/.agents/rules/20-interfaz-pyqt5.md) | Invariantes C++, flujo `.ui`/Qt Designer, subprogramas `QWidget`, `QThread` y estándares UX/UI. |
+| **30. Datos Sismológicos** | [`.agents/rules/30-datos-sismologicos.md`](file:///c:/proyectos/rsa_sismologia/.agents/rules/30-datos-sismologicos.md) | Token `EEEECBFFIISS`, offset `+3`, árbol `DIA` y prohibiciones sobre datos operativos. |
+| **40. Prohibiciones** | [`.agents/rules/40-prohibiciones.md`](file:///c:/proyectos/rsa_sismologia/.agents/rules/40-prohibiciones.md) | Reglas Madres, lista negra de acciones y autorizaciones requeridas. |
+| **50. Sesión y Documentación** | [`.agents/rules/50-sesion-documentacion.md`](file:///c:/proyectos/rsa_sismologia/.agents/rules/50-sesion-documentacion.md) | Protocolo de apertura/cierre, artefactos documentales e impacto en librerías compartidas. |
 
 ### 🛠️ Suite de Skills Oficiales:
 
@@ -137,6 +145,7 @@ Revisa los archivos del directorio [DIRECTORIO] para que entiendas el contexto a
 1. `Genera o actualiza el contexto tecnico de los archivos que fueron modificados durante la sesión, según la skill generar_contexto.md.`
 2. `Extrae o actualiza el ADR de las decisiones tomadas durante la sesión, según la skill extraer_adr.md.`
 3. `Genera la transición técnica de esta sesión según la skill crear_transicion_tecnica.md.`
-4. `Genera el texto de los commits para los repositorios modificados en las ultimas 3 instrucciones (modificaciones de la documentacion)` *(Respetando la Regla Madre: redactar propuesta integral optimizada para GitHub Desktop con Título + Descripción detallada, nunca ejecutar)*.
+4. `Genera un resumen detallado de todos los cambios y archivos modificados durante esta sesión.`
+
 
 

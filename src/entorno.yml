@@ -1,3 +1,22 @@
+# ==============================================================================
+#  ⚠️  ENTORNO LEGADO / NO OPERATIVO — NO USAR COMO REFERENCIA
+# ------------------------------------------------------------------------------
+#  Este archivo describe el entorno conda "sismologia" (Python 3.11) y se
+#  conserva únicamente como respaldo histórico.
+#
+#  El entorno OFICIAL y OPERATIVO del proyecto es Python 3.9:
+#      C:\entornos\venv_py309\Scripts\python.exe
+#
+#  Motivo: ObsPy, núcleo del procesamiento sísmico, es estable y funcional en
+#  Python 3.9 y NO en 3.11. Todos los lanzadores .bat y Spyder.bat invocan el
+#  venv 3.9 (C:\entornos\venv_py309).
+#
+#  PROHIBIDO usar este archivo como referencia de APIs, sintaxis, firmas de
+#  librerías ni dependencias del proyecto.
+#
+#  Regla aplicable: .agents/rules/10-codigo-python.md
+# ==============================================================================
+
 name: sismologia
 channels:
   - conda-forge
