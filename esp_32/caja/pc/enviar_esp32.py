@@ -2,6 +2,9 @@ import os
 import subprocess
 
 PUERTO = "COM4"
+MPREMOTE = r"C:\entornos\venv_esp32\Scripts\mpremote.exe"
+if not os.path.exists(MPREMOTE):
+    MPREMOTE = "mpremote"
 
 RUTA_PROYECTO = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..")
@@ -32,7 +35,7 @@ def subir_archivos():
 
         print(f"Subiendo {archivo} → ESP32...")
         subprocess.run(
-            ["mpremote", "connect", PUERTO, "cp", archivo, ":"],
+            [MPREMOTE, "connect", PUERTO, "cp", archivo, ":"],
             check=False
         )
 

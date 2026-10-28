@@ -494,6 +494,8 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.Btn_Salir.clicked.connect(self.Salir_)
         self.Btn_drive.clicked.connect(self.seleccionar_drive)
         self.dateEdit.dateChanged.connect(self.showDate)
+        if hasattr(self, 'chk_solo_digitales'):
+            self.chk_solo_digitales.toggled.connect(self.al_cambiar_modo_digital)
 
         self.parametros = parametros_estaciones()
         self.config_estaciones = {
@@ -531,8 +533,23 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         if os.path.exists('R:'):
             self.bandera_drive_r = 1
         else:
-            mostrar_advertencia(self)
             self.bandera_drive_r = 0
+            if hasattr(self, 'chk_solo_digitales'):
+                self.chk_solo_digitales.setChecked(True)
+            mensaje_lbl(
+                self.Lbl_Mensajes,
+                "[ADVERTENCIA] Unidad R: no detectada. Se activó automáticamente el modo 'Solo estaciones digitales'.",
+                False,
+                tipo='error'
+            )
+
+    def al_cambiar_modo_digital(self, activado):
+        if activado:
+            mensaje_lbl(self.Lbl_Mensajes, "[MODO] 'Solo estaciones digitales' activado (se omitirá telemetría analógica de R:)", False, tipo='exito')
+        else:
+            mensaje_lbl(self.Lbl_Mensajes, "[MODO] Consolidación híbrida activada (analógica continua + digital)", False)
+            if not os.path.exists('R:'):
+                mensaje_lbl(self.Lbl_Mensajes, "[ADVERTENCIA] Unidad R: no está disponible para telemetría analógica.", False, tipo='error')
 
     def showDate(self, date):
         self.date = date
@@ -636,37 +653,59 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
         dia_yyyymmdd = self.date.toString('yyyyMMdd')
         archivo_evento = dia_yyyymmdd + "_000000"
-        patron_mseed_dia = re.compile(r'^([A-Za-z0-9]{4})_(\d{8})_(\d{6}).*\.mseed$', re.IGNORECASE)
+        patron_mseed_dia = re.compile(r'^([A-Za-z0-9]{3,6})_(\d{8})_(\d{6}).*\.mseed$', re.IGNORECASE)
         estaciones_procesadas = 0
         png_pendientes = []
         estado_comunicaciones = {}
+        filas_validas = self.filas_digitales_validas()
+        total_validas = len(filas_validas)
 
-        for numero_fila, estacion_digital, nombre_carpeta, num_estacion in self.filas_digitales_validas():
+        for idx_eval, (numero_fila, estacion_digital, nombre_carpeta, num_estacion) in enumerate(filas_validas, start=1):
+            if hasattr(self, 'progressBar') and self.progressBar is not None and total_validas > 0:
+                progreso = int(10 + (idx_eval / total_validas) * 60)
+                self.progressBar.setValue(progreso)
+                QCoreApplication.processEvents()
+
             if self.config_estaciones['HAB_CANAL'][num_estacion] != '1':
                 mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] Estacion {self.config_estaciones['NOMBRE'][num_estacion]} no habilitada - omitida", False)
                 continue
 
             codigo_estacion = self.config_estaciones['CODIGO'][num_estacion]
-            ruta_carpeta = os.path.join(self.directorio_binario, nombre_carpeta)
+            partes_carpeta = [p for p in nombre_carpeta.replace('\\', '/').split('/') if p]
+            carpeta_base = partes_carpeta[0] if partes_carpeta else ''
+            sub_rel = '/'.join(partes_carpeta[1:]) if len(partes_carpeta) > 1 else ''
+
+            ruta_carpeta = os.path.join(self.directorio_binario, *partes_carpeta) if partes_carpeta else self.directorio_binario
             if not os.path.isdir(ruta_carpeta):
-                # Búsqueda resiliente de variantes (ej: LAB02 <-> LAB2, CHA02 <-> CHA2)
+                # Búsqueda resiliente de variantes (ej: CHA01 <-> CHA1, LAB02 <-> LAB2) preservando subcarpetas
                 carpeta_encontrada = None
                 try:
-                    nombre_norm = nombre_carpeta.strip().upper()
-                    variantes = {nombre_carpeta.upper(), nombre_norm, codigo_estacion.upper()}
-                    match_num = re.search(r'([A-Za-z]+)(\d+)$', nombre_norm)
-                    if match_num:
-                        prefix = match_num.group(1)
-                        num_int = int(match_num.group(2))
-                        variantes.add(f"{prefix}{num_int}")
-                        variantes.add(f"{prefix}{num_int:02d}")
-                    
+                    variantes = {carpeta_base.upper(), codigo_estacion.upper()}
+                    m_b = re.search(r'^([A-Za-z]+)(\d+)$', carpeta_base.strip())
+                    if m_b:
+                        pfx, n = m_b.group(1).upper(), int(m_b.group(2))
+                        variantes.add(f"{pfx}{n}")
+                        variantes.add(f"{pfx}{n:02d}")
+
+                    m_c = re.search(r'^([A-Za-z]+)(\d+)$', codigo_estacion.strip())
+                    if m_c:
+                        pfx_c, n_c = m_c.group(1).upper(), int(m_c.group(2))
+                        variantes.add(f"{pfx_c}{n_c}")
+                        variantes.add(f"{pfx_c}{n_c:02d}")
+
                     for sub in os.listdir(self.directorio_binario):
                         if sub.upper() in variantes:
-                            sub_path = os.path.join(self.directorio_binario, sub)
-                            if os.path.isdir(sub_path):
-                                carpeta_encontrada = sub_path
-                                break
+                            cand_raiz = os.path.join(self.directorio_binario, sub)
+                            if os.path.isdir(cand_raiz):
+                                if sub_rel and os.path.isdir(os.path.join(cand_raiz, sub_rel)):
+                                    carpeta_encontrada = os.path.join(cand_raiz, sub_rel)
+                                    break
+                                elif os.path.isdir(os.path.join(cand_raiz, 'mseed')):
+                                    carpeta_encontrada = os.path.join(cand_raiz, 'mseed')
+                                    break
+                                else:
+                                    carpeta_encontrada = cand_raiz
+                                    break
                 except Exception:
                     pass
 
@@ -678,19 +717,81 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
             archivos_mseed = []
             archivos_otro_codigo = 0
+            codigos_compatibles = {codigo_estacion.upper()}
+            m_cod = re.search(r'^([A-Za-z]+)(\d+)$', codigo_estacion.strip())
+            if m_cod:
+                pfx_m, n_m = m_cod.group(1).upper(), int(m_cod.group(2))
+                codigos_compatibles.add(f"{pfx_m}{n_m}")
+                codigos_compatibles.add(f"{pfx_m}{n_m:02d}")
+
+            archivos_candidatos_orig = {}
+            archivos_candidatos_copias = {}
+            patron_copia = re.compile(r'^(.*?)\s*\(\d+\)\.mseed$', re.IGNORECASE)
+
             try:
                 for archivo in os.listdir(ruta_carpeta):
                     match = patron_mseed_dia.match(archivo)
                     if not match or match.group(2) != dia_yyyymmdd:
                         continue
                     codigo_archivo = match.group(1).upper()
-                    if codigo_archivo != codigo_estacion.upper():
+                    if codigo_archivo not in codigos_compatibles:
                         archivos_otro_codigo += 1
                         continue
-                    archivos_mseed.append(os.path.join(ruta_carpeta, archivo))
+
+                    ruta_archivo = os.path.join(ruta_carpeta, archivo)
+                    match_copia = patron_copia.match(archivo)
+                    if match_copia:
+                        nombre_base_orig = match_copia.group(1).strip() + ".mseed"
+                        archivos_candidatos_copias.setdefault(nombre_base_orig, []).append((archivo, ruta_archivo))
+                    else:
+                        archivos_candidatos_orig[archivo] = ruta_archivo
             except Exception as e:
                 mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: error al listar {ruta_carpeta}: {e}", False)
                 continue
+
+            # Filtrar y verificar duplicados de sincronización por tamaño
+            copias_descartadas = 0
+            for nombre_orig, ruta_orig in archivos_candidatos_orig.items():
+                archivos_mseed.append(ruta_orig)
+                if nombre_orig in archivos_candidatos_copias:
+                    try:
+                        tam_orig = os.path.getsize(ruta_orig)
+                        for nombre_copia, ruta_copia in archivos_candidatos_copias[nombre_orig]:
+                            try:
+                                tam_copia = os.path.getsize(ruta_copia)
+                                if tam_orig == tam_copia:
+                                    copias_descartadas += 1
+                                else:
+                                    mensaje_lbl(
+                                        self.Lbl_Mensajes,
+                                        f"[DIGITAL] {codigo_estacion}: Discrepancia en copia '{nombre_copia}' ({tam_copia} B vs original {tam_orig} B). Se prioriza el original.",
+                                        False,
+                                        tipo='error'
+                                    )
+                            except Exception:
+                                copias_descartadas += 1
+                    except Exception:
+                        pass
+
+            # Caso de contingencia: si el original no existe pero sí una copia válida
+            for nombre_base_orig, copias in archivos_candidatos_copias.items():
+                if nombre_base_orig not in archivos_candidatos_orig:
+                    nombre_copia, ruta_copia = copias[0]
+                    archivos_mseed.append(ruta_copia)
+                    mensaje_lbl(
+                        self.Lbl_Mensajes,
+                        f"[DIGITAL] {codigo_estacion}: Original '{nombre_base_orig}' ausente; se usará la copia '{nombre_copia}'",
+                        False
+                    )
+                    copias_descartadas += max(0, len(copias) - 1)
+
+            if copias_descartadas > 0:
+                mensaje_lbl(
+                    self.Lbl_Mensajes,
+                    f"[DIGITAL] {codigo_estacion}: {copias_descartadas} copias duplicadas '(N)' descartadas (mismo tamaño que el original)",
+                    False,
+                    tipo='exito'
+                )
 
             if archivos_otro_codigo:
                 mensaje_lbl(self.Lbl_Mensajes, f"[DIGITAL] {codigo_estacion}: {archivos_otro_codigo} archivos del dia ignorados por otro codigo", False)
@@ -777,7 +878,13 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
         import matplotlib.pyplot as plt
         mensaje_lbl(self.Lbl_Mensajes, "Imprimiendo PNGs digitales:", False)
-        for archivo_salida, num_estacion, codigo_estacion, archivo_evento in png_pendientes:
+        total_png = len(png_pendientes)
+        for idx_png, (archivo_salida, num_estacion, codigo_estacion, archivo_evento) in enumerate(png_pendientes, start=1):
+            if hasattr(self, 'progressBar') and self.progressBar is not None and total_png > 0:
+                progreso = int(70 + (idx_png / total_png) * 25)
+                self.progressBar.setValue(progreso)
+                QCoreApplication.processEvents()
+
             try:
                 stream_unido = obspy.read(archivo_salida)
                 traza_png = self.seleccionar_traza_png_digital(stream_unido, num_estacion, codigo_estacion)
@@ -793,8 +900,53 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             QCoreApplication.processEvents()
 
     def Abrir_archivo(self):
-        lista_archivos = []
+        # Sincronizar fecha y directorios canónicos del día
+        self.showDate(self.dateEdit.date())
+        self.archivo = self.directorio_trabajo + self.dia + '000000'
+        self.definir_dia()
+
+        # Flujo exclusivo: solo estaciones digitales (omite telemetría analógica de R:)
+        if hasattr(self, 'chk_solo_digitales') and self.chk_solo_digitales.isChecked():
+            mensaje_lbl(self.Lbl_Mensajes, "=== MODO EXCLUSIVO: CONSOLIDACIÓN DE ESTACIONES DIGITALES ===", False)
+            mensaje_lbl(self.Lbl_Mensajes, f"Buscando fragmentos MiniSEED en: {self.directorio_binario}", False)
+            mensaje_lbl(self.Lbl_Mensajes, f"Destino de registros MiniSEED: {self.directorio_registros}", False)
+
+            if not os.path.isdir(self.directorio_binario):
+                mensaje_lbl(self.Lbl_Mensajes, f"[ERROR] No existe la carpeta de estaciones digitales: {self.directorio_binario}", False, tipo='error')
+                QMessageBox.warning(
+                    self,
+                    "Carpeta no encontrada",
+                    f"No existe la carpeta de estaciones digitales:\n{self.directorio_binario}\n\nSeleccione la carpeta DIA mediante el botón '../dia/'."
+                )
+                return
+
+            if self.progressBar is not None:
+                self.progressBar.setValue(10)
+            QCoreApplication.processEvents()
+
+            png_digitales = self.procesar_digitales()
+
+            if self.progressBar is not None:
+                self.progressBar.setValue(70)
+            QCoreApplication.processEvents()
+
+            if png_digitales:
+                self.imprimir_png_digitales(png_digitales)
+            else:
+                mensaje_lbl(self.Lbl_Mensajes, "[DIGITAL] No se generaron registros MiniSEED ni gráficos PNG para esta fecha.", False)
+
+            if self.progressBar is not None:
+                self.progressBar.setValue(100)
+            QCoreApplication.processEvents()
+            mensaje_lbl(self.Lbl_Mensajes, "Consolidación de estaciones digitales finalizada con éxito.", True, tipo='exito')
+            return
+
+        # Flujo analógico e híbrido (requiere o intenta telemetría en R:)
         directorio_origen = 'R:'
+        if not os.path.exists(directorio_origen):
+            mostrar_advertencia(self)
+
+        lista_archivos = []
 
         try:
             archivos_auxiliar = os.listdir(directorio_origen)

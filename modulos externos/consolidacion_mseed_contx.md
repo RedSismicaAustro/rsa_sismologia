@@ -74,9 +74,10 @@ flowchart TD
 
 | Método / Función | Responsabilidad |
 |---|---|
-| `MyApp.procesar_digitales()` | Procesa todas las estaciones digitales habilitadas en `digitales.csv` con búsqueda resiliente de carpetas (`LAB02` <-> `LAB2`), une sus trazas y retorna la lista de PNGs pendientes. |
+| `MyApp.al_cambiar_modo_digital(activado)` | Maneja el cambio de estado del checkbox `chk_solo_digitales`, informando al operador si se opera en modo exclusivo digital o híbrido. |
+| `MyApp.procesar_digitales()` | Procesa todas las estaciones digitales habilitadas en `digitales.csv` con búsqueda resiliente de carpetas (`LAB02` <-> `LAB2`), deduplicación de copias de sincronización ` (N)` mediante verificación estricta de tamaño en bytes, unión cronológica de trazas y generación de la lista de PNGs pendientes. |
 | `MyApp.imprimir_png_digitales(...)` | Genera los dayplots PNG para cada archivo digital consolidado según el canal/componente configurado, cerrando figuras con `plt.close('all')` para evitar fugas de memoria. |
-| `MyApp.Abrir_archivo()` | Gestiona el ciclo completo de descarga y decodificación de la telemetría continua desde `R:` o fallback automático en `directorio_trabajo`. |
+| `MyApp.Abrir_archivo()` | Gestiona el ciclo de consolidación. Si `chk_solo_digitales` está activado, salta la fase analógica y ejecuta directamente `procesar_digitales()` e `imprimir_png_digitales()`; en caso contrario, descarga y decodifica la telemetría continua desde `R:` antes del procesamiento digital. |
 | `MyApp.unir_mseed(arch1, arch2)` | Une pares de archivos MiniSEED analógicos por canal conservando discontinuidades reales con `split()`. |
 | `MyApp.validar_fila_digital(fila, idx)` | Valida límites y tipos de datos en filas de `digitales.csv`. |
 | `MyApp.seleccionar_traza_png_digital(...)` | Prioriza la traza vertical (`Z`) según la cadena de orientación o componente configurada. |
@@ -90,6 +91,7 @@ flowchart TD
 1. **Doble Dependencia de Almacenamiento**: Requiere acceso simultáneo a la unidad de red `R:` y a la ruta local/nube `Datos Estaciones`. Si `R:` no está disponible, el módulo digital puede ejecutarse de forma aislada, pero el usuario debe confirmar la advertencia.
 2. **Volumen de Logs en UI**: Dado que procesa tanto analógicos como digitales, el buffer de `Lbl_Mensajes` recibe cientos de líneas de log; se usa `QCoreApplication.processEvents()` para mantener la fluidez de la ventana sin congelar el hilo principal de Qt.
 3. **Escritura Atómica en Unidades Mapeadas**: Se debe asegurar que las carpetas de destino admitan `os.replace` sin bloqueos de antivirus o permisos de red en Windows.
+4. **Conflictos de Sincronización en Nube**: Carpetas de Google Drive pueden acumular copias de colisión `(1)`, `(2)`, etc. El algoritmo de deduplicación descarta automáticamente estas copias cuando su tamaño coincide con el original.
 
 ---
 
@@ -98,5 +100,6 @@ flowchart TD
 Antes de validar cualquier modificación en `consolidacion_mseed.py`, verificar:
 - [ ] La aplicación maneja adecuadamente tanto la presencia como la ausencia de la unidad `R:`.
 - [ ] Las estaciones digitales se ordenan estrictamente por `stats.starttime` antes de ejecutar `merge()`.
+- [ ] Los archivos duplicados de sincronización con sufijo ` (N)` son filtrados y descartados validando identidad de tamaño en bytes contra el original.
 - [ ] La compresión de salida en todos los archivos `.mseed` es `STEIM1` con longitud de registro `512`.
 - [ ] Los dayplots PNG para estaciones analógicas y digitales se generan en las rutas canónicas del día sin sobreescribirse entre sí.
