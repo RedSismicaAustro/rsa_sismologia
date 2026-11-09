@@ -214,6 +214,16 @@
             </property>
            </widget>
           </item>
+          <item row="5" column="0" colspan="2">
+           <widget class="QPushButton" name="boton_borrar_marcas">
+            <property name="toolTip">
+             <string>Borra las marcas temporales del zoom o elimina la medición registrada con confirmación de seguridad</string>
+            </property>
+            <property name="text">
+             <string>🗑️ Borrar Marcas</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>

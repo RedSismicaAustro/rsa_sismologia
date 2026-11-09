@@ -437,7 +437,16 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
     responsable_evento=responsables[indice_responsable][0]        
 
 # ==== XML (para RMS y marcas)
-    evento_trabajo = raiz.find(f"./Evento[id_evento='{evento_catalogo[IDX_INDICE]}']")#
+    # Búsqueda por archivo .sis (ruta), única por sismo real incluso en el mismo minuto
+    evento_trabajo = None
+    nombre_sis = Path(archivo).name
+    for ev in raiz.findall("./Evento"):
+        ruta_ev = ev.findtext("ruta", "")
+        if Path(ruta_ev).name == nombre_sis or ruta_ev == archivo:
+            evento_trabajo = ev
+            break
+    if evento_trabajo is None:
+        evento_trabajo = raiz.find(f"./Evento[id_evento='{evento_catalogo[IDX_INDICE]}']")#
     # Convertir el elemento a una cadena XML
     valor_rms = evento_trabajo.findtext("rms") if evento_trabajo is not None else "__"
     estaciones_vector,estaciones_proceso = [],[]
@@ -484,7 +493,7 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
         if dato[1]==archivo:
             for i in range(0,NUMERO_ESTACIONES):
                 if bandera_seleccion:
-                    if trCanal[i]!=[]:
+                    if trCanal[i] and len(trCanal[i]) > 0:
                         tiempo_inicio,tiempo_inicial,duracion, catNames=obtener_marcas_tiempo(trCanal[i])
                         estacion=trCanal[i][0].stats.station
                         estacion_completa=dato[i+3]
@@ -492,7 +501,7 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
                             grado_=int(estacion_completa[6:8])
                             freqmin_=int(estacion_completa[8:10])
                             freqmax_=int(estacion_completa[10:12])
-                        except ValueError:
+                        except (ValueError, Exception):
                             grado_=0
                         if grado_!=0:
                                 trCanal[i][0].filter("bandpass",freqmin=freqmin_,freqmax=freqmax_,corners=grado_)
@@ -520,9 +529,13 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
                             tiempo_1=tiempo_p-variacion
                             tiempo_2=tiempo_p+variacion
                             trCanal_copia[i].trim(tiempo_inicio+tiempo_1,tiempo_inicio+tiempo_2)
-                            if trCanal_copia_filtrada[i][0]!=' ':
+                            if (hasattr(trCanal_copia_filtrada[i], '__len__') and not isinstance(trCanal_copia_filtrada[i], list) and len(trCanal_copia_filtrada[i]) > 0 and trCanal_copia_filtrada[i][0] != ' '):
                                 trCanal_copia_filtrada[i].trim(tiempo_inicio+tiempo_1,tiempo_inicio+tiempo_2)
-                        except ValueError:
+                            if hasattr(trCanal_copia[i], '__len__') and len(trCanal_copia[i]) == 0:
+                                trCanal_copia[i] = [' ']
+                            if (hasattr(trCanal_copia_filtrada[i], '__len__') and not isinstance(trCanal_copia_filtrada[i], list) and len(trCanal_copia_filtrada[i]) == 0):
+                                trCanal_copia_filtrada[i] = [' ']
+                        except (ValueError, Exception):
                             trCanal_copia[i]=[]
                             trCanal_copia[i].append(' ')
                             trCanal_copia_filtrada[i]=[]
@@ -570,7 +583,7 @@ def hoja_seniales_(directorio_trabajo,lienzo,evento_catalogo,evento_generar,even
         alto=800
         x_=50
         lienzo.setFont('Helvetica', 8)
-        if pagina[i] and trCanal[i]!=[]:
+        if pagina[i] and trCanal[i] and len(trCanal[i]) > 0:
             y_=alto-(contador+1.8)*(int(alto/6))
             texto='    Canal '+evento[i+3][4]
             if evento[i+3][6:8]=='00':

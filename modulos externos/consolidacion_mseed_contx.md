@@ -81,6 +81,7 @@ flowchart TD
 | `MyApp.unir_mseed(arch1, arch2)` | Une pares de archivos MiniSEED analógicos por canal conservando discontinuidades reales con `split()`. |
 | `MyApp.validar_fila_digital(fila, idx)` | Valida límites y tipos de datos en filas de `digitales.csv`. |
 | `MyApp.seleccionar_traza_png_digital(...)` | Prioriza la traza vertical (`Z`) según la cadena de orientación o componente configurada. |
+| `asegurar_archivo_estaciones(...)` | Garantiza la existencia e integridad del snapshot `AAAAMMDD_estaciones.csv`. Si existe y es válido lo preserva; si falta o está vacío, extrae desde el binario analógico, desde la plantilla canónica `datos/cabecera_sismo` o desde días vecinos, evitando errores en la emisión de reportes. |
 | `Leer_binario_comun(...)` | Decodifica la trama binaria multiplexada por hardware de 16 canales y 2077 bytes por segundo. |
 | `escribir_atomico_mseed(stream, dest)` | Escritura de seguridad mediante archivo temporal `.tmp`, `fsync` y reemplazo atómico `os.replace` con hasta 3 reintentos ante bloqueos en Windows/Google Drive. |
 
@@ -102,4 +103,5 @@ Antes de validar cualquier modificación en `consolidacion_mseed.py`, verificar:
 - [ ] Las estaciones digitales se ordenan estrictamente por `stats.starttime` antes de ejecutar `merge()`.
 - [ ] Los archivos duplicados de sincronización con sufijo ` (N)` son filtrados y descartados validando identidad de tamaño en bytes contra el original.
 - [ ] La compresión de salida en todos los archivos `.mseed` es `STEIM1` con longitud de registro `512`.
+- [ ] El archivo snapshot `AAAAMMDD_estaciones.csv` siempre se preserva o genera con éxito (tanto en modo híbrido, digital exclusivo o analógico), evitando fallos en la generación de reportes e informes.
 - [ ] Los dayplots PNG para estaciones analógicas y digitales se generan en las rutas canónicas del día sin sobreescribirse entre sí.

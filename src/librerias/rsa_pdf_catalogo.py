@@ -205,7 +205,7 @@ def imprimir_catalogo(catalogo,arbol,lienzo,directorio,estaciones_informe,tipo_c
         eventos_a_graficar=marcar_impresiones(evento,estaciones_informe,tipo_canal,mapa_)
         for i in range(0,len(eventos_a_graficar)):
             catalogo_=convertir_lista(catalogo[indice_evento])
-            if trCanal[i]!=[] and tipo_canal[i]=='ACELEROGRAFICO' and eventos_a_graficar[i]:
+            if trCanal[i] and len(trCanal[i]) > 0 and tipo_canal[i]=='ACELEROGRAFICO' and eventos_a_graficar[i]:
                 lienzo,maximos=impresion_reporte_acelerograma(lienzo,trCanal[i],i,catalogo_,1)#lienzo,maximos
                 if maximos!=[]:
                     xxx=[catalogo[indice_evento][IDX_EVENTO]]

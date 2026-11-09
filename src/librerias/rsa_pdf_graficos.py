@@ -708,7 +708,7 @@ def imprimir_seniales(tamanio,canales,trcanal,evento,bandera_seniales,bandera_zo
     datos_np = [0] * 101
     #####Obtension de los datos para graficar
     for i in range(0, 101):
-        if trcanal[i]!=[] and trcanal[i][0]!=' ':#Es igual a ' ' cuando es la copia del mseed 
+        if trcanal[i] and len(trcanal[i]) > 0 and trcanal[i][0] != ' ':#Es igual a ' ' cuando es la copia del mseed 
  
             trcanal[i].detrend(type='linear') #Correccion de linea de base
 
@@ -716,7 +716,7 @@ def imprimir_seniales(tamanio,canales,trcanal,evento,bandera_seniales,bandera_zo
     contador=0
     #canales[6]=0#No se que hace esto.
     for i in range (0,NUMERO_ESTACIONES):
-        if canales[i]!=0 and trcanal[i]!=[]:
+        if canales[i]!=0 and trcanal[i] and len(trcanal[i]) > 0:
             color_senial=colors.blue
             if trcanal[i][0]==' ':  #CUANDO ES COPIA PARA QUE GENERE EL ESAPACIO EN BLANCO
                 contador=contador+1

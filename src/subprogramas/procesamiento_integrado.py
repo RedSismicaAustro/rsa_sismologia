@@ -279,7 +279,7 @@ class Procesar_evento(QWidget):
     def activar_hilo(self):
         """
         Activa el hilo de monitoreo del archivo .rsa del evento.
-        Si ss > 50, monitorea dos posibilidades:
+        Si ss >= 50, monitorea dos posibilidades:
             - minuto +1
             - minuto real
         """
@@ -300,7 +300,7 @@ class Procesar_evento(QWidget):
             else:
                 ss_evento = int(base_evento[12:14])
 
-            if ss_evento > 50:
+            if ss_evento >= 50:
                 lista_fast_siguiente = archivos_fast(
                     archivo,
                     self.directorio_trabajo,
@@ -451,6 +451,14 @@ class Procesar_evento(QWidget):
                     rutas_real_base[4] = os.path.join(dir_fast_real, base_lp + "L")
                     rutas_real_base[5] = os.path.join(dir_fast_real, base_lp + "P")
                     rutas_real_base[6] = os.path.join(dir_fast_real, base_lp + "S")
+
+                    if hasattr(self, 'archivos_procesamiento_virtual') and self.archivos_procesamiento_virtual and len(self.archivos_procesamiento_virtual) >= 7:
+                        dir_fast_virtual = os.path.dirname(self.archivos_procesamiento_virtual[2])
+                        self.archivos_procesamiento_virtual[2] = self.archivo_rsa_actual
+                        self.archivos_procesamiento_virtual[3] = os.path.join(dir_fast_virtual, f"Phase{dd_fast}{hh_fast[0]}.{hh_fast[1]}{minu_fast}")
+                        self.archivos_procesamiento_virtual[4] = os.path.join(dir_fast_virtual, base_lp + "L")
+                        self.archivos_procesamiento_virtual[5] = os.path.join(dir_fast_virtual, base_lp + "P")
+                        self.archivos_procesamiento_virtual[6] = os.path.join(dir_fast_virtual, base_lp + "S")
 
                 self.archivos_procesamiento_real = verificar_coincidencias(
                     self.eventos,

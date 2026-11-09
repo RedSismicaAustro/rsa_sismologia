@@ -24,6 +24,7 @@ if ruta_datos not in sys.path:
     sys.path.insert(0, ruta_datos)
 
 import re
+import csv
 from PyQt5 import uic, QtWidgets
 from PyQt5.QtCore import QDate
 import shutil
@@ -202,6 +203,80 @@ def conversion_mseed_bloque(canal, hab_canal, nombre_canal, fecha_, directorio, 
     return trCanal
 
 # ==========================
+# Gestión de configuración de estaciones del día
+# ==========================
+
+def asegurar_archivo_estaciones(ruta_archivo_estaciones, archivo_binario_candidato=None, ruta_datos_local=None):
+    """
+    Garantiza la existencia e integridad del archivo AAAAMMDD_estaciones.csv.
+    Si ya existe y tiene contenido válido (>50 bytes y al menos 2 líneas), lo preserva intacto.
+    Si no existe o está incompleto:
+      1. Intenta extraer la configuración del archivo binario analógico si existe y es legible.
+      2. Si no hay binario o falla la extracción, utiliza la plantilla maestra de datos/cabecera_sismo.
+      3. Como respaldo adicional, busca el archivo _estaciones.csv válido más cercano en el mes/año.
+    Escribe el archivo usando formato CSV con delimitador ';' asegurando el snapshot del día.
+    """
+    if not ruta_archivo_estaciones:
+        return False
+
+    if os.path.isfile(ruta_archivo_estaciones) and os.path.getsize(ruta_archivo_estaciones) > 50:
+        return True
+
+    os.makedirs(os.path.dirname(ruta_archivo_estaciones), exist_ok=True)
+    configuracion = []
+
+    # 1. Intentar extraer desde archivo binario si existe
+    if archivo_binario_candidato and os.path.isfile(archivo_binario_candidato):
+        try:
+            with open(archivo_binario_candidato, 'rb') as ftmp:
+                _, config_tmp, _ = loc_cabecera(ftmp)
+                if config_tmp and len(config_tmp) >= 2:
+                    configuracion = config_tmp
+        except Exception:
+            configuracion = []
+
+    # 2. Si no se obtuvo del binario, usar la plantilla maestra de datos/cabecera_sismo
+    if not configuracion:
+        ref_datos = ruta_datos_local if (ruta_datos_local and os.path.isdir(ruta_datos_local)) else ruta_datos
+        ruta_cabecera_ref = os.path.join(ref_datos, "cabecera_sismo")
+        if os.path.isfile(ruta_cabecera_ref):
+            try:
+                with open(ruta_cabecera_ref, 'rb') as fref:
+                    _, config_ref, _ = loc_cabecera(fref)
+                    if config_ref and len(config_ref) >= 2:
+                        configuracion = config_ref
+            except Exception:
+                configuracion = []
+
+    # 3. Si aún no hay configuración, intentar clonar de un _estaciones.csv existente en carpetas vecinas
+    if not configuracion:
+        directorio_base = os.path.dirname(ruta_archivo_estaciones)
+        mes_dir = os.path.dirname(directorio_base)
+        if os.path.isdir(mes_dir):
+            for otro_dia in sorted(os.listdir(mes_dir), reverse=True):
+                cand = os.path.join(mes_dir, otro_dia, f"{otro_dia.replace('_', '')}_estaciones.csv")
+                if os.path.isfile(cand) and os.path.getsize(cand) > 50:
+                    try:
+                        shutil.copy(cand, ruta_archivo_estaciones)
+                        return True
+                    except Exception:
+                        pass
+
+    # Escribir el archivo estaciones si obtuvimos configuracion
+    if configuracion:
+        try:
+            with open(ruta_archivo_estaciones, 'w', newline='', encoding='utf-8') as f_out:
+                escritor = csv.writer(f_out, delimiter=';')
+                for fila in configuracion:
+                    escritor.writerow(fila)
+            return True
+        except Exception as e:
+            print(f"[ERROR] No se pudo escribir {ruta_archivo_estaciones}: {e}")
+            return False
+
+    return False
+
+# ==========================
 # Lector binario (tu versión original, sin cambios de lógica interna)
 # ==========================
 
@@ -241,17 +316,7 @@ def Leer_binario_comun(directorio_trabajo, archivo_binario, barra_progreso, Lbl_
 
     # ------------------- Directorios y cabecera de estaciones ------------ #
     directorios = obtener_directorios(archivo_binario)
-
-    try:
-        if (not os.path.exists(directorios['archivo_estaciones'])) or (os.path.getsize(directorios['archivo_estaciones']) == 0):
-            with open(archivo_binario, 'rb') as ftmp:
-                numero_segundo_tmp, configuracion_tmp, puntero_cab_tmp = loc_cabecera(ftmp)
-            with open(directorios['archivo_estaciones'], 'w', newline='') as archivo_estaciones:
-                escritor_csv_ = csv.writer(archivo_estaciones, delimiter=';')
-                for fila in configuracion_tmp:
-                    escritor_csv_.writerow(fila)
-    except Exception:
-        pass
+    asegurar_archivo_estaciones(directorios['archivo_estaciones'], archivo_binario, ruta_datos)
 
     # La lectura siempre inicia desde la cabecera localizada del binario.
     contador_segundos = 0
@@ -870,6 +935,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             mensaje_lbl(self.Lbl_Mensajes, "[COMUNICACION] Todas las estaciones con enlace operativo", False, tipo='exito')
 
         mensaje_lbl(self.Lbl_Mensajes, f"=== DIGITALES COMPLETADO: {estaciones_procesadas} estaciones ===", False)
+        asegurar_archivo_estaciones(getattr(self, 'estaciones', None), getattr(self, 'archivo_binario', None), ruta_datos)
         return png_pendientes
 
     def imprimir_png_digitales(self, png_pendientes):
@@ -938,6 +1004,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             if self.progressBar is not None:
                 self.progressBar.setValue(100)
             QCoreApplication.processEvents()
+            asegurar_archivo_estaciones(self.estaciones, getattr(self, 'archivo_binario', None), ruta_datos)
             mensaje_lbl(self.Lbl_Mensajes, "Consolidación de estaciones digitales finalizada con éxito.", True, tipo='exito')
             return
 
@@ -1040,12 +1107,14 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             png_digitales = self.procesar_digitales()
             self.imprimir_png()
             self.imprimir_png_digitales(png_digitales)
+            asegurar_archivo_estaciones(self.estaciones, getattr(self, 'archivo_binario', None), ruta_datos)
             mensaje_lbl(self.Lbl_Mensajes, "Terminado:", True)
         else:
             self.archivo = self.directorio_trabajo + self.dia + '000000'
             self.definir_dia()
             png_digitales = self.procesar_digitales()
             self.imprimir_png_digitales(png_digitales)
+            asegurar_archivo_estaciones(self.estaciones, getattr(self, 'archivo_binario', None), ruta_datos)
             mensaje_lbl(self.Lbl_Mensajes, "No hay registros analogicos para ese dia. Archivo buscado: " + self.archivo, True)
 
 
@@ -1068,11 +1137,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.estaciones = self.directorios_['archivo_estaciones']
         self.fecha_ = obtencion_hora(self.archivo)
 
-        if os.path.exists(self.estaciones):
-            try:
-                os.remove(self.estaciones)
-            except Exception:
-                pass
+        asegurar_archivo_estaciones(self.estaciones, getattr(self, 'archivo_binario', None), ruta_datos)
 
         for ruta in (self.directorio, self.directorio_dia, self.directorio_eventos,
                      self.directorio_registros, self.directorio_reportes, self.directorio_acel,

@@ -57,26 +57,6 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.setWindowTitle("CAUDALES — Monitoreo de Filtraciones e Instrumentación")
         
-        hoy = QDate.currentDate()
-        semana_atras = hoy.addDays(-7)
-        self.selector_fecha_inicio.setDate(semana_atras)
-        self.selector_fecha_fin.setDate(hoy)
-        self.selector_fecha_grafico.setDate(hoy)
-        
-        # Conexiones de cambio de fechas y parámetros
-        self.selector_fecha_inicio.dateChanged.connect(self.al_cambiar_periodo)
-        self.selector_fecha_fin.dateChanged.connect(self.al_cambiar_periodo)
-        self.selector_fecha_grafico.dateChanged.connect(self.al_cambiar_fecha_sismograma)
-        
-        self.combo_diezmado.clear()
-        self.combo_diezmado.addItems(["1", "2", "5", "8", "10", "20", "50", "100"])
-        self.combo_diezmado.setCurrentText("10")
-        self.combo_diezmado.currentIndexChanged.connect(lambda: self.desplegar_grafico(silencioso=True))
-        
-        self.combo_traza.setMinimumWidth(180)
-        self.combo_traza.currentIndexChanged.connect(lambda: self.desplegar_grafico(silencioso=True))
-        self.Lbl_directorio.setText("Directorio de trabajo: G:/Mi unidad/DIA/")
-        
         # === Variables internas y memoria ===
         self.directorio_trabajo = "G:/Mi unidad/DIA/"
         self.stream = None
@@ -91,10 +71,26 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.tiempo_centro_zoom = None
         self.evento_caudal_seleccionado = None
 
+        # Conexiones de cambio de fechas y parámetros
+        self.selector_fecha_inicio.dateChanged.connect(self.al_cambiar_periodo)
+        self.selector_fecha_fin.dateChanged.connect(self.al_cambiar_periodo)
+        self.selector_fecha_grafico.dateChanged.connect(self.al_cambiar_fecha_sismograma)
+        
+        self.combo_diezmado.clear()
+        self.combo_diezmado.addItems(["1", "2", "5", "8", "10", "20", "50", "100"])
+        self.combo_diezmado.setCurrentText("10")
+        self.combo_diezmado.currentIndexChanged.connect(lambda: self.desplegar_grafico(silencioso=True))
+        
+        self.combo_traza.setMinimumWidth(180)
+        self.combo_traza.currentIndexChanged.connect(lambda: self.desplegar_grafico(silencioso=True))
+        self.Lbl_directorio.setText("Directorio de trabajo: G:/Mi unidad/DIA/")
+
         # === Formulario de configuración y eventos ===
         self.boton_directorio.clicked.connect(self.seleccionar_directorio_trabajo)
         self.boton_siguiente_ciclo.clicked.connect(self.ir_a_siguiente_ciclo_esperado)
         self.boton_guardar_marcas.clicked.connect(self.guardar_marcas)
+        if hasattr(self, "boton_borrar_marcas"):
+            self.boton_borrar_marcas.clicked.connect(self.borrar_marcas)
         self.boton_ignorar_caudal.clicked.connect(self.ignorar_punto_caudal_seleccionado)
         if hasattr(self, "boton_exportar_grafico"):
             self.boton_exportar_grafico.clicked.connect(self.abrir_dialogo_exportar_grafico)
@@ -103,12 +99,206 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         # === Incrustar los 3 Lienzos de Matplotlib ===
         self.inicializar_lienzos_graficos()
         
-        # Cargar datos iniciales
-        self.al_cambiar_fecha_sismograma()
-        self.al_cambiar_periodo()
+        # Cargar base de datos de caudales y posicionarse automáticamente en la última marca
+        self.cargar_caudales_y_posicionar_inicio()
         
         # Iniciar ventana maximizada
         self.showMaximized()
+
+    def ordenar_caudales(self):
+        """Ordena self.caudales cronológicamente por la fecha y hora del evento .sis."""
+        def clave_fecha(fila):
+            if not fila or len(fila) == 0:
+                return datetime.min
+            nom = str(fila[0]).strip().replace(".sis", "")
+            if len(nom) == 13:
+                nom = '20' + nom
+            try:
+                return datetime.strptime(nom, "%Y%m%d_%H%M%S")
+            except Exception:
+                return datetime.min
+
+        self.caudales.sort(key=clave_fecha)
+
+    def obtener_ultima_marca_confirmada(self):
+        """Retorna la última marca confirmada (bandera == '1') registrada en self.caudales."""
+        eventos = []
+        for fila in self.caudales:
+            if len(fila) >= 3 and str(fila[2]).strip() == "1":
+                nom = str(fila[0]).strip().replace(".sis", "")
+                if len(nom) == 13:
+                    nom = '20' + nom
+                try:
+                    dt = datetime.strptime(nom, "%Y%m%d_%H%M%S")
+                    eventos.append((dt, fila))
+                except Exception:
+                    pass
+        if not eventos:
+            return None
+        eventos.sort(key=lambda x: x[0])
+        dt_ult, fila_ult = eventos[-1]
+        return {
+            'dt': dt_ult,
+            'nombre': str(fila_ult[0]).strip(),
+            'caudal': int(fila_ult[1]) if len(fila_ult) > 1 and str(fila_ult[1]).isdigit() else 0,
+            'fila': fila_ult
+        }
+
+    def sanear_caudales_duplicados(self):
+        """
+        Detecta y remueve de self.caudales registros duplicados con bandera 0 que fueron generados
+        por sobre-marcado accidental a menos de 60 segundos de un evento confirmado válido.
+        """
+        if not self.caudales:
+            return False
+
+        eventos_validos_dt = []
+        for fila in self.caudales:
+            if len(fila) >= 3 and str(fila[2]).strip() == "1":
+                nom = str(fila[0]).strip().replace(".sis", "")
+                if len(nom) == 13:
+                    nom = '20' + nom
+                try:
+                    dt = datetime.strptime(nom, "%Y%m%d_%H%M%S")
+                    eventos_validos_dt.append(dt)
+                except Exception:
+                    pass
+
+        filas_limpias = []
+        filas_eliminadas = 0
+        for fila in self.caudales:
+            if len(fila) >= 3 and str(fila[2]).strip() == "0":
+                nom = str(fila[0]).strip().replace(".sis", "")
+                if len(nom) == 13:
+                    nom = '20' + nom
+                try:
+                    dt = datetime.strptime(nom, "%Y%m%d_%H%M%S")
+                    es_duplicado_accidental = any(abs((dt - dt_val).total_seconds()) <= 60 for dt_val in eventos_validos_dt)
+                    if es_duplicado_accidental:
+                        filas_eliminadas += 1
+                        continue
+                except Exception:
+                    pass
+            filas_limpias.append(fila)
+
+        if filas_eliminadas > 0:
+            print(f"[INFO] Saneamiento: se removieron {filas_eliminadas} registros duplicados de caudales.csv.")
+            self.caudales = filas_limpias
+            self.ordenar_caudales()
+            archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
+            try:
+                escritura_archivo(archivo_caudales, self.caudales)
+            except Exception as e:
+                print(f"[ERROR] Error al guardar saneamiento de caudales.csv: {e}")
+            return True
+        return False
+
+    def cargar_caudales_y_posicionar_inicio(self):
+        """Carga caudales.csv, asegura el orden cronológico y posiciona todos los gráficos en la última marca confirmada."""
+        archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
+        if os.path.isfile(archivo_caudales):
+            try:
+                self.caudales = lectura_archivo(archivo_caudales)
+                self.ordenar_caudales()
+                self.sanear_caudales_duplicados()
+            except Exception as e:
+                print(f"[ERROR] Error al cargar caudales iniciales: {e}")
+                self.caudales = []
+        else:
+            self.caudales = []
+
+        hoy = QDate.currentDate()
+        ultima_marca = self.obtener_ultima_marca_confirmada()
+
+        if ultima_marca:
+            dt_ult = ultima_marca['dt']
+            qdate_ult = QDate(dt_ult.year, dt_ult.month, dt_ult.day)
+            
+            self.selector_fecha_grafico.blockSignals(True)
+            self.selector_fecha_inicio.blockSignals(True)
+            self.selector_fecha_fin.blockSignals(True)
+            
+            # Posicionar el sismograma en la fecha de la última marca confirmada
+            self.selector_fecha_grafico.setDate(qdate_ult)
+            
+            # El periodo abarca desde 15 días antes de la última marca hasta la fecha actual
+            self.selector_fecha_inicio.setDate(qdate_ult.addDays(-15))
+            self.selector_fecha_fin.setDate(hoy)
+            
+            self.selector_fecha_grafico.blockSignals(False)
+            self.selector_fecha_inicio.blockSignals(False)
+            self.selector_fecha_fin.blockSignals(False)
+            
+            # Centrar el zoom exactamente en el instante de la última marca
+            self.tiempo_centro_zoom = mdates.date2num(dt_ult)
+        else:
+            self.selector_fecha_inicio.setDate(hoy.addDays(-7))
+            self.selector_fecha_fin.setDate(hoy)
+            self.selector_fecha_grafico.setDate(hoy)
+            self.tiempo_centro_zoom = None
+
+        # Desplegar sismograma diario, zoom y serie histórica de caudales
+        self.cargar_componentes_fecha()
+        self.desplegar_grafico(silencioso=True)
+        self.cargar_eventos_control(silencioso=True)
+        self.graficar_caudales(silencioso=True)
+        self.cargar_guia_operacion()
+
+    def obtener_eventos_grafico_dia(self, fecha_grafico):
+        """
+        Retorna la lista de eventos para el día seleccionado, unificando caudales.csv y los
+        eventos CONTROL del catálogo diario (evitando duplicados y garantizando visibilidad en pantalla).
+        Cada elemento es un dict: {'nombre': str, 'dt': datetime, 'caudal': int, 'bandera': str}
+        """
+        eventos_dia = {}
+
+        # 1. Prioridad: registros maestros en self.caudales
+        for fila in self.caudales:
+            if not fila or len(fila) == 0:
+                continue
+            nom_original = str(fila[0]).strip()
+            nom_limpio = nom_original.replace(".sis", "")
+            nom_14 = '20' + nom_limpio if len(nom_limpio) == 13 else nom_limpio
+            try:
+                dt_ev = datetime.strptime(nom_14, "%Y%m%d_%H%M%S")
+            except Exception:
+                continue
+
+            if dt_ev.date() == fecha_grafico:
+                caudal = int(fila[1]) if len(fila) > 1 and str(fila[1]).isdigit() else 0
+                bandera = str(fila[2]).strip() if len(fila) > 2 else '1'
+                eventos_dia[nom_original] = {
+                    'nombre': nom_original,
+                    'dt': dt_ev,
+                    'caudal': caudal,
+                    'bandera': bandera
+                }
+
+        # 2. Complementar con eventos CONTROL del catálogo diario self.eventos si existen
+        caudales_confirmados = {f[0] for f in self.caudales if len(f) > 2 and f[2] == "1"}
+        for evento in self.eventos:
+            if len(evento) > 2 and str(evento[2]).strip().upper() == "CONTROL":
+                nom_ev = str(evento[1]).strip()
+                if nom_ev not in eventos_dia:
+                    nom_limpio = nom_ev.replace(".sis", "")
+                    nom_14 = '20' + nom_limpio if len(nom_limpio) == 13 else nom_limpio
+                    try:
+                        dt_ev = datetime.strptime(nom_14, "%Y%m%d_%H%M%S")
+                    except Exception:
+                        continue
+                    if dt_ev.date() == fecha_grafico:
+                        bandera = '1' if nom_ev in caudales_confirmados else '0'
+                        eventos_dia[nom_ev] = {
+                            'nombre': nom_ev,
+                            'dt': dt_ev,
+                            'caudal': 0,
+                            'bandera': bandera
+                        }
+
+        # Retornar lista ordenada por tiempo
+        lista_ordenada = list(eventos_dia.values())
+        lista_ordenada.sort(key=lambda x: x['dt'])
+        return lista_ordenada
 
     def inicializar_lienzos_graficos(self):
         """Inicializa los 3 lienzos Matplotlib con margen para unidades en caudales y alineación vertical."""
@@ -449,12 +639,14 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
                 break
 
         if encontrado:
+            self.ordenar_caudales()
             archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
             escritura_archivo(archivo_caudales, self.caudales)
             
             self.evento_caudal_seleccionado = None
             self.graficar_caudales(silencioso=True)
             self.desplegar_grafico(silencioso=True, mantener_vista=True)
+            self.cargar_guia_operacion()
             QMessageBox.information(
                 self,
                 "Punto Ignorado",
@@ -463,6 +655,157 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             QMessageBox.warning(self, "No encontrado", f"No se encontró el evento {evento_a_ignorar} en el catálogo.")
 
+    def borrar_marcas(self):
+        """
+        Gestiona el borrado seguro con confirmación de decisión negativa (por defecto 'No, salir sin borrar'):
+        - Si existen marcas de usuario en pantalla (rojas), permite eliminarlas del lienzo.
+        - Si existe un evento seleccionado en la curva de caudales, permite eliminarlo de caudales.csv.
+        """
+        hay_marcas_pantalla = bool(self.marcas_usuario)
+        hay_evento_seleccionado = bool(self.evento_caudal_seleccionado)
+
+        if not hay_marcas_pantalla and not hay_evento_seleccionado:
+            QMessageBox.information(
+                self,
+                "Sin Marcas para Borrar",
+                "No hay marcas temporales activas en pantalla ni eventos seleccionados en la curva de caudales.\n\n"
+                "• Para borrar marcas de pantalla: coloca marcas con clic derecho en el zoom.\n"
+                "• Para borrar un registro guardado: haz clic derecho sobre su punto en la curva superior de caudales para seleccionarlo y luego presiona este botón."
+            )
+            return
+
+        if hay_marcas_pantalla and hay_evento_seleccionado:
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Question)
+            msg_box.setWindowTitle("Borrar Marcas / Registros")
+            msg_box.setText(
+                f"Tiene {len(self.marcas_usuario)} marca(s) temporal(es) en pantalla y el evento "
+                f"'{self.evento_caudal_seleccionado}' seleccionado en la curva de caudales.\n\n"
+                "¿Qué acción desea realizar?"
+            )
+            boton_cancelar = msg_box.addButton("No, salir sin borrar", QMessageBox.RejectRole)
+            boton_pantalla = msg_box.addButton("Borrar marcas en pantalla", QMessageBox.ActionRole)
+            boton_registro = msg_box.addButton("Eliminar registro de caudales.csv", QMessageBox.DestructiveRole)
+            msg_box.setDefaultButton(boton_cancelar)
+            msg_box.exec_()
+
+            if msg_box.clickedButton() == boton_pantalla:
+                self.limpiar_marcas_pantalla()
+            elif msg_box.clickedButton() == boton_registro:
+                self.eliminar_evento_caudal(self.evento_caudal_seleccionado)
+            return
+
+        if hay_marcas_pantalla:
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setWindowTitle("Confirmar Borrado de Marcas")
+            msg_box.setText(
+                f"¿Desea borrar las {len(self.marcas_usuario)} marca(s) temporales activas en pantalla?\n\n"
+                "Esta acción desmarcará la selección actual en el sismograma y zoom."
+            )
+            boton_cancelar = msg_box.addButton("No, salir sin borrar", QMessageBox.RejectRole)
+            boton_borrar = msg_box.addButton("Sí, borrar marcas", QMessageBox.AcceptRole)
+            msg_box.setDefaultButton(boton_cancelar)
+            msg_box.exec_()
+
+            if msg_box.clickedButton() == boton_borrar:
+                self.limpiar_marcas_pantalla()
+            return
+
+        if hay_evento_seleccionado:
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setWindowTitle("Confirmar Eliminación de Registro")
+            msg_box.setText(
+                f"¿Desea eliminar definitivamente el registro del evento '{self.evento_caudal_seleccionado}'?\n\n"
+                "Esta acción removerá la medición de caudales.csv y de los catálogos del día."
+            )
+            boton_cancelar = msg_box.addButton("No, salir sin borrar", QMessageBox.RejectRole)
+            boton_eliminar = msg_box.addButton("Sí, eliminar registro", QMessageBox.DestructiveRole)
+            msg_box.setDefaultButton(boton_cancelar)
+            msg_box.exec_()
+
+            if msg_box.clickedButton() == boton_eliminar:
+                self.eliminar_evento_caudal(self.evento_caudal_seleccionado)
+            return
+
+    def limpiar_marcas_pantalla(self):
+        """Limpia las marcas temporales del usuario y refresca los lienzos gráficos."""
+        self.marcas_usuario.clear()
+        for line in list(self.ax_sismograma.lines):
+            if line.get_color() == 'red' and line.get_linestyle() == '--':
+                line.remove()
+        self.canvas_sismograma.draw_idle()
+        self.actualizar_grafico_zoom()
+
+    def eliminar_evento_caudal(self, evento_nom):
+        """Elimina permanentemente un evento de caudales.csv y de los catálogos diarios asociados."""
+        if not evento_nom:
+            return
+
+        nom_base = str(evento_nom).strip().replace(".sis", "")
+        # 1. Remover de self.caudales
+        longitud_antes = len(self.caudales)
+        self.caudales = [
+            fila for fila in self.caudales
+            if len(fila) == 0 or (str(fila[0]).strip().replace(".sis", "") != nom_base)
+        ]
+        eliminado_caudales = (len(self.caudales) < longitud_antes)
+
+        # 2. Guardar caudales.csv ordenado
+        self.ordenar_caudales()
+        archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
+        escritura_archivo(archivo_caudales, self.caudales)
+
+        # 3. Remover del catálogo del día correspondiente
+        nom_limpio = nom_base
+        if len(nom_limpio) == 13:
+            nom_limpio = '20' + nom_limpio
+        try:
+            ev_dt = datetime.strptime(nom_limpio, "%Y%m%d_%H%M%S")
+            nombre_archivo_dia = ev_dt.strftime("%Y%m%d000000")
+            dirs_dia = obtener_directorios(os.path.join(self.directorio_trabajo, nombre_archivo_dia))
+            
+            # Limpiar del archivo_csv del día
+            archivo_csv_dia = dirs_dia.get('archivo_csv', '')
+            if not os.path.isfile(archivo_csv_dia):
+                archivo_csv_dia = os.path.join(self.directorio_trabajo, dirs_dia.get('archivo_csv', ''))
+            if os.path.isfile(archivo_csv_dia):
+                eventos_dia = lectura_archivo(archivo_csv_dia)
+                eventos_dia_filtrados = [
+                    ev for ev in eventos_dia
+                    if len(ev) < 2 or str(ev[1]).strip().replace(".sis", "") != nom_base
+                ]
+                if len(eventos_dia_filtrados) < len(eventos_dia):
+                    escritura_archivo(archivo_csv_dia, eventos_dia_filtrados)
+                    if hasattr(self, 'archivo') and nombre_archivo_dia in self.archivo:
+                        self.eventos = eventos_dia_filtrados
+
+            # Limpiar del archivo_auxiliar del día
+            archivo_aux_dia = dirs_dia.get('archivo_auxiliar', '')
+            if not os.path.isfile(archivo_aux_dia):
+                archivo_aux_dia = os.path.join(self.directorio_trabajo, dirs_dia.get('archivo_auxiliar', ''))
+            if os.path.isfile(archivo_aux_dia):
+                eventos_aux = lectura_archivo(archivo_aux_dia)
+                eventos_aux_filtrados = [
+                    ev for ev in eventos_aux
+                    if len(ev) < 2 or str(ev[1]).strip().replace(".sis", "") != nom_base
+                ]
+                if len(eventos_aux_filtrados) < len(eventos_aux):
+                    escritura_archivo(archivo_aux_dia, eventos_aux_filtrados)
+        except Exception as e:
+            print(f"[WARN] No se pudo depurar el evento de los catálogos diarios: {e}")
+
+        self.evento_caudal_seleccionado = None
+        self.graficar_caudales(silencioso=True)
+        self.desplegar_grafico(silencioso=True, mantener_vista=True)
+        self.cargar_guia_operacion()
+        QMessageBox.information(
+            self,
+            "Registro Eliminado",
+            f"El evento '{evento_nom}' ha sido eliminado exitosamente de caudales.csv y catálogos asociados."
+        )
+
     def al_cambiar_periodo(self):
         """Sincroniza y actualiza automáticamente los caudales al modificar cualquier fecha del periodo."""
         self.cargar_eventos_control(silencioso=True)
@@ -470,6 +813,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def al_cambiar_fecha_sismograma(self):
         """Carga el registro del día y actualiza automáticamente el sismograma y zoom."""
+        self.tiempo_centro_zoom = None
         self.cargar_componentes_fecha()
         self.desplegar_grafico(silencioso=True)
 
@@ -532,6 +876,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         if os.path.isfile(archivo_caudales):
             try:
                 self.caudales = lectura_archivo(archivo_caudales)
+                self.ordenar_caudales()
             except Exception as e:
                 print(f"[ERROR] Error al leer caudales.csv: {e}")
         else:
@@ -590,30 +935,36 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         self.ax_sismograma.yaxis.set_visible(False)
         self.ax_sismograma.grid(True, linestyle='--', alpha=0.3)
 
-        # === Eventos CONTROL del día ===
+        # === Eventos del día (unificando caudales.csv y catálogo diario) ===
         archivo_csv_dia = self.directorios.get('archivo_csv', '')
         if os.path.isfile(archivo_csv_dia):
             self.eventos = lectura_archivo(archivo_csv_dia)
         else:
             self.eventos = []
 
-        eventos_control_dia = [evento[1] for evento in self.eventos if len(evento) > 2 and str(evento[2]).strip().upper() == "CONTROL"]
+        eventos_dia = self.obtener_eventos_grafico_dia(fecha_grafico)
         max_valor = float(datos.max()) if len(datos) > 0 else 1.0
-        caudales_confirmados = {f[0] for f in self.caudales if len(f) > 2 and f[2] == "1"}
 
         primer_evento_dt = None
-        for evento in eventos_control_dia:
+        for ev in eventos_dia:
             try:
-                color_linea = 'green' if evento in caudales_confirmados else 'red'
-                dt_evento = datetime.strptime(evento.replace(".sis", ""), "%Y%m%d_%H%M%S")
+                dt_evento = ev['dt']
                 if primer_evento_dt is None:
                     primer_evento_dt = dt_evento
                 tiempo_relativo = mdates.date2num(dt_evento)
-                self.ax_sismograma.axvline(x=tiempo_relativo, color=color_linea, linestyle=':', linewidth=1, alpha=0.7)
-                self.ax_sismograma.text(tiempo_relativo, max_valor * 0.95, evento, rotation=90,
-                                        fontsize=6.5, verticalalignment='bottom', color=color_linea)
+                
+                es_confirmado = (ev['bandera'] == '1')
+                color_linea = '#16a34a' if es_confirmado else '#dc2626'
+                estilo_linea = '-' if es_confirmado else ':'
+                ancho_linea = 1.3 if es_confirmado else 1.0
+                
+                texto_etiqueta = f"{ev['nombre']} ({ev['caudal']} cm³/s)" if (es_confirmado and ev['caudal'] > 0) else ev['nombre']
+                
+                self.ax_sismograma.axvline(x=tiempo_relativo, color=color_linea, linestyle=estilo_linea, linewidth=ancho_linea, alpha=0.85)
+                self.ax_sismograma.text(tiempo_relativo, max_valor * 0.92, texto_etiqueta, rotation=90,
+                                        fontsize=6.5, verticalalignment='top', color=color_linea, fontweight='bold')
             except Exception as e:
-                print(f"Error al graficar evento CONTROL del día: {evento} → {e}")
+                print(f"Error al graficar evento del día en sismograma: {ev} → {e}")
 
         # === Zona Predictiva de Bombeo (Ciclo Esperado) ===
         pred = self.obtener_estado_bombeo_y_prediccion()
@@ -646,8 +997,14 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         # Actualizar la vista de Zoom preservando la posición actual del pico
         if mantener_vista and self.tiempo_centro_zoom is not None:
             centro_zoom = self.tiempo_centro_zoom
+        elif self.tiempo_centro_zoom is not None:
+            dt_centro = mdates.num2date(self.tiempo_centro_zoom).replace(tzinfo=None)
+            if dt_centro.date() == fecha_grafico:
+                centro_zoom = self.tiempo_centro_zoom
+            else:
+                centro_zoom = mdates.date2num(eventos_dia[-1]['dt']) if eventos_dia else (tiempo[0] + (tiempo[-1] - tiempo[0]) / 2.0)
         else:
-            centro_zoom = mdates.date2num(primer_evento_dt) if primer_evento_dt else (tiempo[0] + (tiempo[-1] - tiempo[0]) / 2.0)
+            centro_zoom = mdates.date2num(eventos_dia[-1]['dt']) if eventos_dia else (tiempo[0] + (tiempo[-1] - tiempo[0]) / 2.0)
         self.actualizar_grafico_zoom(centro_tiempo=centro_zoom)
 
     def actualizar_grafico_zoom(self, centro_tiempo=None):
@@ -717,18 +1074,24 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
         for marca in self.marcas_usuario:
             self.ax_zoom.axvline(marca, color='red', linestyle='--', linewidth=1.8)
 
-        # Dibujar marcas de eventos CONTROL en el zoom
-        for evento in self.eventos:
-            if len(evento) > 2 and str(evento[2]).strip().upper() == "CONTROL":
-                try:
-                    dt_ev = datetime.strptime(evento[1].replace(".sis", ""), "%Y%m%d_%H%M%S")
-                    t_ev = mdates.date2num(dt_ev)
-                    if t_min <= t_ev <= t_max:
-                        self.ax_zoom.axvline(x=t_ev, color='green', linestyle=':', linewidth=1.2)
-                        self.ax_zoom.text(t_ev, self.ax_zoom.get_ylim()[1] * 0.9, evento[1], rotation=90,
-                                          fontsize=6.5, verticalalignment='top', color='green')
-                except Exception:
-                    pass
+        # Dibujar marcas de eventos en el zoom
+        eventos_dia_zoom = self.obtener_eventos_grafico_dia(dt_min.date())
+        for ev in eventos_dia_zoom:
+            try:
+                t_ev = mdates.date2num(ev['dt'])
+                if t_min <= t_ev <= t_max:
+                    es_confirmado = (ev['bandera'] == '1')
+                    color_linea = '#16a34a' if es_confirmado else '#dc2626'
+                    estilo_linea = '-' if es_confirmado else ':'
+                    ancho_linea = 1.4 if es_confirmado else 1.0
+                    
+                    texto_etiqueta = f"{ev['nombre']} ({ev['caudal']} cm³/s)" if (es_confirmado and ev['caudal'] > 0) else ev['nombre']
+                    
+                    self.ax_zoom.axvline(x=t_ev, color=color_linea, linestyle=estilo_linea, linewidth=ancho_linea, alpha=0.9)
+                    self.ax_zoom.text(t_ev, self.ax_zoom.get_ylim()[1] * 0.88, texto_etiqueta, rotation=90,
+                                      fontsize=6.8, verticalalignment='top', color=color_linea, fontweight='bold')
+            except Exception as e:
+                print(f"Error al graficar evento en zoom: {ev} → {e}")
 
         self.ax_zoom.tick_params(axis='x', labelsize=7.5, pad=1)
         self.ax_zoom.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
@@ -807,42 +1170,59 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
 
         eventos_auxiliar = lectura_archivo(archivo_auxiliar) if os.path.isfile(archivo_auxiliar) else []
         tiempo = obtencion_hora(self.archivo)
-        n_evento = 0
-        tipo_evento = 'CONTROL'
         fecha_real = tiempo + tiempo_inicio
         nombre_sis = fecha_real.strftime('%Y%m%d_%H%M%S.sis')
-        ahora = datetime.now()
-        estaciones = "CHA231000000"
-        
-        evento_auxiliar = (n_evento, nombre_sis, tipo_evento, ahora, tiempo_inicio, tiempo_fin, 'RSA', estaciones, 'Caudales')
-        eventos_auxiliar.append(evento_auxiliar)
-        escritura_archivo(archivo_auxiliar, eventos_auxiliar)
-
-        archivo_csv = self.directorios.get('archivo_csv', '')
-        if os.path.isfile(archivo_csv):
-            self.eventos = lectura_archivo(archivo_csv)
-        else:
-            self.eventos = []
-
-        solo_eventos = [fila[1] for fila in self.eventos if len(fila) > 1]
-        for i, ev_aux in enumerate(eventos_auxiliar):
-            evento = extraccion(ev_aux, solo_eventos, self.archivo, False)
-            if evento is not None:
-                self.eventos.append(evento)
-                
-        self.eventos = ordenar_y_eliminar_duplicados(self.eventos, 1, False)
-        escritura_archivo(archivo_csv, self.eventos)
-        
-        # Calcular caudal para el nuevo evento respecto al último confirmado anterior
         dt_nuevo = datetime.strptime(nombre_sis.replace(".sis", ""), "%Y%m%d_%H%M%S")
+
+        # 1. Detección preventiva de pulsos ya marcados (mismo ciclo de descarga de la bomba)
+        evento_existente_cercano = None
+        distancia_minima_seg = 999999
+        for fila in self.caudales:
+            if not fila or len(fila) == 0:
+                continue
+            nom_fila = str(fila[0]).strip().replace(".sis", "")
+            nom_norm = '20' + nom_fila if len(nom_fila) == 13 else nom_fila
+            try:
+                dt_fila = datetime.strptime(nom_norm, "%Y%m%d_%H%M%S")
+                dist_seg = abs((dt_nuevo - dt_fila).total_seconds())
+                if dist_seg < 1800:  # Menor a 30 minutos (mismo pulso de descarga de la bomba)
+                    if dist_seg < distancia_minima_seg:
+                        distancia_minima_seg = dist_seg
+                        evento_existente_cercano = (dt_fila, fila)
+            except Exception:
+                pass
+
+        nom_reemplazar = None
+        if evento_existente_cercano:
+            dt_exist, fila_exist = evento_existente_cercano
+            nom_exist = str(fila_exist[0]).strip()
+            caudal_exist = fila_exist[1] if len(fila_exist) > 1 else '0'
+            dif_seg = int(distancia_minima_seg)
+            minutos = round(dif_seg / 60.0, 1)
+
+            msg = (
+                f"Ya existe una marca registrada para este pulso de descarga:\n\n"
+                f"• Evento existente: {nom_exist}\n"
+                f"• Caudal actual: {caudal_exist} cm³/s\n"
+                f"• Diferencia de tiempo: {dif_seg} s ({minutos} min)\n\n"
+                f"¿Deseas REEMPLAZAR la marca existente con la nueva posición seleccionada?\n\n"
+                f"(Al aceptar se actualizará la posición manteniendo el cálculo de caudal correcto respecto al ciclo anterior)."
+            )
+            resp = QMessageBox.question(self, "Pulso Ya Registrado", msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if resp != QMessageBox.Yes:
+                return
+            nom_reemplazar = nom_exist
+
+        # 2. Calcular caudal respecto al último evento confirmado previo
         eventos_confirmados_previos = []
         for fila in self.caudales:
             if len(fila) >= 3 and str(fila[2]).strip() == "1":
                 nom = str(fila[0]).strip()
-                if len(nom) == 17:
-                    nom = '20' + nom
+                if nom_reemplazar and (nom == nom_reemplazar or nom.replace('.sis', '') == nom_reemplazar.replace('.sis', '')):
+                    continue  # No comparar contra sí mismo al reemplazar
+                nom_norm = '20' + nom if len(nom) == 17 else nom
                 try:
-                    dt_prev = datetime.strptime(nom.replace(".sis", ""), "%Y%m%d_%H%M%S")
+                    dt_prev = datetime.strptime(nom_norm.replace(".sis", ""), "%Y%m%d_%H%M%S")
                     if dt_prev < dt_nuevo:
                         eventos_confirmados_previos.append((dt_prev, fila))
                 except Exception:
@@ -854,31 +1234,85 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
             dt_ultimo = eventos_confirmados_previos[-1][0]
             segundos = int((dt_nuevo - dt_ultimo).total_seconds())
             if segundos > 0:
+                if segundos < 600:
+                    QMessageBox.warning(
+                        self,
+                        "Intervalo Anómalo",
+                        f"El intervalo respecto al ciclo anterior es de solo {segundos} segundos (< 10 min).\n"
+                        f"Esto generaría un caudal anómalo.\n\n"
+                        f"Operación cancelada para preservar la integridad del registro."
+                    )
+                    return
                 caudal_nuevo = int(1.214 * 3500000 / segundos)
 
-        # Registrar o actualizar solo el nuevo evento en self.caudales (bandera = '1')
-        evento_en_caudales = False
-        for fila in self.caudales:
-            if len(fila) > 0 and (fila[0] == nombre_sis or fila[0] == nombre_sis.replace('.sis', '')):
-                fila[1] = str(caudal_nuevo)
-                if len(fila) > 2:
-                    fila[2] = '1'
-                else:
-                    fila.append('1')
-                evento_en_caudales = True
-                break
-        if not evento_en_caudales:
-            self.caudales.append([nombre_sis, str(caudal_nuevo), "1"])
+        # 3. Actualizar catálogo auxiliar y matriz de eventos del día
+        n_evento = 0
+        tipo_evento = 'CONTROL'
+        ahora = datetime.now()
+        estaciones = "CHA231000000"
+        
+        if nom_reemplazar:
+            eventos_auxiliar = [ev for ev in eventos_auxiliar if len(ev) < 2 or ev[1] != nom_reemplazar]
+            
+        evento_auxiliar = (n_evento, nombre_sis, tipo_evento, ahora, tiempo_inicio, tiempo_fin, 'RSA', estaciones, 'Caudales')
+        eventos_auxiliar.append(evento_auxiliar)
+        escritura_archivo(archivo_auxiliar, eventos_auxiliar)
 
+        archivo_csv = self.directorios.get('archivo_csv', '')
+        if os.path.isfile(archivo_csv):
+            self.eventos = lectura_archivo(archivo_csv)
+        else:
+            self.eventos = []
+
+        if nom_reemplazar:
+            self.eventos = [ev for ev in self.eventos if len(ev) < 2 or ev[1] != nom_reemplazar]
+
+        solo_eventos = [fila[1] for fila in self.eventos if len(fila) > 1]
+        for i, ev_aux in enumerate(eventos_auxiliar):
+            evento = extraccion(ev_aux, solo_eventos, self.archivo, False)
+            if evento is not None:
+                self.eventos.append(evento)
+                
+        self.eventos = ordenar_y_eliminar_duplicados(self.eventos, 1, False)
+        escritura_archivo(archivo_csv, self.eventos)
+
+        # 4. Registrar o actualizar en self.caudales (bandera = '1')
+        if nom_reemplazar:
+            for fila in self.caudales:
+                if len(fila) > 0 and (fila[0] == nom_reemplazar or fila[0] == nom_reemplazar.replace('.sis', '')):
+                    fila[0] = nombre_sis
+                    fila[1] = str(caudal_nuevo)
+                    if len(fila) > 2:
+                        fila[2] = '1'
+                    else:
+                        fila.append('1')
+                    break
+        else:
+            evento_en_caudales = False
+            for fila in self.caudales:
+                if len(fila) > 0 and (fila[0] == nombre_sis or fila[0] == nombre_sis.replace('.sis', '')):
+                    fila[1] = str(caudal_nuevo)
+                    if len(fila) > 2:
+                        fila[2] = '1'
+                    else:
+                        fila.append('1')
+                    evento_en_caudales = True
+                    break
+            if not evento_en_caudales:
+                self.caudales.append([nombre_sis, str(caudal_nuevo), "1"])
+
+        # Ordenar cronológicamente y guardar
+        self.ordenar_caudales()
         archivo_caudales = os.path.join(self.directorio_trabajo, "caudales.csv")
         escritura_archivo(archivo_caudales, self.caudales)
         
         # Limpiar marcas y redibujar preservando el encuadre actual del sismograma y zoom
         self.marcas_usuario.clear()
+        self.tiempo_centro_zoom = mdates.date2num(dt_nuevo)
         self.desplegar_grafico(silencioso=True, mantener_vista=True)
         self.graficar_caudales(silencioso=True)
         self.cargar_guia_operacion()
-        QMessageBox.information(self, "Extracción Exitosa", f"Evento {nombre_sis} extraído, confirmado y graficado en la serie de caudales.")
+        QMessageBox.information(self, "Extracción Exitosa", f"Evento {nombre_sis} extraído, confirmado (Q = {caudal_nuevo} cm³/s) y graficado.")
 
     def graficar_caudales(self, silencioso=False):
         """Grafica la evolución temporal de caudales confirmados (bandera=1) en el contenedor superior de caudales."""
@@ -1027,6 +1461,7 @@ class Caudales(QtWidgets.QMainWindow, Ui_MainWindow):
 
         if eventos_control_nuevos:
             try:
+                self.ordenar_caudales()
                 escritura_archivo(archivo_csv, self.caudales)
                 if not silencioso:
                     QMessageBox.information(

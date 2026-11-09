@@ -2,8 +2,8 @@
 proyecto: rsa_sismologia
 tipo: contexto_tecnico
 archivo: modulos externos/caudales_filtraciones.py
-temas: [caudales, filtraciones, presas, obspy, pyqt5, matplotlib_interactivo, cha2, reactive_ui, zoom_preservation]
-generado: 2026-08-22
+temas: [caudales, filtraciones, presas, obspy, pyqt5, matplotlib_interactivo, cha2, reactive_ui, zoom_preservation, prevencion_sobremarcado, orden_cronologico]
+generado: 2026-11-02
 ---
 
 # `caudales_filtraciones.py` — Contexto Técnico para Agentes IA
@@ -87,17 +87,25 @@ Ubicado en `directorio_trabajo/caudales.csv` (por defecto `G:/Mi unidad/DIA/caud
 | Componente / Método | Tipo | Descripción |
 |---|---|---|
 | `Caudales.__init__()` | Constructor | Configura selectores de fechas, combos, conecta botones (incluyendo `boton_siguiente_ciclo`), inicializa variables internas y maximiza la ventana. |
+| `ordenar_caudales()` | Gestión Datos | Ordena `self.caudales` estrictamente en orden cronológico ascendente según la fecha/hora del archivo `.sis`. |
+| `obtener_ultima_marca_confirmada()` | Vigilancia | Retorna la última marca con bandera 1 en `caudales.csv` para posicionar la aplicación. |
+| `sanear_caudales_duplicados()` | Saneamiento | Purga automáticamente registros duplicados espurios (bandera 0) creados por sobre-marcado accidental a menos de 60 s de un evento confirmado. |
+| `cargar_caudales_y_posicionar_inicio()` | Flujo Inicial | Carga `caudales.csv`, ordena cronológicamente, sanea duplicados y enfoca automáticamente todos los gráficos (fecha, zoom y periodo) en la última marca confirmada. |
+| `obtener_eventos_grafico_dia(fecha)` | Visualización / Datos | Unifica las marcas de `caudales.csv` y eventos `CONTROL` del catálogo diario para la fecha consultada, garantizando que siempre se dibujen en sismograma y zoom. |
 | `inicializar_lienzos_graficos()` | UI / Matplotlib | Incrusta las 3 instancias de `FigureCanvasQTAgg` y `NavigationToolbar2QT` (altura 24px) suprimiendo ejes Y y títulos redundantes. |
 | `verificar_senal_en_intervalo(dt_min, dt_max)` | Telemetría / Sismología | Comprueba si existen datos sísmicos registrados para la estación `CHA2` en la ventana temporal solicitada. |
 | `obtener_estado_bombeo_y_prediccion()` | Lógica / Vigilancia | Proyecta la próxima descarga usando la **Moda de las últimas 10 mediciones validadas** ($Q > 0$). Evalúa si existe señal en la ventana del ciclo esperado; de no haber señal, activa `REINICIO_MEDICION` para solicitar una marca base ($T_0$). |
 | `ir_a_siguiente_ciclo_esperado()` | Asistente UX | Salto guiado secuencial: calcula el próximo $T_{\text{esperado}}$, conmuta el selector de fecha del sismograma y centra automáticamente el Zoom en la franja estimada. |
 | `cargar_guia_operacion()` | UI / HTML | Despliega en `cuadro_guia` el diagnóstico dinámico de la bomba (horas transcurridas, ciclos omitidos, badge de alarma o reinicio de medición) y el flujo rápido de operación. |
 | `al_hacer_clic_caudales()` | Slot Ratón | Maneja clic izquierdo (navegación y sincronización) y clic derecho (selección y resaltado en rojo para exclusión). |
-| `ignorar_punto_caudal_seleccionado()` | Lógica | Establece `bandera = '0'` para el evento seleccionado en `caudales.csv` sin recalcular valores y actualiza gráficos y diagnóstico. |
-| `desplegar_grafico(silencioso, mantener_vista)` | Slot / Plot | Grafica la traza de 24h con diezmado, marcas de eventos y franja sombreada predictiva (`axvspan`). Si `mantener_vista=True`, restaura `xlim` y `ylim`. |
-| `actualizar_grafico_zoom(centro_tiempo)` | Slot / Plot | Extrae y grafica un corte en alta resolución ($\pm 10$ min) alrededor de `centro_tiempo`, superponiendo la franja predictiva sombreada. |
+| `ignorar_punto_caudal_seleccionado()` | Lógica | Establece `bandera = '0'` para el evento seleccionado en `caudales.csv`, reordena cronológicamente y actualiza gráficos y diagnóstico. |
+| `borrar_marcas()` | UX / Seguridad | Maneja el borrado seguro de marcas o eventos con confirmación de decisión negativa (botón por defecto `No, salir sin borrar`). Si hay marcas en pantalla las borra; si hay un evento seleccionado en la curva de caudales lo elimina de `caudales.csv` y catálogos. |
+| `limpiar_marcas_pantalla()` | UI / Lienzos | Limpia `self.marcas_usuario`, elimina las líneas rojas discontinuas de sismograma y zoom, y refresca los lienzos. |
+| `eliminar_evento_caudal(evento_nom)` | Gestión Datos | Elimina permanentemente el registro de un evento de `caudales.csv`, catálogos diarios (`AAAAMMDD000000.csv`) y archivos auxiliares (`_aux.csv`), reordena y refresca las gráficas. |
+| `desplegar_grafico(silencioso, mantener_vista)` | Slot / Plot | Grafica la traza de 24h con diezmado, marcas de eventos (verdes si confirmado, rojas si ignorado) desde `caudales.csv` y franja sombreada predictiva. |
+| `actualizar_grafico_zoom(centro_tiempo)` | Slot / Plot | Extrae y grafica un corte en alta resolución ($\pm 10$ min) alrededor de `centro_tiempo`, superponiendo marcas de eventos unificadas y franja predictiva. |
 | `gestionar_marca_tiempo(tiempo_click)` | Lógica | Inserta o elimina hasta 2 marcas temporales rojas sincronizándolas entre el sismograma 24h y el zoom. |
-| `guardar_marcas()` | Extracción Sísmica | Valida 2 marcas, extrae el `.sis`, actualiza catálogos diarios, fija `bandera='1'` en `caudales.csv`, refresca el diagnóstico y gráficos. |
+| `guardar_marcas()` | Extracción Sísmica | Valida 2 marcas, previene sobre-marcado mediante diálogo de reemplazo (<30 min) y corte de seguridad (<10 min), calcula caudal respecto al ciclo anterior real, actualiza catálogos y reordena `caudales.csv`. |
 | `graficar_caudales(silencioso)` | Visualización | Grafica los caudales confirmados (`bandera='1'`) en el periodo histórico con eje Y visible, unidades `Caudal (cm³/s)` y resalta en rojo la selección activa. |
 | `limpiar_graficos_sismograma(mensaje)` | Contención | Dibuja un mensaje limpio en los lienzos cuando un archivo MiniSEED no existe o falla su lectura. |
 | `abrir_dialogo_exportar_grafico()` | UI / Exportación | Despliega `DialogoExportarGraficoCaudales` para configurar el marco de caudales y exportar la serie en CAD DXF. |
@@ -113,8 +121,9 @@ Ubicado en `directorio_trabajo/caudales.csv` (por defecto `G:/Mi unidad/DIA/caud
 2. **Conversión de Zonas Horarias en Matplotlib**: Se utiliza `tzinfo=None` al convertir `mdates.num2date` para evitar inconsistencias de tiempo ingenuo (*naive*) vs consciente (*aware*) al interactuar con ObsPy `UTCDateTime`.
 3. **Inmutabilidad de Datos Históricos en `caudales.csv`**: Las filas ya existentes en `caudales.csv` son registros permanentes e inmutables; no se someten a recálculos automáticos al cargar la aplicación. Los nuevos caudales se computan exclusivamente para marcas nuevas respecto al último evento confirmado anterior.
 4. **Residente de Vigilancia (`vigilante_caudales.py`)**: Monitorea `caudales.csv` en segundo plano para notificar al usuario en Windows si transcurren más de $1.5 \times \Delta t$ sin bombeo o si no se ha revisado la aplicación hoy.
-5. **División Temporal Dinámica en DXF/Preview**: Los meses y sus límites se calculan estrictamente a partir del rango de fechas ingresado (`fecha_inicio` a `fecha_final`). Si el rango abarca meses parciales, los segmentos y etiquetas se centran proporcionalmente en la barra inferior.
-6. **Compatibilidad Estricta ODA / Vectorworks**: Para evitar el error de biblioteca `ODA Platform Error: Internal Error`, el exportador genera estándar R12 (`AC1009`) con sección `BLOCKS` explícita, secuencias `POLYLINE` + `VERTEX` + `SEQEND`, coordenadas tridimensionales en todas las entidades y caracteres ASCII limpios (ej. `cm3/s`), asegurando compatibilidad con Vectorworks, AutoCAD, Civil 3D y LibreCAD.
+5. **Prevención de Sobre-Marcado y Orden Cronológico**: Las marcas se validan contra un umbral de 30 minutos; si se detecta un pulso preexistente, se ofrece reemplazarlo calculando el caudal contra el ciclo previo real para evitar disparos numéricos. Todo guardado en `caudales.csv` pasa obligatoriamente por `ordenar_caudales()`.
+6. **División Temporal Dinámica en DXF/Preview**: Los meses y sus límites se calculan estrictamente a partir del rango de fechas ingresado (`fecha_inicio` a `fecha_final`). Si el rango abarca meses parciales, los segmentos y etiquetas se centran proporcionalmente en la barra inferior.
+7. **Compatibilidad Estricta ODA / Vectorworks**: Para evitar el error de biblioteca `ODA Platform Error: Internal Error`, el exportador genera estándar R12 (`AC1009`) con sección `BLOCKS` explícita, secuencias `POLYLINE` + `VERTEX` + `SEQEND`, coordenadas tridimensionales en todas las entidades y caracteres ASCII limpios (ej. `cm3/s`), asegurando compatibilidad con Vectorworks, AutoCAD, Civil 3D y LibreCAD.
 
 ---
 
@@ -130,6 +139,7 @@ Antes de validar cualquier modificación en `caudales_filtraciones.py`, verifica
 - [ ] Cambiar la fecha del sismograma o diezmado actualiza inmediatamente la traza 24h y el zoom.
 - [ ] Clic izquierdo en la serie superior sincroniza fecha, traza 24h y centra el zoom.
 - [ ] Clic derecho en la serie superior resalta el punto en rojo y el botón `🚫 Ignorar Punto Seleccionado` lo pasa a bandera 0.
+- [ ] El botón `🗑️ Borrar Marcas` despliega confirmación de decisión negativa (`No, salir sin borrar` preseleccionado) y permite limpiar marcas activas en pantalla o eliminar definitivamente registros seleccionados en `caudales.csv`.
 - [ ] Colocar 2 marcas con clic derecho en el zoom y pulsar `💾 Guardar marcas (.SIS)` extrae el evento, pone bandera 1 y mantiene intactos `xlim` y `ylim`.
 - [ ] El proceso residente `vigilante_caudales.py` se ejecuta en la bandeja del sistema emitiendo notificaciones según el estado del sistema.
 - [ ] Fechas sin MiniSEED no lanzan excepciones y muestran el aviso gris de ausencia de datos.

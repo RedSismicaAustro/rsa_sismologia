@@ -256,7 +256,7 @@ def archivos_fast(evento, dir_trabajo, usuario, retornar_validaciones=False, mod
     modo_minuto_fast:
         'real'      -> fuerza minuto exacto
         'siguiente' -> fuerza minuto + 1
-        'auto'      -> busca archivos existentes o usa ss>50 si no existen
+        'auto'      -> busca archivos existentes o usa ss>=50 si no existen
     """
     info = obtener_directorios(evento)
     dir_dia = os.path.join(dir_trabajo, info['Directorio_dia'])
@@ -376,10 +376,15 @@ def verificar_coincidencias(eventos, evento_procesar, rutas_fast):
         ss = int(base_evento[12:14])
 
     dt_evento = datetime(yy, mm, dd, hh, minu, ss)
-    if ss > 50:
+    if ss >= 50:
         dt_evento = dt_evento + timedelta(minutes=1)
 
     clave_minuto = dt_evento.strftime("%Y%m%d%H%M")
+    if rutas_fast and len(rutas_fast) > 2 and rutas_fast[2]:
+        stem_rsa = Path(rutas_fast[2]).stem.rstrip('abc')
+        if len(stem_rsa) >= 8 and stem_rsa[:8].isdigit():
+            mm_f, dd_f, hh_f, mi_f = int(stem_rsa[0:2]), int(stem_rsa[2:4]), int(stem_rsa[4:6]), int(stem_rsa[6:8])
+            clave_minuto = datetime(yy, mm_f, dd_f, hh_f, mi_f).strftime("%Y%m%d%H%M")
 
     for evento in eventos:
         tipo_evento = evento[2]
@@ -403,7 +408,7 @@ def verificar_coincidencias(eventos, evento_procesar, rutas_fast):
             ss_a = int(base_actual[12:14])
 
         dt_actual = datetime(yy_a, mm_a, dd_a, hh_a, minu_a, ss_a)
-        if ss_a > 50:
+        if ss_a >= 50:
             dt_actual = dt_actual + timedelta(minutes=1)
 
         clave_actual = dt_actual.strftime("%Y%m%d%H%M")
