@@ -58,7 +58,9 @@ graph TD
 |---|---|---|
 | `Extraer_evento` | `QWidget` | Panel de subprograma con controles de filtrado y corte a la izquierda y visor Matplotlib a la derecha. |
 | `cargar_eventos()` | Método | Carga la marca seleccionada en `cmbx_eventos`, invoca `copiar_stream_dia()` y grafica la ventana temporal. |
-| `guardar_evento()` | Método | Persiste el evento en disco, actualiza el catálogo auxiliar y blanquea el visor inmediatamente. |
+| `guardar_evento()` | Método | Persiste el evento en disco, actualiza el catálogo auxiliar, blanquea el visor y avanza automáticamente a la siguiente marca habilitada/pendiente. |
+| `buscar_siguiente_marca_pendiente()` | Método | Búsqueda bidireccional/circular del próximo evento no extraído (adelante y desde el inicio si hubo saltos manuales). |
+| `validar_periodo_evento()` | Método | Valida si la marca cae dentro de la franja horaria activa y habilita `Btn_eventos` con diálogo opcional. |
 | `copiar_stream_dia()` | Método | Duplica los streams de registro continuo para manipulación y filtrado interactivo. |
 | `visor_limpiar_completo()` | Método | Limpia los axes del objeto `Figure` sin romper el enlace con el canvas. |
 | `Salir_()` | Método | Solicita confirmación para extraer el día y cierra la interfaz. |
@@ -93,6 +95,7 @@ graph TD
 - [x] `Extraer_evento` hereda de `QWidget`.
 - [x] Delegación de controles mediante `__getattr__` hacia `self.ui`.
 - [x] Diálogos modales anclados a `self.window()`.
+- [x] Avance automático a siguiente marca pendiente sin omitir eventos previos salteados.
 - [x] `extraer_dia()` completa la extracción de 11+ eventos sin colisiones de memoria.
 - [x] Retorno LIFO a `VentanaPrincipal` exitoso en Estado B.
 

@@ -30,6 +30,7 @@ from rsa_pdf_catalogo import reporte_resumen_modos
 
 #from metodos_reportes_individuales import insertar_evento_otras_redes
 from PyQt5.QtWidgets import (QMessageBox,QDialog,QLabel,QCheckBox,QPushButton,QComboBox,QSpinBox,QTextEdit,QVBoxLayout,QWidget,QRadioButton)
+from PyQt5.QtGui import QColor, QBrush, QFont
 from PyQt5 import uic
 from datetime import datetime
 from PyQt5.QtCore import QDate
@@ -54,6 +55,46 @@ MODO_FACULTAD_RESUMEN         = 5   # M5 – Facultad resumen (Facultad/redes), 
 MODO_INSTITUCIONAL_DETALLADO  = 6   # M6 – Institucional detallado (solo catálogo), sin extras ni responsables
 MODO_INSTITUCIONAL_RESUMEN    = 7   # M7 – Institucional, sin detalle
 
+def evento_esta_procesado(self, nombre_evento):
+    """
+    Determina si un evento ya ha sido procesado exitosamente.
+    Revisa:
+    1. Si está presente en self.catalogo (localización calculada).
+    2. Si en self.eventos_reporte tiene datos válidos (no está como 'revisar').
+    3. Si existe su archivo de procesamiento *_proc.csv con intentos calculados.
+    """
+    base_nombre = Path(nombre_evento).name
+
+    # 1. Catálogo oficial cargado
+    if hasattr(self, 'catalogo') and self.catalogo:
+        for fila in self.catalogo:
+            if fila and len(fila) > 18 and fila[18] != 'ruta':
+                if Path(fila[18]).name == base_nombre:
+                    return True
+
+    # 2. Resumen de eventos_reporte
+    if hasattr(self, 'eventos_reporte') and self.eventos_reporte:
+        for fila in self.eventos_reporte:
+            if fila and len(fila) > 3:
+                if Path(fila[1]).name == base_nombre:
+                    if fila[3] != 'revisar' and fila[3] != '' and fila[3] != ' ':
+                        return True
+
+    # 3. Archivo *_proc.csv en disco
+    try:
+        dir_evento = os.path.join(self.directorio_trabajo, nombre_evento)
+        dirs = obtener_directorios(dir_evento)
+        arch_proc = dirs.get('archivo_procesamiento', '')
+        if arch_proc and os.path.exists(arch_proc):
+            contenido = lectura_archivo(arch_proc)
+            if contenido and len(contenido) > 2:
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
 def cargar_combo_eventos(self, text):
     self.sismos_procesar = []
     self.ui.cmbx_eventos.clear()
@@ -61,7 +102,16 @@ def cargar_combo_eventos(self, text):
         if text == 'TODOS' or self.eventos[i][2] == text:
             aux_sismo = (int(self.eventos[i][0]), self.eventos[i][1])  # aux_sismo tiene el numero de evento del csv y todo el registro
             self.sismos_procesar.append(aux_sismo)
+            idx = self.ui.cmbx_eventos.count()
             self.ui.cmbx_eventos.addItem(self.eventos[i][1])
+            if evento_esta_procesado(self, self.eventos[i][1]):
+                self.ui.cmbx_eventos.setItemData(idx, QBrush(QColor(200, 0, 0)), Qt.ForegroundRole)
+                font = QFont()
+                font.setBold(True)
+                self.ui.cmbx_eventos.setItemData(idx, font, Qt.FontRole)
+                self.ui.cmbx_eventos.setItemData(idx, "Evento ya procesado", Qt.ToolTipRole)
+            else:
+                self.ui.cmbx_eventos.setItemData(idx, "Evento pendiente de procesamiento", Qt.ToolTipRole)
     self.preparar_evento('')
 
 
@@ -356,6 +406,7 @@ class Procesar_evento(QWidget):
         self.actualizar_mapa(self.procesamiento)
 
 
+
     def _estaciones_devuelven_cambios(self, habilitados, filtros_nuevos):
         """
         estaciones_ envía estaciones habilitadas y nuevos filtros.
@@ -497,6 +548,14 @@ class Procesar_evento(QWidget):
             print("Error limpiando panel central:", e)
 
         try:
+            idx_actual = self.ui.cmbx_eventos.currentIndex()
+            if idx_actual >= 0 and self.evento_procesar and self.evento_procesar[2] == 'SISMO':
+                fuente_roja = QBrush(QColor(200, 0, 0))
+                self.ui.cmbx_eventos.setItemData(idx_actual, fuente_roja, Qt.ForegroundRole)
+                font = QFont()
+                font.setBold(True)
+                self.ui.cmbx_eventos.setItemData(idx_actual, font, Qt.FontRole)
+                self.ui.cmbx_eventos.setItemData(idx_actual, "Evento ya procesado", Qt.ToolTipRole)
             self.preparar_evento(self.ui.cmbx_eventos.currentText())
             print("Evento recargado.")
         except Exception as e:
@@ -584,6 +643,14 @@ class Procesar_evento(QWidget):
 
         # 7) Recargar evento
         try:
+            idx_actual = self.ui.cmbx_eventos.currentIndex()
+            if idx_actual >= 0 and self.evento_procesar and self.evento_procesar[2] == 'SISMO':
+                fuente_roja = QBrush(QColor(200, 0, 0))
+                self.ui.cmbx_eventos.setItemData(idx_actual, fuente_roja, Qt.ForegroundRole)
+                font = QFont()
+                font.setBold(True)
+                self.ui.cmbx_eventos.setItemData(idx_actual, font, Qt.FontRole)
+                self.ui.cmbx_eventos.setItemData(idx_actual, "Evento ya procesado", Qt.ToolTipRole)
             self.preparar_evento(self.ui.cmbx_eventos.currentText())
             print("Evento recargado.")
         except Exception as e:
@@ -659,6 +726,7 @@ class Procesar_evento(QWidget):
             # Insertar nuevamente el widget_mapa
             self.panel_derecho.layout().addWidget(self.widget_mapa)
             self.actualizar_mapa(self.procesamiento)
+
 
         else:  # "senales"
             # Crear visor para señales
@@ -972,6 +1040,16 @@ class Procesar_evento(QWidget):
         escritura_archivo(self.directorios['archivo_reporte'], self.eventos_reporte)
         escritura_archivo(self.directorios['archivo_catalogo'], self.catalogo)
 
+    def actualizar_estilo_combo_actual(self):
+        """Actualiza el color del texto del QComboBox según si el evento seleccionado está procesado"""
+        idx_actual = self.ui.cmbx_eventos.currentIndex()
+        if idx_actual >= 0:
+            color_item = self.ui.cmbx_eventos.itemData(idx_actual, Qt.ForegroundRole)
+            if color_item and isinstance(color_item, QBrush) and color_item.color() == QColor(200, 0, 0):
+                self.ui.cmbx_eventos.setStyleSheet("QComboBox { color: #C80000; font-weight: bold; }")
+            else:
+                self.ui.cmbx_eventos.setStyleSheet("")
+
     def preparar_evento(self, text):
         """
         Escoge el evento actual desde el combo y prepara estructuras internas
@@ -1031,6 +1109,8 @@ class Procesar_evento(QWidget):
         # Cada vez que se prepara evento, limpiar procesamiento actual y mapa
         self.procesamiento = []
         self.actualizar_mapa(self.procesamiento)
+
+        self.actualizar_estilo_combo_actual()
 
     def cambio_evento(self, text):
         """
@@ -1133,6 +1213,7 @@ class Procesar_evento(QWidget):
         # (2) ACTUALIZAR MAPA INMEDIATAMENTE (ANTES DE ACTIVAR HILO)
         # ==============================================================
         self.actualizar_mapa(self.procesamiento)
+
 
         # ==============================================================
         # (3) Manejo Virtual SOLO si es SISMO

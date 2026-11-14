@@ -162,13 +162,19 @@ class Extraer_evento(QWidget):
             self.grupo_carga.setEnabled(True)
             self.grupo_hora_especifica.setEnabled(True)
             self.grupo_evento.setEnabled(False)
-            self.Lbl_Mensajes.setText("Actual: Marca 1. ")               
+            primera_pendiente = self.buscar_siguiente_marca_pendiente(-1)
+            if primera_pendiente is not None:
+                self.cmbx_eventos.setCurrentIndex(primera_pendiente)
+                self.validar_periodo_evento(mostrar_dialogo=False)
+                self.Lbl_Mensajes.setText(f"Actual: Marca {primera_pendiente + 1}. ")
+            else:
+                self.Lbl_Mensajes.setText("Actual: Marca 1. ")               
         self.Lbl_Mensajes_2.setText(mensaje)
         self.lectura_mseed_dia = self.filtrar_streams_invalidos(leer_mseed(self.archivo, 0))
 
-    def cargar_lista_eventos(self):
+    def cargar_lista_eventos(self, nuevo_indice=None):
             from PyQt5 import QtCore
-            indice_actual = self.cmbx_eventos.currentIndex()
+            indice_actual = self.cmbx_eventos.currentIndex() if nuevo_indice is None else nuevo_indice
             self.cmbx_eventos.clear() 
             
             self.hora_sismos_extraidos = [
@@ -193,7 +199,32 @@ class Extraer_evento(QWidget):
                 if self.hora_sismos[i] in self.hora_sismos_extraidos:
                     self.cmbx_eventos.setItemData(i, False, QtCore.Qt.UserRole - 1)
            
-            self.cmbx_eventos.setCurrentIndex(indice_actual)
+            if 0 <= indice_actual < self.cmbx_eventos.count():
+                self.cmbx_eventos.setCurrentIndex(indice_actual)
+
+    def buscar_siguiente_marca_pendiente(self, indice_referencia):
+        """
+        Busca el siguiente evento no procesado (habilitado) en self.hora_sismos.
+        Primero busca hacia adelante desde indice_referencia + 1.
+        Si llega al final, busca desde el inicio (0 hasta indice_referencia)
+        para asegurar que no haya eventos salteados manualmente.
+        Retorna el índice entero si encuentra uno, o None si todos fueron extraídos.
+        """
+        if not hasattr(self, 'hora_sismos') or not self.hora_sismos:
+            return None
+
+        total_marcas = len(self.hora_sismos)
+        # 1. Búsqueda hacia adelante
+        for i in range(indice_referencia + 1, total_marcas):
+            if self.hora_sismos[i] not in self.hora_sismos_extraidos:
+                return i
+
+        # 2. Búsqueda desde el inicio (revisión de eventos salteados)
+        for i in range(0, indice_referencia):
+            if self.hora_sismos[i] not in self.hora_sismos_extraidos:
+                return i
+
+        return None
 
     def filtrar_streams_invalidos(self, lista_streams):
         """
@@ -281,11 +312,33 @@ class Extraer_evento(QWidget):
                 aporta="1"
             estacion=self.parametros['CODIGO'][indice]+self.parametros['COMPONENTE'][indice]+aporta+self.filtros_estaciones[i]+" "
             estaciones=estaciones+estacion
-        evento_auxiliar=(n_evento,nombre_sis,tipo_evento,ahora, self.t_inicio, self.t_final,self.responsable,estaciones,self.hora_sismos[self.cmbx_eventos.currentIndex()])
+        indice_guardado = self.cmbx_eventos.currentIndex()
+        evento_auxiliar = (n_evento, nombre_sis, tipo_evento, ahora, self.t_inicio, self.t_final, self.responsable, estaciones, self.hora_sismos[indice_guardado])
         self.eventos_auxiliar.append(evento_auxiliar)
-        escritura_archivo(self.directorios['archivo_auxiliar'],self.eventos_auxiliar)
-        self.cargar_lista_eventos()
-        self.Lbl_Mensajes_2.setText("Ultimo : Marca "+str(self.cmbx_eventos.currentIndex()+1))
+        escritura_archivo(self.directorios['archivo_auxiliar'], self.eventos_auxiliar)
+        self.cargar_lista_eventos(nuevo_indice=indice_guardado)
+
+        # Buscar siguiente marca no procesada (habilitada)
+        siguiente = self.buscar_siguiente_marca_pendiente(indice_guardado)
+        if siguiente is not None:
+            self.cmbx_eventos.setCurrentIndex(siguiente)
+            en_periodo = self.validar_periodo_evento(mostrar_dialogo=False)
+            if siguiente < indice_guardado:
+                self.Lbl_Mensajes.setText(f"Actual: Marca {siguiente + 1} (pendiente previa)")
+            else:
+                self.Lbl_Mensajes.setText(f"Actual: Marca {siguiente + 1}")
+            if not en_periodo:
+                self.Lbl_Mensajes.setText(self.Lbl_Mensajes.text() + f" [Fuera de turno {self.periodo}]")
+        else:
+            self.Btn_eventos.setEnabled(False)
+            self.Lbl_Mensajes.setText("¡Todas las marcas del día han sido extraídas!")
+            QMessageBox.information(
+                self.window(),
+                "Extracción Completa",
+                "Todas las marcas del día han sido extraídas exitosamente."
+            )
+
+        self.Lbl_Mensajes_2.setText(f"Ultimo : Marca {indice_guardado + 1}")
         self.grupo_evento.setEnabled(False)
     
     def lista_filtros(self, text):
@@ -356,25 +409,39 @@ class Extraer_evento(QWidget):
         grafico_evento_int(self.visor,self.trCanal,self.t_inicio,self.t_final,self.estaciones_eventos,self.hab_grafico,self.bandera_marcas,self.pagina)
         self.grupo_evento.setEnabled(True)       
     
-    def lista_eventos(self, text):
+    def validar_periodo_evento(self, mostrar_dialogo=True):
         periodo=[(0,120000),(120000,180000),(180000,240000)]
         diccionaio_periodo= {
             "00:00 - 12:00": 0,
             "12:00 - 18:00": 1,
             "18:00 - 24:00": 2
-            }
+        }
         self.grupo_evento.setEnabled(False)
-        #self.grupo_desplazar.setEnabled(False)
         hora_str=self.cmbx_eventos.currentText()[-8:]
-        var_tiempo=int(hora_str[:2]+hora_str[3:5]+hora_str[6:8])
+        try:
+            var_tiempo=int(hora_str[:2]+hora_str[3:5]+hora_str[6:8])
+        except (ValueError, IndexError):
+            self.Btn_eventos.setEnabled(False)
+            return False
+
+        if self.periodo not in diccionaio_periodo:
+            self.Btn_eventos.setEnabled(True)
+            return True
+
         index_periodo=diccionaio_periodo[self.periodo]
         minimo=periodo[index_periodo][0]
         maximo=periodo[index_periodo][1]
         if var_tiempo>minimo and var_tiempo<maximo:
             self.Btn_eventos.setEnabled(True)
+            return True
         else:
             self.Btn_eventos.setEnabled(False)
-            QMessageBox.information(self, 'Advertencia', 'Periodo incorrecto.')
+            if mostrar_dialogo:
+                QMessageBox.information(self, 'Advertencia', 'Periodo incorrecto.')
+            return False
+
+    def lista_eventos(self, text):
+        self.validar_periodo_evento(mostrar_dialogo=True)
 
     def cambio_pagina(self):
         self.copiar_stream_dia()

@@ -85,6 +85,8 @@ El módulo define y gestiona 7 modos de generación de catálogos y boletines PD
 | Método | Firma | Descripción |
 |---|---|---|
 | `Abrir_archivo()` | `()` | Carga el archivo base del día, inicializa combos de filtros, listas de eventos y parsea el catálogo existente. |
+| `evento_esta_procesado()` | `(nombre_evento)` | Verifica si un evento ya fue procesado consultando `self.catalogo`, `self.eventos_reporte` (sin estado `'revisar'`) y el archivo `*_proc.csv`. |
+| `actualizar_estilo_combo_actual()` | `()` | Aplica formato visual (color rojo `QColor(200, 0, 0)`, fuente negrita y tooltip) al ítem seleccionado en `cmbx_eventos` si ya está procesado. |
 | `preparar_evento()` | `(nombre_evento)` | Carga la traza MiniSEED del evento seleccionado, inicializa las fases sismológicas y actualiza el mapa GIS. |
 | `procesar_()` | `()` | Ejecuta el procesamiento de fases sísmicas y localización hipocentral mediante ProcesoV2 / SeisComP / FAST. |
 | `iniciar_monitor_virtual()` | `(archivos)` | Lanza el hilo `FileMonitorThread` para detectar la culminación de cálculos externos. |
@@ -110,8 +112,13 @@ El módulo define y gestiona 7 modos de generación de catálogos y boletines PD
 * `archivo_auxiliar` (`*_aux.csv`): Registro temporal de intentos de procesamiento y flags de revisión.
 * `archivo_reporte` (`Reporte_*.pdf`): Documentos PDF oficiales generados por ReportLab con gráficos de fases e intensidades.
 
-### 5.3. Filtrado Dinámico de Eventos en GUI
+### 5.3. Filtrado Dinámico y Marcado Visual de Eventos en GUI
 * `cargar_combo_eventos(self, text)`: Soporta filtrado selectivo por clasificación (`SISMO`, `FF`, `FC`, `INDEFINIDO`, etc.) y el modo global `'TODOS'`, que lista todos los eventos registrados del día sin importar su categoría.
+* **Marcado en Rojo de Eventos Procesados**: Al poblar `cmbx_eventos`, cada evento se evalúa con `evento_esta_procesado()`. Si ya fue procesado, se le asigna:
+  - Texto en color rojo (`Qt.ForegroundRole` con `QBrush(QColor(200, 0, 0))`).
+  - Peso tipográfico en negrita (`Qt.FontRole` con `QFont.Bold`).
+  - Tooltip informativo: `"Evento ya procesado"`.
+* **Actualización Dinámica**: Al concluir el cálculo y guardado en `_estaciones_cerraron`, el ítem recién procesado se actualiza de inmediato al formato rojo sin necesidad de recargar la lista completa.
 
 ---
 
@@ -123,5 +130,9 @@ El módulo define y gestiona 7 modos de generación de catálogos y boletines PD
    * `estaciones_` y `widget_mapa` residen en los paneles central y derecho. `limpiar_panel_central()` y `limpiar_estado()` deben invocarse en `closeEvent` para evitar violaciones de acceso en Qt.
 3. **Persistencia Atómica del Catálogo**:
    * Las operaciones sobre el catálogo deben ejecutar `ordenar_y_eliminar_duplicados()` antes de invocar `escritura_archivo()` para preservar la integridad cronológica.
-4. **Navegación LIFO**:
+4. **Sincronización de Umbral $\ge 50$ Segundos (FastHypo)**:
+   * FastHypo redondea al minuto superior cuando los segundos son $\ge 50$. El monitoreo en `activar_hilo` y las validaciones de coincidencia en `rsa_procesamiento.py` deben verificar de forma dual tanto el minuto nominal como el minuto subsiguiente ante eventos en `ss >= 50` para evitar archivos huérfanos.
+5. **Múltiples Eventos en el Mismo Minuto en Reportes PDF**:
+   * Cuando existen múltiples sismos dentro del mismo minuto (mismo prefijo de minuto pero diferente `.sis`), la búsqueda de fases en el XML de catálogo debe realizarse por el nombre único del archivo de traza `<ruta>` en lugar de por `<id_evento>`, y se debe validar `len(stream) > 0` antes de indexar canales en `rsa_pdf_graficos.py`.
+6. **Navegación LIFO**:
    * El retorno a la ventana principal se rige exclusivamente por `self.cerrado.emit()` en `closeEvent()`.
